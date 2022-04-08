@@ -4,12 +4,12 @@ import datetime
 import parsl
 from parsl import python_app
 
-def main():
-    '''Main program to execute all stats.'''
+def run_pdg_workflow():
+    '''Main workflow to execute all stats.'''
 
     parsl.set_stream_logger()
     #from parslexec import local_exec
-    from parslexec import htex_kube
+    from pdg_workflow.parslexec import htex_kube
     #parsl.load(local_exec)
     parsl.load(htex_kube)
 
@@ -35,5 +35,5 @@ def calc_stat_lat(year, lat):
 
 
 if __name__ == "__main__":
-    main()
+    run_pdg_workflow()
 
