@@ -8,6 +8,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+env/
 build/
 develop-eggs/
 dist/
@@ -130,3 +131,7 @@ dmypy.json
 
 # VS Code stuff
 *.code-workspace
+
+# IDE settings
+.vscode/
+.idea/
