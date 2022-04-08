@@ -43,7 +43,7 @@ setup(
     packages=find_packages(include=['pdg_workflow', 'pdg_workflow.*']),
     test_suite='tests',
     tests_require=test_requirements,
-    url='https://github.com/mbjones/pdg_workflow',
+    url='https://github.com/PermafrostDiscoveryGateway/viz-workflow',
     version='0.1.0',
     zip_safe=False,
 )
