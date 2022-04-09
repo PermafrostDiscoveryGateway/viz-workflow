@@ -10,7 +10,11 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['Click>=7.0', ]
+requirements = [
+    'Click>=7.0', 
+    'parsl>=1.2.0',
+    'kubernetes>=21.7.0'
+]
 
 test_requirements = ['pytest>=3', ]
 
@@ -27,6 +31,7 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
     ],
     description="PDG Visualization workflow using Parsl.",
     entry_points={

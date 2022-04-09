@@ -1,3 +1,4 @@
+import parsl
 from parsl.config import Config
 from parsl.channels import LocalChannel
 from parsl.executors import HighThroughputExecutor
@@ -39,7 +40,7 @@ htex_kube = Config(
             address='192.168.0.103',
             #address_probe_timeout=3600,
             worker_debug=True,
-            provider=KubernetesProvider(
+            provider=parsl.providers.KubernetesProvider(
                 namespace="test",
 
                 # Docker image url to use for pods
