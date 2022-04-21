@@ -153,11 +153,12 @@ class RasterTiler():
 
                 # Check if deduplication should be performed first
                 gdf = gpd.read_file(path)
-                if self.config.deduplicate_at('raster'):
-                    dedup = pdgstaging.deduplicate(
-                        gdf, **self.config.get_deduplication_config())
+                dedup_here = self.config.deduplicate_at('raster')
+                dedup_method = self.config.get_deduplication_method()
+                if dedup_here and (dedup_method is not None):
+                    dedup_config = self.config.get_deduplication_config(gdf)
+                    dedup = dedup_method(gdf, **dedup_config)
                     gdf = dedup['keep']
-
                 raster = Raster.from_vector(
                     vector=gdf,
                     centroid_properties=centroid_properties,
@@ -342,7 +343,6 @@ class RasterTiler():
                     'webtiles_from_geotiffs',
                     message=f'Creating web tile {tile} from {gt_path}.')
 
-                # single band example
                 for i in range(len(stats)):
                     stat = stats[i]
                     palette = palettes[i]
