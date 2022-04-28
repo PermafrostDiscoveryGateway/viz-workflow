@@ -117,7 +117,6 @@ def run_pdg_workflow(
 
     # Get all paths to input files and create batches of paths
     input_paths = stager.tiles.get_filenames_from_dir('input')
-    input_paths = input_paths[:3]  # TODO: remove this line
     input_batches = make_batch(input_paths, batch_size_staging)
 
     start_time = datetime.now()
