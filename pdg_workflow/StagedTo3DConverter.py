@@ -150,7 +150,7 @@ class StagedTo3DConverter():
             # Add the path to the list
             json_paths.append(json_path)
 
-        Cesium3DTileset.create_parent_json(
+        Cesium3DTileset().create_parent_json(
             json_paths=json_paths,
             save_to=dir3d,
             save_as='tileset',
