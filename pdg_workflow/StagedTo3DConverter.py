@@ -73,47 +73,69 @@ class StagedTo3DConverter():
         self,
         path
     ):
-        # Get information about the tile from the path
-        tile = self.tiles.tile_from_path(path)
-        out_path = self.tiles.path_from_tile(tile, '3dtiles')
 
-        # Get the filename of the tile WITHOUT the extension
-        tile_filename = os.path.splitext(os.path.basename(out_path))[0]
-        # Get the base of the path, without the filename
-        tile_dir = os.path.dirname(out_path) + os.path.sep
+        try:
 
-        # Log the event
-        logger.info(
-            f'Creating 3dtile from {path} for tile {tile} to {out_path}.')
+            # Read in the staged vector tile
+            gdf = gpd.read_file(path)
 
-        # Read in the staged vector tile
-        gdf = gpd.read_file(path)
+            # Check if the gdf is empty
+            if len(gdf) == 0:
+                logger.warning(
+                    f'Vector tile {path} is empty. 3D tile will not be'
+                    ' created.')
+                return
 
-        # Remove polygons with centroids that are outside the tile boundary
-        prop_cent_in_tile = self.config.polygon_prop('centroid_within_tile')
-        gdf = gdf[gdf[prop_cent_in_tile]]
+            # Get information about the tile from the path
+            tile = self.tiles.tile_from_path(path)
+            out_path = self.tiles.path_from_tile(tile, '3dtiles')
 
-        # Check if deduplication should be performed
-        dedup_here = self.config.deduplicate_at('3dtiles')
-        dedup_method = self.config.get_deduplication_method()
+            # Get the filename of the tile WITHOUT the extension
+            tile_filename = os.path.splitext(os.path.basename(out_path))[0]
+            # Get the base of the path, without the filename
+            tile_dir = os.path.dirname(out_path) + os.path.sep
 
-        # Deduplicate if required
-        if dedup_here and (dedup_method is not None):
-            dedup_config = self.config.get_deduplication_config(gdf)
-            dedup = dedup_method(gdf, **dedup_config)
-            gdf = dedup['keep']
+            # Log the event
+            logger.info(
+                f'Creating 3D Tile from {path} for tile {tile} to {out_path}.')
 
-        # Create & save the b3dm file
-        tile3d = Cesium3DTile()
-        tile3d.set_save_to_path(tile_dir)
-        tile3d.set_b3dm_name(tile_filename)
-        tile3d.from_geodataframe(gdf)
+            # Remove polygons with centroids that are outside the tile boundary
+            prop_cent_in_tile = self.config.polygon_prop(
+                'centroid_within_tile')
+            gdf = gdf[gdf[prop_cent_in_tile]]
 
-        # Create & save the tileset json
-        tileset = Cesium3DTileset(tiles=[tile3d])
-        tileset.set_save_to_path(tile_dir)
-        tileset.set_json_filename(tile_filename)
-        tileset.write_file()
+            # Check if deduplication should be performed
+            dedup_here = self.config.deduplicate_at('3dtiles')
+            dedup_method = self.config.get_deduplication_method()
+
+            # Deduplicate if required
+            if dedup_here and (dedup_method is not None):
+                dedup_config = self.config.get_deduplication_config(gdf)
+                dedup = dedup_method(gdf, **dedup_config)
+                gdf = dedup['keep']
+
+                # The tile could theoretically be empty after deduplication
+                if len(gdf) == 0:
+                    logger.warning(
+                        f'Vector tile {path} is empty after deduplication.'
+                        ' 3D Tile will not be created.')
+                    return
+
+            # Create & save the b3dm file
+            tile3d = Cesium3DTile()
+            tile3d.set_save_to_path(tile_dir)
+            tile3d.set_b3dm_name(tile_filename)
+            tile3d.from_geodataframe(gdf)
+
+            # Create & save the tileset json
+            tileset = Cesium3DTileset(tiles=[tile3d])
+            tileset.set_save_to_path(tile_dir)
+            tileset.set_json_filename(tile_filename)
+            tileset.write_file()
+
+        except Exception as e:
+            logger.error(f'Error creating 3D Tile from {path}.')
+            logger.error(e)
 
     def create_parent_json(self, remove_children=True):
         """
