@@ -18,6 +18,10 @@ from kubernetes import client, config
 
 import pdgraster
 import pdgstaging
+from StagedTo3DConverter import StagedTo3DConverter
+
+from shapely.geometry import box
+import geopandas as gpd
 
 
 def init_parsl():
@@ -73,8 +77,10 @@ def run_pdg_workflow(
     logging_dict=None,
     batch_size_staging=1,
     batch_size_rasterization=30,
+    batch_size_3dtiles=20,
+    batch_size_parent_3dtiles=500,
     batch_size_geotiffs=200,
-    batch_size_web_tiles=200,
+    batch_size_web_tiles=200
 ):
     """
     Run the main PDG workflow
@@ -100,6 +106,7 @@ def run_pdg_workflow(
     """
 
     stager = pdgstaging.TileStager(workflow_config)
+    tiles3dmaker = StagedTo3DConverter(workflow_config)
     rasterizer = pdgraster.RasterTiler(workflow_config)
     tile_manager = stager.tiles
     config_manager = stager.config
@@ -215,6 +222,87 @@ def run_pdg_workflow(
     logging.info(f'⏰ Total time to create web tiles: '
                  f'{end_time - start_time}')
 
+    # =================================================================================
+    # STEP 5: Deduplicate & make leaf 3D tiles all staged tiles (only highest
+    # z-level).
+    # TODO: COMBINE WITH STEP 2, so we only read in and deduplicate
+    # each staged file once.
+
+    # Get paths to all the newly staged tiles
+    staged_paths = stager.tiles.get_filenames_from_dir('staged')
+    staged_batches = make_batch(staged_paths, batch_size_3dtiles)
+
+    start_time = datetime.now()
+
+    app_futures = []
+    for batch in staged_batches:
+        app_future = create_leaf_3dtiles(batch, workflow_config, logging_dict)
+        app_futures.append(app_future)
+
+    # Don't continue to step 6 until all max-zoom level 3d tilesets have been
+    # created
+    [a.result() for a in app_futures]
+
+    end_time = datetime.now()
+    logging.info(f'⏰ Total time to create {len(staged_paths)} 3d tiles: '
+                 f'{end_time - start_time}')
+
+    # =================================================================================
+    # STEP 6: Create parent cesium 3d tilesets for all z-levels (except highest)
+    # TODO: COMBINE WITH STEP 3
+
+    start_time = datetime.now()
+
+    # For tiles in max-z-level, get the total bounds for all the tiles. We will
+    # limit parent tileset bounding volumes to this total bounds.
+    # convert the paths to tiles
+    max_z_tiles = [tile_manager.tile_from_path(path) for path in staged_paths]
+    # get the total bounds for all the tiles
+    max_z_bounds = [tile_manager.get_bounding_box(
+        tile) for tile in max_z_tiles]
+    # get the total bounds for all the tiles
+    polygons = [box(bounds['left'],
+                    bounds['bottom'],
+                    bounds['right'],
+                    bounds['top']) for bounds in max_z_bounds]
+    max_z_bounds = gpd.GeoSeries(polygons, crs=tile_manager.tms.crs)
+
+    bound_volume_limit = max_z_bounds.total_bounds
+
+    # Can't start lower z-level until higher z-level is complete.
+    for z in parent_zs:
+
+        # Determine which tiles we need to make for the next z-level based on the
+        # path names of the files just created
+        all_child_paths = tiles3dmaker.tiles.get_filenames_from_dir(
+            '3dtiles', z=z + 1)
+        parent_tiles = set()
+        for child_path in all_child_paths:
+            parent_tile = tile_manager.get_parent_tile(child_path)
+            parent_tiles.add(parent_tile)
+        parent_tiles = list(parent_tiles)
+
+        # Break all parent tiles at level z into batches
+        parent_tile_batches = make_batch(
+            parent_tiles, batch_size_parent_3dtiles)
+
+        # Make the next level of parent tiles
+        app_futures = []
+        for parent_tile_batch in parent_tile_batches:
+            app_future = create_parent_3dtiles(
+                parent_tile_batch,
+                workflow_config,
+                bound_volume_limit,
+                logging_dict)
+            app_futures.append(app_future)
+
+        # Don't start the next z-level until the current z-level is complete
+        [a.result() for a in app_futures]
+
+    end_time = datetime.now()
+    logging.info(f'⏰ Total time to create parent 3d tiles: '
+                 f'{end_time - start_time}')
+
     # ================================================================
     # End the workflow
 
@@ -264,6 +352,37 @@ def create_composite_geotiffs(tiles, config, logging_dict=None):
         logging.config.dictConfig(logging_dict)
     rasterizer = pdgraster.RasterTiler(config)
     return rasterizer.parent_geotiffs_from_children(tiles, recursive=False)
+
+
+@python_app
+def create_leaf_3dtiles(staged_paths, config, logging_dict=None):
+    """
+    Create a batch of leaf 3d tiles from staged vector tiles
+    """
+    from pdg_workflow import StagedTo3DConverter
+    if logging_dict:
+        import logging.config
+        logging.config.dictConfig(logging_dict)
+    converter3d = StagedTo3DConverter(config)
+    tilesets = []
+    for path in staged_paths:
+        ces_tile, ces_tileset = converter3d.staged_to_3dtile(path)
+        tilesets.append(ces_tileset)
+    return tilesets
+
+
+@python_app
+def create_parent_3dtiles(tiles, config, limit_bv_to=None, logging_dict=None):
+    """
+    Create a batch of cesium 3d tileset parent files that point to child
+    tilesets
+    """
+    from pdg_workflow import StagedTo3DConverter
+    if logging_dict:
+        import logging.config
+        logging.config.dictConfig(logging_dict)
+    converter3d = StagedTo3DConverter(config)
+    return converter3d.parent_3dtiles_from_children(tiles, limit_bv_to)
 
 
 # Create a batch of webtiles from geotiffs (step 4)

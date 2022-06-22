@@ -1,11 +1,11 @@
-
 import logging
 import os
 
 import geopandas as gpd
+from shapely.geometry import box
 
 import pdgstaging
-from viz_3dtiles import Cesium3DTile, Cesium3DTileset
+from viz_3dtiles import TreeGenerator, BoundingVolumeRegion
 
 
 logger = logging.getLogger(__name__)
@@ -40,24 +40,15 @@ class StagedTo3DConverter():
 
         # For now, manually add directory for the 3D tiles. We should add this
         # to the ConfigManager & TilePathManager class
-        b3dm_ext = Cesium3DTile.FILE_EXT
-        b3dm_dir = self.config.get('dir_3dtiles')
-        self.tiles.add_base_dir('3dtiles', dir_path=b3dm_dir, ext=b3dm_ext)
+        c3dt_ext = '.json'
+        c3dt_dir = self.config.get('dir_3dtiles')
+        self.tiles.add_base_dir('3dtiles', dir_path=c3dt_dir, ext=c3dt_ext)
 
     def all_staged_to_3dtiles(
-        self,
-        parent_json=False
+        self
     ):
         """
             Process all staged vector tiles into 3D tiles.
-
-            Parameters
-            ----------
-
-            parent_json : bool
-                If True, then a single parent tileset.json file will be created
-                that encompasses all the 3D Tiles created. The children json
-                files will subsequently be removed.
         """
 
         # Get the list of staged vector tiles
@@ -66,15 +57,38 @@ class StagedTo3DConverter():
         for path in paths:
             self.staged_to_3dtile(path)
 
-        if parent_json:
-            self.create_parent_json()
+    def staged_to_3dtile(self, path):
+        """
+            Convert a staged vector tile into a B3DM tile file and a matching JSON
+            tileset file.
 
-    def staged_to_3dtile(
-        self,
-        path
-    ):
+            Parameters
+            ----------
+            path : str
+                The path to the staged vector tile.
+
+            Returns
+            -------
+            tile, tileset : Cesium3DTile, Tileset
+                The Cesium3DTiles and Cesium3DTileset objects
+        """
 
         try:
+
+            # Get information about the tile from the path
+            tile = self.tiles.tile_from_path(path)
+            out_path = self.tiles.path_from_tile(tile, '3dtiles')
+
+            tile_bv = self.bounding_region_for_tile(tile)
+
+            # Get the filename of the tile WITHOUT the extension
+            tile_filename = os.path.splitext(os.path.basename(out_path))[0]
+            # Get the base of the path, without the filename
+            tile_dir = os.path.dirname(out_path) + os.path.sep
+
+            # Log the event
+            logger.info(
+                f'Creating 3dtile from {path} for tile {tile} to {out_path}.')
 
             # Read in the staged vector tile
             gdf = gpd.read_file(path)
@@ -85,19 +99,6 @@ class StagedTo3DConverter():
                     f'Vector tile {path} is empty. 3D tile will not be'
                     ' created.')
                 return
-
-            # Get information about the tile from the path
-            tile = self.tiles.tile_from_path(path)
-            out_path = self.tiles.path_from_tile(tile, '3dtiles')
-
-            # Get the filename of the tile WITHOUT the extension
-            tile_filename = os.path.splitext(os.path.basename(out_path))[0]
-            # Get the base of the path, without the filename
-            tile_dir = os.path.dirname(out_path) + os.path.sep
-
-            # Log the event
-            logger.info(
-                f'Creating 3D Tile from {path} for tile {tile} to {out_path}.')
 
             # Remove polygons with centroids that are outside the tile boundary
             prop_cent_in_tile = self.config.polygon_prop(
@@ -122,59 +123,101 @@ class StagedTo3DConverter():
                     return
 
             # Create & save the b3dm file
-            tile3d = Cesium3DTile()
-            tile3d.set_save_to_path(tile_dir)
-            tile3d.set_b3dm_name(tile_filename)
-            tile3d.from_geodataframe(gdf)
+            ces_tile, ces_tileset = TreeGenerator.leaf_tile_from_gdf(
+                gdf,
+                dir=tile_dir,
+                filename=tile_filename,
+                geometricError=self.config.get('geometricError'),
+                tilesetVersion=self.config.get('version'),
+                boundingVolume=tile_bv
+            )
 
-            # Create & save the tileset json
-            tileset = Cesium3DTileset(tiles=[tile3d])
-            tileset.set_save_to_path(tile_dir)
-            tileset.set_json_filename(tile_filename)
-            tileset.write_file()
+            return ces_tile, ces_tileset
 
         except Exception as e:
             logger.error(f'Error creating 3D Tile from {path}.')
             logger.error(e)
 
-    def create_parent_json(self, remove_children=True):
+    def parent_3dtiles_from_children(self, tiles, bv_limit=None):
         """
-            Merge all the tileset json files into one main tileset.json file.
+            Create parent Cesium 3D Tileset json files that point to 
+            of child JSON files in the tile tree hierarchy.
 
             Parameters
             ----------
-
-            remove_children : bool
-                If True, then the children json files will be removed after
-                they are merged into the parent.
+            tiles : list of morecantile.Tile
+                The list of tiles to create parent tiles for.
         """
 
-        # Get the list of b3dm files
-        b3dms = self.tiles.get_filenames_from_dir('3dtiles')
+        tile_manager = self.tiles
+        config_manager = self.config
 
-        # Extensions will be used to find the json file associated with each
-        # b3dm file
-        b3dm_ext = Cesium3DTile.FILE_EXT
-        json_ext = '.' + Cesium3DTileset.FILE_EXT
+        tileset_objs = []
 
-        # Get the base directory where the 3D tiles are stored. The
-        # tileset.json should be saved at the root of this directory
-        dir3d = self.tiles.get_base_dir('3dtiles')['path']
+        # Make the next level of parent tiles
+        for parent_tile in tiles:
+            # Get the path to the parent tile
+            parent_path = tile_manager.path_from_tile(parent_tile, '3dtiles')
+            # Get just the base dir without the filename
+            parent_dir = os.path.dirname(parent_path)
+            # Get the filename of the parent tile, without the extension
+            parent_filename = os.path.basename(parent_path)
+            parent_filename = os.path.splitext(parent_filename)[0]
+            # Get the children paths for this parent tile
+            child_paths = tile_manager.get_child_paths(parent_tile, '3dtiles')
+            # Remove paths that do not exist
+            child_paths = tile_manager.remove_nonexistent_paths(child_paths)
+            # Get the parent bounding volume
+            parent_bv = self.bounding_region_for_tile(parent_tile, limit_to=bv_limit)
+            # If the bounding region is outside t
+            # Get the version
+            version = config_manager.get('version')
+            # Get the geometric error
+            geometric_error = config_manager.get('geometricError')
+            # Create the parent tile
+            tileset_obj = TreeGenerator.parent_tile_from_children_json(
+                child_paths,
+                dir=parent_dir,
+                filename=parent_filename,
+                geometricError=geometric_error,
+                tilesetVersion=version,
+                boundingVolume=parent_bv
+            )
+            tileset_objs.append(tileset_obj)
+        
+        return tileset_objs
 
-        json_paths = []
+    def bounding_region_for_tile(self, tile, limit_to=None):
+        """
+        For a morecantile.Tile object, return a BoundingVolumeRegion object
+        that represents the bounding region of the tile.
 
-        # Check that all the JSON files exist
-        for b3dm in b3dms:
-            # Get the JSON path
-            json_path = b3dm.replace(b3dm_ext, json_ext)
-            if not os.path.isfile(json_path):
-                raise ValueError(f'JSON file {json_path} does not exist')
-            # Add the path to the list
-            json_paths.append(json_path)
+        Parameters
+        ----------
+        tile : morecantile.Tile
+            The tile object.
+        limit_to : list of float
+            Optional list of west, south, east, north coordinates to limit
+            the bounding region to.
 
-        Cesium3DTileset().create_parent_json(
-            json_paths=json_paths,
-            save_to=dir3d,
-            save_as='tileset',
-            remove_children=remove_children
-        )
+        Returns
+        -------
+        bv : BoundingVolumeRegion
+            The bounding region object.
+        """
+        tms = self.tiles.tms
+        bounds = tms.bounds(tile)
+        bounds = gpd.GeoSeries(
+            box(bounds.left, bounds.bottom, bounds.right, bounds.top), crs=tms.crs)
+        if limit_to is not None:
+            bounds_limitor = gpd.GeoSeries(
+                box(limit_to[0], limit_to[1], limit_to[2], limit_to[3]), crs=tms.crs)
+            bounds = bounds.intersection(bounds_limitor)
+        bounds = bounds.to_crs(BoundingVolumeRegion.CESIUM_EPSG)
+        bounds = bounds.total_bounds
+
+        region_bv = {
+            'west': bounds[0], 'south': bounds[1],
+            'east': bounds[2], 'north': bounds[3],
+        }
+        return region_bv
