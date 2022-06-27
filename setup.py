@@ -13,7 +13,10 @@ with open('HISTORY.rst') as history_file:
 requirements = [
     'Click>=7.0', 
     'parsl>=1.2.0',
-    'kubernetes>=21.7.0'
+    'kubernetes>=21.7.0',
+    'viz_3dtiles @ git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git@feature-#9-tileset-tree#egg=viz_3dtiles',
+    'pdgstaging @ git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git@develop#egg=pdgstaging',
+    'pdgraster @ git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git@develop#egg=pdgraster',
 ]
 
 test_requirements = ['pytest>=3', ]
