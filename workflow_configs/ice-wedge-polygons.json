@@ -1,0 +1,40 @@
+{
+  "dir_input": "INPUT_SHAPEFILES",
+  "dir_footprints": "INPUT_FOOTPRINTS",
+  "dir_geotiff": "OUTPUT_GEOTIFFS",
+  "dir_web_tiles": "OUTPUT_WEBTILE",
+  "dir_staged": "OUTPUT_STAGING_TILES",
+  "filename_staging_summary": "RECORDS_DIR/staging_summary.csv",
+  "filename_rasterization_events": "RECORDS_DIR/raster_events.csv",
+  "filename_rasters_summary": "RECORDS_DIR/raster_summary.csv",
+  "version": "DATE",
+  "ext_input": ".shp",
+  "simplify_tolerance": 0.1,
+  "tms_id": "WorldCRS84Quad",
+  "z_range": [0, 16],
+  "geometricError": 57,
+  "z_coord": 0,
+  "statistics": [
+      {
+          "name": "iwp_count",
+          "weight_by": "count",
+          "property": "centroids_per_pixel",
+          "aggregation_method": "sum",
+          "resampling_method": "sum",
+          "val_range": [0, null],
+          "palette": ["rgb(102 51 153 / 0.0)", "#d93fce", "lch(85% 100 85)"]
+      },
+      {
+          "name": "iwp_coverage",
+          "weight_by": "area",
+          "property": "area_per_pixel_area",
+          "aggregation_method": "sum",
+          "resampling_method": "average",
+          "val_range": [0, 1],
+          "palette": ["rgb(102 51 153 / 0.0)", "lch(85% 100 85)"]
+      }
+  ],
+  "deduplicate_at": ["raster", "3dtiles"],
+  "deduplicate_method": "footprints",
+  "deduplicate_keep_rules": [["Date", "larger"]]
+}
