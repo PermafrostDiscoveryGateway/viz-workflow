@@ -38,12 +38,6 @@ class StagedTo3DConverter():
         self.tiles = pdgstaging.TilePathManager(
             **self.config.get_path_manager_config())
 
-        # For now, manually add directory for the 3D tiles. We should add this
-        # to the ConfigManager & TilePathManager class
-        c3dt_ext = '.json'
-        c3dt_dir = self.config.get('dir_3dtiles')
-        self.tiles.add_base_dir('3dtiles', dir_path=c3dt_dir, ext=c3dt_ext)
-
     def all_staged_to_3dtiles(
         self
     ):
