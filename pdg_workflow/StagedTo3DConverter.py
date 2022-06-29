@@ -59,8 +59,8 @@ class StagedTo3DConverter():
 
     def staged_to_3dtile(self, path):
         """
-            Convert a staged vector tile into a B3DM tile file and a matching JSON
-            tileset file.
+            Convert a staged vector tile into a B3DM tile file and a matching
+            JSON tileset file.
 
             Parameters
             ----------
@@ -127,6 +127,7 @@ class StagedTo3DConverter():
                 gdf,
                 dir=tile_dir,
                 filename=tile_filename,
+                z=self.config.get('z_coord'),
                 geometricError=self.config.get('geometricError'),
                 tilesetVersion=self.config.get('version'),
                 boundingVolume=tile_bv
@@ -140,7 +141,7 @@ class StagedTo3DConverter():
 
     def parent_3dtiles_from_children(self, tiles, bv_limit=None):
         """
-            Create parent Cesium 3D Tileset json files that point to 
+            Create parent Cesium 3D Tileset json files that point to
             of child JSON files in the tile tree hierarchy.
 
             Parameters
@@ -168,7 +169,8 @@ class StagedTo3DConverter():
             # Remove paths that do not exist
             child_paths = tile_manager.remove_nonexistent_paths(child_paths)
             # Get the parent bounding volume
-            parent_bv = self.bounding_region_for_tile(parent_tile, limit_to=bv_limit)
+            parent_bv = self.bounding_region_for_tile(
+                parent_tile, limit_to=bv_limit)
             # If the bounding region is outside t
             # Get the version
             version = config_manager.get('version')
@@ -184,7 +186,7 @@ class StagedTo3DConverter():
                 boundingVolume=parent_bv
             )
             tileset_objs.append(tileset_obj)
-        
+
         return tileset_objs
 
     def bounding_region_for_tile(self, tile, limit_to=None):
@@ -208,10 +210,12 @@ class StagedTo3DConverter():
         tms = self.tiles.tms
         bounds = tms.bounds(tile)
         bounds = gpd.GeoSeries(
-            box(bounds.left, bounds.bottom, bounds.right, bounds.top), crs=tms.crs)
+            box(bounds.left, bounds.bottom, bounds.right, bounds.top),
+            crs=tms.crs)
         if limit_to is not None:
             bounds_limitor = gpd.GeoSeries(
-                box(limit_to[0], limit_to[1], limit_to[2], limit_to[3]), crs=tms.crs)
+                box(limit_to[0], limit_to[1], limit_to[2], limit_to[3]),
+                crs=tms.crs)
             bounds = bounds.intersection(bounds_limitor)
         bounds = bounds.to_crs(BoundingVolumeRegion.CESIUM_EPSG)
         bounds = bounds.total_bounds
