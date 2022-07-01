@@ -20,12 +20,12 @@ import viz_3dtiles  # import Cesium3DTile, Cesium3DTileset
 #######################
 #### Change me 😁  ####
 #######################
-RAY_ADDRESS       = 'ray://172.28.23.105:10001'  # SET ME!! Use output from `$ ray start --head --port=6379 --dashboard-port=8265`
+RAY_ADDRESS       = 'ray://172.28.23.109:10001'  # SET ME!! Use output from `$ ray start --head --port=6379 --dashboard-port=8265`
 
 # ALWAYS include the tailing slash "/"
 BASE_DIR_OF_INPUT = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/'   # The output data of MAPLE. Which is the input data for STAGING.
 FOOTPRINTS_PATH   = BASE_DIR_OF_INPUT + 'footprints/'
-OUTPUT            = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/monday_v1/'       # Dir for results. High I/O is good.
+OUTPUT            = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/monday_v3/'       # Dir for results. High I/O is good.
 # BASE_DIR_OF_INPUT = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs'                  # The output data of MAPLE. Which is the input data for STAGING.
 # OUTPUT            = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output'       # Dir for results. High I/O is good.
 OUTPUT_OF_STAGING = OUTPUT + 'staged/'              # Output dirs for each sub-step
@@ -34,8 +34,8 @@ WEBTILE_PATH      = OUTPUT + 'web_tiles/'
 THREE_D_PATH      = OUTPUT + '3d_tiles/'
 
 # Convenience for little test runs. Change me 😁  
-ONLY_SMALL_TEST_RUN = False                          # For testing, this ensures only a small handful of files are processed.
-TEST_RUN_SIZE       = 3_000                              # Number of files to pre processed during testing (only effects testing)
+ONLY_SMALL_TEST_RUN = True                          # For testing, this ensures only a small handful of files are processed.
+TEST_RUN_SIZE       = 800                              # Number of files to pre processed during testing (only effects testing)
 ##############################
 #### END OF Change me 😁  ####
 ##############################
@@ -43,10 +43,11 @@ TEST_RUN_SIZE       = 3_000                              # Number of files to pr
 ##################################
 #### ⛔️ don't change these ⛔️  ####
 ##################################
-IWP_CONFIG = {'dir_input': BASE_DIR_OF_INPUT, 'ext_input': '.shp', "dir_footprints": FOOTPRINTS_PATH, 'dir_geotiff': GEOTIFF_PATH, 'dir_web_tiles': WEBTILE_PATH, 'dir_staged': OUTPUT_OF_STAGING, 'filename_staging_summary': OUTPUT_OF_STAGING + 'staging_summary.csv', 'filename_rasterization_events': GEOTIFF_PATH + 'raster_events.csv', 'filename_rasters_summary': GEOTIFF_PATH + 'raster_summary.csv', 'simplify_tolerance': 1e-05, 'tms_id': 'WorldCRS84Quad', 'statistics': [{'name': 'iwp_count', 'weight_by': 'count', 'property': 'centroids_per_pixel', 'aggregation_method': 'sum', 'resampling_method': 'sum', 'val_range': [0, None], 'palette': ['rgb(102 51 153 / 0.0)', '#d93fce', 'lch(85% 100 85)']}, {'name': 'iwp_coverage', 'weight_by': 'area', 'property': 'area_per_pixel_area', 'aggregation_method': 'sum', 'resampling_method': 'average', 'val_range': [0, 1], 'palette': ['rgb(102 51 153 / 0.0)', 'lch(85% 100 85)']}], 'deduplicate_at': ['raster'], 'deduplicate_keep_rules': [['Date', 'larger']], 'deduplicate_method': 'footprints', 'deduplicate_clip_to_footprint': True,  'input_crs': 'EPSG:3413'}
+IWP_CONFIG = {'dir_input': BASE_DIR_OF_INPUT, 'ext_input': '.shp', "dir_footprints": FOOTPRINTS_PATH, 'dir_geotiff': GEOTIFF_PATH, 'dir_web_tiles': WEBTILE_PATH, 'dir_staged': OUTPUT_OF_STAGING, 'filename_staging_summary': OUTPUT_OF_STAGING + 'staging_summary.csv', 'filename_rasterization_events': GEOTIFF_PATH + 'raster_events.csv', 'filename_rasters_summary': GEOTIFF_PATH + 'raster_summary.csv', 'simplify_tolerance': 1e-05, 'tms_id': 'WorldCRS84Quad', 'tile_path_structure': ['style', 'tms', 'z', 'x', 'y'], 'z_range': [0, 13], 'tile_size': [256, 256], 'statistics': [{'name': 'iwp_count', 'weight_by': 'count', 'property': 'centroids_per_pixel', 'aggregation_method': 'sum', 'resampling_method': 'sum', 'val_range': [0, None], 'palette': ['rgb(102 51 153 / 0.1)', '#d93fce', 'lch(85% 100 85)']}, {'name': 'iwp_coverage', 'weight_by': 'area', 'property': 'area_per_pixel_area', 'aggregation_method': 'sum', 'resampling_method': 'average', 'val_range': [0, 1], 'palette': ['rgb(102 51 153 / 0.1)', 'lch(85% 100 85)']}], 'deduplicate_at': ['raster'], 'deduplicate_keep_rules': [['Date', 'larger'], ['Time', 'larger']], 'deduplicate_overlap_tolerance': 0, 'deduplicate_overlap_both': False, 'deduplicate_centroid_tolerance': None, 'deduplicate_method': 'footprints', 'deduplicate_clip_to_footprint': True}
+
 
 # total num input files to Staging
-LEN_STAGING_FILES_LIST = 0
+# LEN_STAGING_FILES_LIST = None
 
 # TODO: return path names instead of 0. 
 # TODO: use logging instead of prints. 
@@ -201,9 +202,9 @@ class SubmitActor:
         # self.submit_jobs()
 
     def submit_jobs(self):
-        print("submitting a batch of jobs")
+        print("Starting new actor...")
         
-        print(f"📌 Submitting {self.work_queue.size()} jobs to {self.pg}")
+        # print(f"📌 Submitting {self.work_queue.size()} jobs to {self.pg}")
         
         FAILURES = []
         IP_ADDRESSES_OF_WORK = []
@@ -211,6 +212,8 @@ class SubmitActor:
         while not self.work_queue.empty():
             # Get work from the queue.
             self.filepath_batch = self.work_queue.get()
+            
+            print("Remaining jobs:", self.work_queue.size(), " -- Actor fetching new batch of jobs.")
             
             ##########################################################
             ##################### SCHEDULE TASKS #####################
@@ -269,9 +272,10 @@ def start_actors_staging(staging_input_files_list):
         
 
     ################### CHANGE THESE SETTINGS FOR PARALLELISM ###############################
-    num_submission_actors = 900 # pick num concurrent submitters. 
+    num_submission_actors = 250 # pick num concurrent submitters. 
     num_cpu_per_actor = 1
-    batch_size = 5
+    batch_size = 2
+    max_open_files = 800
     ################### ^ CHANGE THESE SETTINGS FOR PARALLELISM ^ ###########################
     
     filepath_batches = make_batch(staging_input_files_list, batch_size=batch_size)
@@ -279,6 +283,8 @@ def start_actors_staging(staging_input_files_list):
     ray.get(pg.ready()) # wait for it to be ready
 
     # 1. put files in queue. 
+    # todo create a dynamic limit of the number of open files.
+    # todo: should be batch_size * num_submission_actors should be < max_open_files
     from ray.util.queue import Queue
     work_queue = Queue()
     for filepath_batch in filepath_batches:
@@ -287,6 +293,8 @@ def start_actors_staging(staging_input_files_list):
     # 2. create actors ----- KEY IDEA HERE.
     # Create a bunch of Actor class instances. I'm wrapping my ray tasks in an Actor class. 
     # For some reason, the devs showed me this yields much better performance than using Ray Tasks directly, as I was doing previously.
+    
+    num_submission_actors = min(num_submission_actors, len(filepath_batches))
     start_time = time.time()
     submit_actors = [SubmitActor.options(placement_group=pg).remote(work_queue, pg, start_time) for _ in range(num_submission_actors)]
     
@@ -300,9 +308,13 @@ def start_actors_staging(staging_input_files_list):
     
     # 4. collect results from each actor at end of job.
     for _ in range(0, len(submit_actors)): 
-        ready, not_ready = ray.wait(app_futures)
-        print("PRINTING Failures (per actor):", ray.get(ready)[0])
-        print("PRINTING IP address of work (per actor):", ray.get(ready)[1])
+        try:
+            ready, not_ready = ray.wait(app_futures)
+            if len(ray.get(ready)[0][0]) > 0:
+                print("PRINTING Failures (per actor):", ray.get(ready)[0][0])
+            # print("PRINTING IP address of work (per actor):", ray.get(ready)[1])
+        except Exception as e:
+            print(e)
     
     return
 
@@ -323,7 +335,7 @@ def step0_staging_actor_placement_group():
     try:
         staging_input_files_list_raw = json.load(open('./exist_files_relative.json'))
     except FileNotFoundError as e:
-        print("Hey you, please specify a json file containing a list of input file paths (relative to `BASE_DIR_OF_INPUT`).", e)
+        print("❌❌❌ Hey you, please specify a 👉 json file containing a list of input file paths 👈 (relative to `BASE_DIR_OF_INPUT`).", e)
 
     if ONLY_SMALL_TEST_RUN: # for testing only
         staging_input_files_list_raw = staging_input_files_list_raw[:TEST_RUN_SIZE]
@@ -332,10 +344,15 @@ def step0_staging_actor_placement_group():
     staging_input_files_list = prepend(staging_input_files_list_raw, BASE_DIR_OF_INPUT)
     
     # save len of input
+    global LEN_STAGING_FILES_LIST
     LEN_STAGING_FILES_LIST = len(staging_input_files_list)
 
     # Save input file list in output dir, for reference and auditing.
     json_filepath = os.path.join(OUTPUT, "staging_input_files_list.json")
+    # check if filepath exists, make if not.
+    filepath = pathlib.Path(json_filepath)
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    filepath.touch(exist_ok=True)
     with open(json_filepath, "w") as f:
         json.dump(staging_input_files_list, f, indent=4, sort_keys=True)
 
@@ -344,14 +361,16 @@ def step0_staging_actor_placement_group():
     
     return
 
-def prepend(List, str):
+def prepend(mylist, mystr):
     '''
     Prepend str to front of each element of List. Typically filepaths.
     '''
+    return [mystr + item for item in mylist]
+    
     # Using format()
-    str += '{0}'
-    List = ((map(str.format, List)))
-    return List
+    # mystr += '{0}'
+    # mylist = list((map(str.format, mylist)))
+    # return mylist
 
 # @workflow.step(name="Step1_3D_Tiles")
 def step1_3d_tiles(stager):
@@ -653,14 +672,14 @@ def stage_remote(filepath):
 
 # 🎯 Best practice to ensure unique Workflow names.
 def make_workflow_id(name: str) -> str:
-  from datetime import datetime
+    from datetime import datetime
 
-  import pytz
+    import pytz
 
-  # Timezones: US/{Pacific, Mountain, Central, Eastern}
-  # All timezones `pytz.all_timezones`. Always use caution with timezones.
-  curr_time = datetime.now(pytz.timezone('US/Central'))
-  return f"{name}-{str(curr_time.strftime('%h_%d,%Y@%H:%M'))}"
+    # Timezones: US/{Pacific, Mountain, Central, Eastern}
+    # All timezones `pytz.all_timezones`. Always use caution with timezones.
+    curr_time = datetime.now(pytz.timezone('US/Central'))
+    return f"{name}-{str(curr_time.strftime('%h_%d,%Y@%H:%M'))}"
 
 def build_filepath(input_file):
     # Demo input: /home/kastanday/output/staged/WorldCRS84Quad/13/1047/1047.gpkg
