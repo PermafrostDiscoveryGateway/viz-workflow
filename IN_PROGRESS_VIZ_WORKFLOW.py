@@ -11,6 +11,7 @@ import time
 import traceback
 from collections import Counter
 from copy import deepcopy
+from datetime import datetime
 
 import pdgraster
 import pdgstaging  # For staging
@@ -20,12 +21,13 @@ import viz_3dtiles  # import Cesium3DTile, Cesium3DTileset
 #######################
 #### Change me 😁  ####
 #######################
-RAY_ADDRESS       = 'ray://172.28.23.109:10001'  # SET ME!! Use output from `$ ray start --head --port=6379 --dashboard-port=8265`
+RAY_ADDRESS       = 'ray://141.142.144.132:10001'  # SET ME!! Use output from `$ ray start --head --port=6379 --dashboard-port=8265`
+NUM_PARALLEL_CPU_CORES = 126 # pick num concurrent submitters. 
 
 # ALWAYS include the tailing slash "/"
 BASE_DIR_OF_INPUT = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/'   # The output data of MAPLE. Which is the input data for STAGING.
-FOOTPRINTS_PATH   = BASE_DIR_OF_INPUT + 'footprints/'
-OUTPUT            = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/monday_v3/'       # Dir for results. High I/O is good.
+FOOTPRINTS_PATH   = BASE_DIR_OF_INPUT + 'footprints/staged_footprints/'
+OUTPUT            = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_6_v1/'       # Dir for results. High I/O is good.
 # BASE_DIR_OF_INPUT = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs'                  # The output data of MAPLE. Which is the input data for STAGING.
 # OUTPUT            = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output'       # Dir for results. High I/O is good.
 OUTPUT_OF_STAGING = OUTPUT + 'staged/'              # Output dirs for each sub-step
@@ -34,8 +36,8 @@ WEBTILE_PATH      = OUTPUT + 'web_tiles/'
 THREE_D_PATH      = OUTPUT + '3d_tiles/'
 
 # Convenience for little test runs. Change me 😁  
-ONLY_SMALL_TEST_RUN = True                          # For testing, this ensures only a small handful of files are processed.
-TEST_RUN_SIZE       = 800                              # Number of files to pre processed during testing (only effects testing)
+ONLY_SMALL_TEST_RUN = False                          # For testing, this ensures only a small handful of files are processed.
+TEST_RUN_SIZE       = 10                              # Number of files to pre processed during testing (only effects testing)
 ##############################
 #### END OF Change me 😁  ####
 ##############################
@@ -43,7 +45,7 @@ TEST_RUN_SIZE       = 800                              # Number of files to pre 
 ##################################
 #### ⛔️ don't change these ⛔️  ####
 ##################################
-IWP_CONFIG = {'dir_input': BASE_DIR_OF_INPUT, 'ext_input': '.shp', "dir_footprints": FOOTPRINTS_PATH, 'dir_geotiff': GEOTIFF_PATH, 'dir_web_tiles': WEBTILE_PATH, 'dir_staged': OUTPUT_OF_STAGING, 'filename_staging_summary': OUTPUT_OF_STAGING + 'staging_summary.csv', 'filename_rasterization_events': GEOTIFF_PATH + 'raster_events.csv', 'filename_rasters_summary': GEOTIFF_PATH + 'raster_summary.csv', 'simplify_tolerance': 1e-05, 'tms_id': 'WorldCRS84Quad', 'tile_path_structure': ['style', 'tms', 'z', 'x', 'y'], 'z_range': [0, 13], 'tile_size': [256, 256], 'statistics': [{'name': 'iwp_count', 'weight_by': 'count', 'property': 'centroids_per_pixel', 'aggregation_method': 'sum', 'resampling_method': 'sum', 'val_range': [0, None], 'palette': ['rgb(102 51 153 / 0.1)', '#d93fce', 'lch(85% 100 85)']}, {'name': 'iwp_coverage', 'weight_by': 'area', 'property': 'area_per_pixel_area', 'aggregation_method': 'sum', 'resampling_method': 'average', 'val_range': [0, 1], 'palette': ['rgb(102 51 153 / 0.1)', 'lch(85% 100 85)']}], 'deduplicate_at': ['raster'], 'deduplicate_keep_rules': [['Date', 'larger'], ['Time', 'larger']], 'deduplicate_overlap_tolerance': 0, 'deduplicate_overlap_both': False, 'deduplicate_centroid_tolerance': None, 'deduplicate_method': 'footprints', 'deduplicate_clip_to_footprint': True}
+IWP_CONFIG = {'dir_input': BASE_DIR_OF_INPUT, 'ext_input': '.shp', "dir_footprints": FOOTPRINTS_PATH, 'dir_geotiff': GEOTIFF_PATH, 'dir_web_tiles': WEBTILE_PATH, 'dir_staged': OUTPUT_OF_STAGING, 'filename_staging_summary': OUTPUT_OF_STAGING + 'staging_summary.csv', 'filename_rasterization_events': GEOTIFF_PATH + 'raster_events.csv', 'filename_rasters_summary': GEOTIFF_PATH + 'raster_summary.csv', 'version': datetime.now().strftime("%B%d,%Y"), 'simplify_tolerance': 0.1, 'tms_id': 'WorldCRS84Quad', 'z_range': [0, 16], 'geometricError': 57, 'z_coord': 0, 'statistics': [{'name': 'iwp_count', 'weight_by': 'count', 'property': 'centroids_per_pixel', 'aggregation_method': 'sum', 'resampling_method': 'sum', 'val_range': [0, None], 'palette': ['rgb(102 51 153 / 0.0)', '#d93fce', 'lch(85% 100 85)']}, {'name': 'iwp_coverage', 'weight_by': 'area', 'property': 'area_per_pixel_area', 'aggregation_method': 'sum', 'resampling_method': 'average', 'val_range': [0, 1], 'palette': ['rgb(102 51 153 / 0.0)', 'lch(85% 100 85)']}], 'deduplicate_at': ['raster', '3dtiles'], 'deduplicate_keep_rules': [['Date', 'larger']], 'deduplicate_method': 'footprints'}
 
 
 # total num input files to Staging
@@ -55,15 +57,19 @@ IWP_CONFIG = {'dir_input': BASE_DIR_OF_INPUT, 'ext_input': '.shp', "dir_footprin
 def main():
     # ray.shutdown()
     # assert ray.is_initialized() == False
+    print("Connecting to Ray...")
     ray.init(address=RAY_ADDRESS, dashboard_port=8265)   # most reliable way to start Ray
     # doesn’t work: _internal_config=json.dumps({"worker_register_timeout_seconds": 120}) 
     # use port-forwarding to see dashboard: `ssh -L 8265:localhost:8265 kastanday@kingfisher.ncsa.illinois.edu`
     # ray.init(address='auto')                                    # multinode, but less reliable than above.
     # ray.init()                                                  # single-node only!
     assert ray.is_initialized() == True
-    
     print("🎯 Ray initialized.")
     print_cluster_stats()
+    
+    # Logging
+    logging.basicConfig(level=logging.INFO, filename= OUTPUT + 'workflow_log.txt', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.debug(f'Started ray at {RAY_ADDRESS}')
 
     # instantiate classes for their helper functions
     # rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
@@ -75,15 +81,16 @@ def main():
     # (optionally) CHANGE ME, if you only want certain steps 😁
     try:
         ########## MAIN STEPS ##########
+        print("Starting main...")
 
-        # step0_result = step0_staging(stager)           # Staging 
-        step0_staging_actor_placement_group()
+        # step0_result = step0_staging()           # Staging 
+        # step0_staging_actor_placement_group() #### <-------------- GOOD ONE ⭐️ 
         # print(step0_result)
         # step1_3d_tiles(stager)                         # Create 3D tiles from .shp
-        # step2_result = step2_raster_highest(stager)                   # rasterize highest Z level only 
+        # step2_raster_highest()                   # rasterize highest Z level only 
         # print(step2_result)                          
-        # step3_raster_lower(stager, batch_size_geotiffs=100)         # rasterize all LOWER Z levels
-        # step4_webtiles(tile_manager, rasterizer, batch_size_web_tiles=100) # convert to web tiles.        
+        # step3_raster_lower(batch_size_geotiffs=100)         # rasterize all LOWER Z levels
+        step4_webtiles(batch_size_web_tiles=200) # convert to web tiles.        
 
     except Exception as e:
         print(f"Caught error in main(): {str(e)}", "\nTraceback", traceback.print_exc())
@@ -121,7 +128,7 @@ def step0_staging(stager):
     
     # Input files! Now we use a list of files ('iwp-file-list.json')
     try:
-        staging_input_files_list_raw = json.load(open('./exist_files_relative.json'))
+        staging_input_files_list_raw = json.load(open('./iwp-file-list.json'))
     except FileNotFoundError as e:
         print("Hey you, please specify a json file containing a list of input file paths (relative to `BASE_DIR_OF_INPUT`).", e)
     
@@ -130,6 +137,7 @@ def step0_staging(stager):
 
     # make paths absolute 
     # todo refactor
+    # warning something going wrong here with water_clipped paths
     staging_input_files_list = []
     for filepath in staging_input_files_list_raw:
         filepath = os.path.join(BASE_DIR_OF_INPUT, filepath)
@@ -193,10 +201,12 @@ class SubmitActor:
     Then each actor just pulls from the queue until it's empty. 
     '''
 
-    def __init__(self, work_queue, pg, start_time):
+    def __init__(self, work_queue, pg, start_time, logging_dict=None):
         self.pg = pg
         self.work_queue = work_queue  # work_queue.get() == filepath_batch
+        self.num_total_jobs = self.work_queue.size()
         self.start_time = start_time
+        # self.logging = logging_dict # todo: Must use Ray distributed logger
         
         # Run work
         # self.submit_jobs()
@@ -245,12 +255,17 @@ class SubmitActor:
                     FAILURES.append([ray.get(ready)[0][0], ray.get(ready)[0][1]])
                     print(f"❌ Failed {ray.get(ready)[0][0]}")
                     IP_ADDRESSES_OF_WORK.append(ray.get(ready)[0][1])
+                    print(f"Failures (in this actor) = {FAILURES}")
+                    
+                    # self.logging.warning(f'❌ Failed staging: {ray.get(ready)[0][0]}')
                 else:
                     # success case
                     print(f"✅ Finished {ray.get(ready)[0][0]}")
-                    print(f"Failures (in this actor) = {len(FAILURES)}")
-                    print(f"📌 Completed {i+1} of {LEN_STAGING_FILES_LIST}, {(i+1)/LEN_STAGING_FILES_LIST*100:.1f}%, ⏰ Elapsed time: {(time.time() - self.start_time)/60:.2f} min\n")
+                    num_jobs_complete = self.num_total_jobs - self.work_queue.size()
+                    print(f"📌 Completed {num_jobs_complete} of {self.num_total_jobs}, {(num_jobs_complete)/self.num_total_jobs*100:.1f}%, ⏰ Elapsed time: {(time.time() - self.start_time)/60:.2f} min\n")
                     IP_ADDRESSES_OF_WORK.append(ray.get(ready)[0][1])
+                    
+                    # self.logging.info(f'✅ Successful staging: {self.filepath_batch}')
 
                 app_futures = not_ready
                 if not app_futures:
@@ -271,35 +286,46 @@ def start_actors_staging(staging_input_files_list):
     print("\n\n👉 Starting Staging with Placement Group Actors (step_0) 👈\n\n")
         
 
-    ################### CHANGE THESE SETTINGS FOR PARALLELISM ###############################
-    num_submission_actors = 250 # pick num concurrent submitters. 
-    num_cpu_per_actor = 1
     batch_size = 2
-    max_open_files = 800
-    ################### ^ CHANGE THESE SETTINGS FOR PARALLELISM ^ ###########################
-    
     filepath_batches = make_batch(staging_input_files_list, batch_size=batch_size)
+    
+    ################### CHANGE THESE SETTINGS FOR PARALLELISM ###############################
+    num_submission_actors = 180 # pick num concurrent submitters. 
+    num_cpu_per_actor = 1
+    max_open_files = (batch_size * num_submission_actors) + num_submission_actors
+    logging.info(f'Num_submission_actors = {num_submission_actors}, batch_size = {batch_size}, max_open_files = {max_open_files}')
+    ################### ^ CHANGE THESE SETTINGS FOR PARALLELISM ^ ###########################
+    num_submission_actors = min(num_submission_actors, len(filepath_batches)) # if few files, use few actors.
+    
     pg = placement_group([{"CPU": num_cpu_per_actor}] * num_submission_actors, strategy="SPREAD") # strategy="STRICT_SPREAD" strict = only one job per node. Bad. 
     ray.get(pg.ready()) # wait for it to be ready
 
     # 1. put files in queue. 
-    # todo create a dynamic limit of the number of open files.
-    # todo: should be batch_size * num_submission_actors should be < max_open_files
+    # todo: I DON"T THINK QUEUE INFLUENCES NUM FILES OPEN!! These are just filepaths..... need to restrict num actors existing...
+    # todo: create a dynamic limit of the number of open files.
+    # todo: batch_size * num_submission_actors should be < max_open_files
     from ray.util.queue import Queue
     work_queue = Queue()
+    batch_iteration = 0
     for filepath_batch in filepath_batches:
         work_queue.put(filepath_batch)
+        # todo -- remove this.
+        # if work_queue.size() < num_submission_actors + 1:
+        #     work_queue.put(filepath_batch)
+        #     batch_iteration += 1
         
     # 2. create actors ----- KEY IDEA HERE.
     # Create a bunch of Actor class instances. I'm wrapping my ray tasks in an Actor class. 
     # For some reason, the devs showed me this yields much better performance than using Ray Tasks directly, as I was doing previously.
     
-    num_submission_actors = min(num_submission_actors, len(filepath_batches))
-    start_time = time.time()
+    start_time = time.time() # start out here so workers have exact same start time.
     submit_actors = [SubmitActor.options(placement_group=pg).remote(work_queue, pg, start_time) for _ in range(num_submission_actors)]
     
     print("total filepath batches: ", len(filepath_batches), "<-- total number of jobs to submit")
     print("total submit_actors: ", len(submit_actors), "<-- expect this many CPUs utilized")
+    logging.info(f"total filepath batches: {len(filepath_batches)} <-- total number of jobs to submit")
+    logging.info(f"total submit_actors: {len(submit_actors)} <-- expect this many CPUs utilized")
+
     
     # 3. start jobs
     app_futures = []
@@ -307,12 +333,34 @@ def start_actors_staging(staging_input_files_list):
         app_futures.append(actor.submit_jobs.remote())
     
     # 4. collect results from each actor at end of job.
-    for _ in range(0, len(submit_actors)): 
+    # for _ in range(0, len(submit_actors)): 
+    
+    # todo: refactor while loop. Purpose: ensure I'm collecting all app futures, even if they return more than once? idk.
+    # not sure if this helps, but I had a good run right after adding this.
+    while True:
         try:
             ready, not_ready = ray.wait(app_futures)
+            
+            print(f"SubmitActor is done (below numbers should sum to: {num_submission_actors}).")
+            print("Num ready: ", len(ready))
+            print("Num not_ready: ", len(not_ready))
+            
+            # add to work queue! 
+            # while work_queue.size() < (num_submission_actors + 1):
+            #     work_queue.put(filepath_batches[batch_iteration])
+            #     # todo if we have more batches... 
+            #     batch_iteration += 1
+            
+            if len(ready) + len(not_ready) != num_submission_actors:
+                print("❌❌❌❌ BAD!!! SOME ACTORS HAVE DIED!!")
+                logging.error(f"❌❌❌❌ BAD!!! SOME ACTORS HAVE DIED!!")
+            
+            # break loop when all actors are dead.
+            if len(ready) == 0 and len(not_ready) == 0:
+                return "All SubmitActors are done or dead."
+            
             if len(ray.get(ready)[0][0]) > 0:
                 print("PRINTING Failures (per actor):", ray.get(ready)[0][0])
-            # print("PRINTING IP address of work (per actor):", ray.get(ready)[1])
         except Exception as e:
             print(e)
     
@@ -332,8 +380,10 @@ def print_cluster_stats():
 # @workflow.step(name="Step0_Stage_All")
 def step0_staging_actor_placement_group():
     # Input files! Now we use a list of files ('iwp-file-list.json')
+    print("Step 0️⃣  -- Staging with SubmitActor Placement Group")
+    
     try:
-        staging_input_files_list_raw = json.load(open('./exist_files_relative.json'))
+        staging_input_files_list_raw = json.load(open('./iwp-file-list.json'))
     except FileNotFoundError as e:
         print("❌❌❌ Hey you, please specify a 👉 json file containing a list of input file paths 👈 (relative to `BASE_DIR_OF_INPUT`).", e)
 
@@ -376,6 +426,8 @@ def prepend(mylist, mystr):
 def step1_3d_tiles(stager):
     IP_ADDRESSES_OF_WORK_3D_TILES = []
     FAILURES_3D_TILES = []
+    
+    print("1️⃣  Step 2 Rasterize only highest Z")
 
     try:
         # collect staged files
@@ -425,25 +477,40 @@ def step1_3d_tiles(stager):
             print(f"    {failure_text} on {ip_address}")
 
 # @workflow.step(name="Step2_Rasterize_only_higest_z_level")
-def step2_raster_highest(stager, batch_size=10):
+def step2_raster_highest(batch_size=100):
     """
     This is a BLOCKING step (but it can run in parallel).
     Rasterize all staged tiles (only highest z-level).
     """
+    print("2️⃣  Step 2 Rasterize only highest Z")
+    stager = pdgstaging.TileStager(IWP_CONFIG)
+    
     # Get paths to all the newly staged tiles
     stager.tiles.add_base_dir('output_of_staging', OUTPUT_OF_STAGING, '.gpkg')
     staged_paths = stager.tiles.get_filenames_from_dir( base_dir = 'output_of_staging' )
+    
+    # Add footprints path! 
+    # todo: not sure this is the right extension.
+    # stager.tiles.add_base_dir('input', FOOTPRINTS_PATH, '.shp')
 
     if ONLY_SMALL_TEST_RUN:
         staged_paths = staged_paths[:TEST_RUN_SIZE]
 
     staged_batches = make_batch(staged_paths, batch_size)
 
-    print(OUTPUT_OF_STAGING)
+    print(f"The input to this step, Rasterization, is the output of Staging.\n Using Staging path: {OUTPUT_OF_STAGING}")
 
-    print("2️⃣  Step 2 Rasterize only highest Z")
-    print(f"🌄 Rasterize {len(staged_paths)} gpkgs")
-    print(f"🏎  Parallel jobs: {len(staged_batches)} \n")
+    print(f"🌄 Rasterize total files {len(staged_paths)} gpkgs, using batch size: {batch_size}")
+    print(f"🏎  Parallel batches of jobs: {len(staged_batches)}...\n")
+
+    
+    # ADD PLACEMENT GROUP FOR ADDED STABILITY WITH MANY NODES
+    print("Creating placement group for Step 2 -- raster highest")    
+    from ray.util.placement_group import placement_group
+    num_cpu_per_actor = 1
+    num_submission_actors = 350
+    pg = placement_group([{"CPU": num_cpu_per_actor}] * num_submission_actors, strategy="SPREAD") # strategy="STRICT_SPREAD" strict = only one job per node. Bad. 
+    ray.get(pg.ready()) # wait for it to be ready
 
     start = time.time()
 
@@ -451,8 +518,10 @@ def step2_raster_highest(stager, batch_size=10):
     try: 
         # Start remote functions
         app_futures = []
-        for batch in staged_batches:
-            app_future = rasterize.remote(batch, IWP_CONFIG)
+        for batch in staged_batches:            
+            # QUEUE JOBS
+            # MANDATORY: include placement_group for better stability on 200+ cpus.
+            app_future = rasterize.options(placement_group=pg).remote(batch, IWP_CONFIG)
             app_futures.append(app_future)
 
         for i in range(0, len(app_futures)): 
@@ -476,32 +545,42 @@ def step2_raster_highest(stager, batch_size=10):
     return "Done rasterize all only highest z level"
 
 # @workflow.step(name="Step3_Rasterize_lower_z_levels")
-def step3_raster_lower(stager, batch_size_geotiffs=200):
+def step3_raster_lower(batch_size_geotiffs=20):
     '''
     STEP 3: Create parent geotiffs for all z-levels (except highest)
     THIS IS HARD TO PARALLELIZE multiple zoom levels at once..... sad, BUT
     👉 WE DO PARALLELIZE BATCHES WITHIN one zoom level.
     '''
-    # find all Z levels
-    min_z = stager.config_manager.get_min_z()
-    max_z = stager.config_manager.get_max_z()
-    parent_zs = range(max_z - 1, min_z - 1, -1)
-    print("3️⃣ Step 3: Create parent geotiffs for all z-levels (except highest)")
+    print("3️⃣ Step 3: Create parent geotiffs for all lower z-levels (everything except highest zoom)")
+    stager = pdgstaging.TileStager(IWP_CONFIG)
     
+    # find all Z levels
+    min_z = stager.config.get_min_z()
+    max_z = stager.config.get_max_z()
+    parent_zs = range(max_z - 1, min_z - 1, -1)
+    
+    print(f"Collecting all Geotiffs (.tif) in: {GEOTIFF_PATH}")
+    stager.tiles.add_base_dir('geotiff_path', GEOTIFF_PATH, '.tif') # already added ??
+    
+    # ADD PLACEMENT GROUP FOR ADDED STABILITY WITH MANY NODES
+    print("Creating placement group for Step 2 -- raster highest")    
+    from ray.util.placement_group import placement_group
+    num_cpu_per_actor = 1
+    num_submission_actors = 800
+    pg = placement_group([{"CPU": num_cpu_per_actor}] * num_submission_actors, strategy="SPREAD") # strategy="STRICT_SPREAD" strict = only one job per node. Bad. 
+    ray.get(pg.ready()) # wait for it to be ready
 
     start = time.time()
-
     # Can't start lower z-level until higher z-level is complete.
     for z in parent_zs:
         print(f"👉 Starting Z level {z} of {len(parent_zs)}")
         # Loop thru Z levels 
         # Make lower z-levels based on the path names of the files just created
-        stager.tiles.add_base_dir('geotiff_path', GEOTIFF_PATH, '.tif')
-        child_paths = stager.tiles.get_filenames_from_dir( base_dir = 'geotiff_path', z=z + 1)
 
         if ONLY_SMALL_TEST_RUN:
             child_paths = child_paths[:TEST_RUN_SIZE]
 
+        child_paths = stager.tiles.get_filenames_from_dir( base_dir = 'geotiff_path', z=z + 1)
         parent_tiles = set()
         for child_path in child_paths:
             parent_tile = stager.tiles.get_parent_tile(child_path)
@@ -510,25 +589,25 @@ def step3_raster_lower(stager, batch_size_geotiffs=200):
 
         # Break all parent tiles at level z into batches
         parent_tile_batches = make_batch(parent_tiles, batch_size_geotiffs)
-        print(f"📦 Staging {len(child_paths)} tifs")
-        print(f"📦 Staging {len(parent_tile_batches)} parents")
-        print(f"📦 Staging {parent_tile_batches} parents")
+        print(f"📦 Rasterizing {len(parent_tile_batches)} parents into {len(child_paths)} children tifs")
+        # print(f"📦 Rasterizing {parent_tile_batches} parents")
 
         # PARALLELIZE batches WITHIN one zoom level (best we can do for now).
         try:
             app_futures = []
             for parent_tile_batch in parent_tile_batches:
-                app_future = create_composite_geotiffs.remote(
+                # MANDATORY: include placement_group for better stability on 200+ cpus.
+                app_future = create_composite_geotiffs.options(placement_group=pg).remote(
                     parent_tile_batch, IWP_CONFIG, logging_dict=None)
                 app_futures.append(app_future)
 
-            print(f"💥💥💥💥 NUMBER OF FUTURES {len(app_futures)} futures (equal to num batches)")
             # Don't start the next z-level (or move to step 4) until the
             # current z-level is complete
             for i in range(0, len(app_futures)): 
                 ready, not_ready = ray.wait(app_futures)
                 print(f"✅ Finished {ray.get(ready)}")
                 print(f"📌 Completed {i+1} of {len(parent_tile_batches)}")
+                print(f"📌 Completed {i+1} of {len(parent_tile_batches)}, {(i+1)/len(parent_tile_batches)*100}%")
                 print(f"⏰ Running total of elapsed time: {(time.time() - start)/60:.2f} minutes\n")
                 app_futures = not_ready
                 if not app_futures:
@@ -540,15 +619,22 @@ def step3_raster_lower(stager, batch_size_geotiffs=200):
     return "Done step 3."
 
 # @workflow.step(name="Step4_create_webtiles")
-def step4_webtiles(stager, rasterizer, batch_size_web_tiles=100):
+def step4_webtiles(batch_size_web_tiles=100):
     '''
     STEP 4: Create web tiles from geotiffs
     Infinite parallelism.
     '''
+    print("4️⃣ -- Creating web tiles from geotiffs...")
+    
+    # instantiate classes for their helper functions
+    rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
+    stager = pdgstaging.TileStager(IWP_CONFIG)
+    
     start = time.time()
     # Update color ranges
     rasterizer.update_ranges()
 
+    print(f"Collecting all Geotiffs (.tif) in: {GEOTIFF_PATH}")
     stager.tiles.add_base_dir('geotiff_path', GEOTIFF_PATH, '.tif')
     geotiff_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_path')
 
@@ -558,12 +644,21 @@ def step4_webtiles(stager, rasterizer, batch_size_web_tiles=100):
     geotiff_batches = make_batch(geotiff_paths, batch_size_web_tiles)
     print(f"📦 Creating web tiles from geotiffs. Num parallel batches = {len(geotiff_batches)}")
     
+    # ADD PLACEMENT GROUP FOR ADDED STABILITY WITH MANY NODES
+    print("Creating placement group for Step 2 -- raster highest")    
+    from ray.util.placement_group import placement_group
+    num_cpu_per_actor = 1
+    num_submission_actors = 126
+    pg = placement_group([{"CPU": num_cpu_per_actor}] * num_submission_actors, strategy="SPREAD") # strategy="STRICT_SPREAD" strict = only one job per node. Bad. 
+    ray.get(pg.ready()) # wait for it to be ready
+    
     # catch kill signal to shutdown on command (ctrl + c)
     try: 
         # Start remote functions
         app_futures = []
         for batch in geotiff_batches:
-            app_future = create_web_tiles.remote(batch, IWP_CONFIG)
+            # MANDATORY: include placement_group for better stability on 200+ cpus.
+            app_future = create_web_tiles.options(placement_group=pg).remote(batch, IWP_CONFIG)
             app_futures.append(app_future)
 
         for i in range(0, len(app_futures)): 

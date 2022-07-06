@@ -1,12 +1,11 @@
 #!/bin/bash -l
 
 #SBATCH --job-name=pdg_viz
-#SBATCH --partition=gpuA40x4
-#SBATCH --account=bbki-delta-gpu
+#SBATCH --partition=cpu
+#SBATCH --account=bbki-delta-cpu
 #SBATCH --time=12:00:00
 
-#SBATCH --nodes=8
-#SBATCH --gpus-per-node=1
+#SBATCH --nodes=1
 #SBATCH --exclusive
 
 set -x
