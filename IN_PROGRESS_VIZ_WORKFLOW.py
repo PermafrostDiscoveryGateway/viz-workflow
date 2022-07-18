@@ -22,14 +22,14 @@ import viz_3dtiles  # import Cesium3DTile, Cesium3DTileset
 #######################
 #### Change me 😁  ####
 #######################
-RAY_ADDRESS       = 'ray://172.28.22.97:10001'  # SET ME!! Use output from `$ ray start --head --port=6379 --dashboard-port=8265`
-NUM_PARALLEL_CPU_CORES = 300 # pick num 600
+RAY_ADDRESS       = 'ray://172.28.23.126:10001'  # SET ME!! Use output from `$ ray start --head --port=6379 --dashboard-port=8265`
+NUM_PARALLEL_CPU_CORES = 220 # 220/960 = 23% 220
 
 # ALWAYS include the tailing slash "/"
 BASE_DIR_OF_INPUT = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/'   # The output data of MAPLE. Which is the input data for STAGING.
 FOOTPRINTS_PATH   = BASE_DIR_OF_INPUT + 'footprints/staged_footprints/'
 # OUTPUT            = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_10_v1_shuffle/'       # Dir for results. High I/O is good.
-OUTPUT            = '/tmp/viz_output/july_11_v0_tmp/'       # Dir for results. High I/O is good.
+OUTPUT            = '/tmp/viz_output/july_13_fifteennode/'       # Dir for results. High I/O is good.
 # BASE_DIR_OF_INPUT = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs'                  # The output data of MAPLE. Which is the input data for STAGING.
 # OUTPUT            = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output'       # Dir for results. High I/O is good.
 OUTPUT_OF_STAGING = OUTPUT + 'staged/'              # Output dirs for each sub-step
@@ -235,8 +235,11 @@ class SubmitActor:
         while not self.work_queue.empty():
             # Get work from the queue.
             self.filepath_batch = self.work_queue.get()
+            remaining_jobs = self.work_queue.size()
             
-            print("Remaining jobs:", self.work_queue.size(), " -- Actor fetching new batch of jobs.")
+            num_jobs_complete = self.num_total_jobs - remaining_jobs
+            logging.info(f"📌 Completed {num_jobs_complete} of {self.num_total_jobs}, {(num_jobs_complete)/self.num_total_jobs*100:.2f}%, ⏰ Elapsed time: {(time.time() - self.start_time)/60:.2f} min\n")
+            logging.info(f"Actor fetching new batch of jobs... Remaining jobs: {remaining_jobs}")
             
             ##########################################################
             ##################### SCHEDULE TASKS #####################
@@ -250,43 +253,27 @@ class SubmitActor:
             ##################### GET REULTS #########################
             ##########################################################
             
-            # returns one staging path at a time. 
-            for i in range(0, len(app_futures)): 
+            for _ in range(0, len(app_futures)): 
                 # ray.wait(app_futures) catches ONE at a time. 
                 ready, not_ready = ray.wait(app_futures) # todo , fetch_local=False do not download object from remote nodes ??
-                
                 data = ray.get(ready)
-                all_returned_values = list(self.traverse(data))
+                all_returned_values = list(self.traverse(data)) # flatten/parse all return values.
                 
-                # ❌ FAILURE CASE
                 if any(err in all_returned_values for err in ["FAILED", "Failed", "❌"]):
-                    FAILURES.append([ray.get(ready)[0][0], ray.get(ready)[0][1]])
-                    IP_ADDRESSES_OF_WORK.append(ray.get(ready)[0][1])
-                    print(f"Failures (in this actor) = {FAILURES}")
-                    
-                    num_jobs_complete = self.num_total_jobs - self.work_queue.size()
-                    logging.info(f"❌ failed_staging_input_path: {all_returned_values[0]}") # input path
+                    # ❌ FAILURE CASE
+                    # Logging is crucial for restarting jobs.
+                    logging.warning(f"Failures (in this actor) = {all_returned_values}")
+                    logging.warning(f"❌ failed_staging_input_path: {all_returned_values[0]}")
                     logging.info(f"Num_jobs_complete = {num_jobs_complete}")
-                    
-                    # self.logging.warning(f'❌ Failed staging: {ray.get(ready)[0][0]}')
                 else:
                     # ✅ SUCCESS CASE 
-                    # print(f"✅ Finished {all_returned_values}")
-                    num_jobs_complete = self.num_total_jobs - self.work_queue.size()
-                    logging.info(f"📌 Completed {num_jobs_complete} of {self.num_total_jobs}, {(num_jobs_complete)/self.num_total_jobs*100:.2f}%, ⏰ Elapsed time: {(time.time() - self.start_time)/60:.2f} min\n")
-                    # IP_ADDRESSES_OF_WORK.append(ray.get(ready)[0][1])
-                    IP_ADDRESSES_OF_WORK.append(all_returned_values)
-                    
-                    # crucial for restarting jobs!
+                    # Logging is crucial for restarting jobs!
                     logging.info(f"✅ successful_staging_input_path: {all_returned_values[0]}")
-                    logging.info(f"Num_jobs_complete = {num_jobs_complete}")
                     
-
                 app_futures = not_ready
                 if not app_futures:
                     break
-        
-        return [FAILURES, IP_ADDRESSES_OF_WORK]
+        return [FAILURES, IP_ADDRESSES_OF_WORK] # not used currently
 
 def start_actors_staging(staging_input_files_list):
     '''
@@ -306,7 +293,7 @@ def start_actors_staging(staging_input_files_list):
     filepath_batches = make_batch(staging_input_files_list, batch_size=batch_size)
     
     num_cpu_per_actor = 1
-    NUM_PARALLEL_CPU_CORES = 300
+    NUM_PARALLEL_CPU_CORES = 220
     max_open_files = (batch_size * NUM_PARALLEL_CPU_CORES) + NUM_PARALLEL_CPU_CORES
     NUM_PARALLEL_CPU_CORES = min(NUM_PARALLEL_CPU_CORES, len(filepath_batches)) # if few files, use few actors.
     
@@ -353,7 +340,7 @@ def start_actors_staging(staging_input_files_list):
         actor = SubmitActor.options(placement_group=pg).remote(work_queue, pg, start_time) 
         submit_actors.append(actor)
         app_futures.append(actor.submit_jobs.remote())
-        time.sleep(0.25) # help raylet timeout error on start?
+        time.sleep(0.2) # help raylet timeout error on start && reduces initial spike of network traffic.
     
     
     # OLD: create all at once (failed to register)
@@ -372,7 +359,7 @@ def start_actors_staging(staging_input_files_list):
     
     # todo: refactor while loop. Purpose: ensure I'm collecting all app futures, even if they return more than once? idk.
     # not sure if this helps, but I had a good run right after adding this.
-    while True:
+    for _ in range(len(app_futures)):
         try:
             ready, not_ready = ray.wait(app_futures)
             
@@ -403,6 +390,8 @@ def start_actors_staging(staging_input_files_list):
         except Exception as e:
             print(e)
     
+    print("🎉 All submit actors have returned.  DONE STAGING...")
+    
     return
 
 def print_cluster_stats():
@@ -418,12 +407,14 @@ def print_cluster_stats():
         
 
 def load_staging_checkpoints(staging_input_files_list):
-    ##########
-    ### use CHECKPOINTS -- don't rerun already-processed-input files
-    ##########
+    '''
+    use CHECKPOINTS -- don't rerun already-processed-input files
+    '''
     print("Using checkpoints. Skipping files that are already processed...")
     checkpoint_paths = ['/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_10_v0/success_paths.txt',
-                        '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_12_v0_tmp_resumable/success_paths.txt']
+                        '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_12_v0_tmp_resumable/success_paths.txt',
+                        '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_12_v0_tmp_resumable/run_2/success_paths.txt',
+                        '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_12_v0_tmp_resumable/run_3/success_paths.txt',]
 
     # combine all checkpoints
     already_processed_files_list = []
@@ -440,13 +431,10 @@ def load_staging_checkpoints(staging_input_files_list):
         already_processed_files_list.extend(filepath.strip("\n") for filepath in already_processed_files_list_raw)
 
     # remove already processed files
-    print(f"Before checkpoint total files = {len(staging_input_files_list)}. \nTotal length of already processed files: {already_processed_files_list}")
+    print(f"Before checkpoint total files = {len(staging_input_files_list)}. \nTotal length of already processed files: {len(already_processed_files_list)}")
     
     # return input file list minus checkpoint files
     return [i for i in staging_input_files_list if i not in already_processed_files_list]
-    ##########
-    ### END OF CHECKPOINTs
-    ##########
 
 # @workflow.step(name="Step0_Stage_All")
 def step0_staging_actor_placement_group(shuffle_input_filepaths=True):
@@ -465,7 +453,9 @@ def step0_staging_actor_placement_group(shuffle_input_filepaths=True):
     staging_input_files_list = prepend(staging_input_files_list_raw, BASE_DIR_OF_INPUT)
     
     # Use checkpoint! Skip already completed input files. 
-    staging_input_files_list = load_staging_checkpoints(staging_input_files_list)
+    # todo: uncomment for future runs.
+    print("⚠️ SKIPPING CHECKPOINT USAGE!!!!!  ⚠️")
+    # staging_input_files_list = load_staging_checkpoints(staging_input_files_list)
     
     # shuffle the list 
     # Idea: this should increase speed by reducing write conflicts wait times. 
