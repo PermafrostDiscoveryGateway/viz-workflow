@@ -40,6 +40,9 @@ class RasterTiler():
         self.config = pdgstaging.ConfigManager(config)
         self.tiles = pdgstaging.TilePathManager(
             **self.config.get_path_manager_config())
+        # Pre-create the palette for each stat
+        palettes = self.config.get_palettes()
+        self.palettes = [Palette(*pal) for pal in palettes]
 
     def rasterize_all(self):
         """
@@ -359,12 +362,10 @@ class RasterTiler():
         # We will make a set of tiles for each band/stat in the geotiff so we
         # need to get the bands.
         stats = self.config.get_stat_names()
-        # Pre-create the palette for each stat
-        palettes = self.config.get_palettes()
-        palettes = [Palette(pal) for pal in palettes]
+        palettes = self.palettes
+        nodata_vals = self.config.get_nodata_vals()
 
         try:
-
             raster = Raster.from_file(geotiff_path)
             image_data = raster.data
             tile = self.tiles.tile_from_path(geotiff_path)
@@ -376,6 +377,7 @@ class RasterTiler():
             for i in range(len(stats)):
                 stat = stats[i]
                 palette = palettes[i]
+                nodata_val = nodata_vals[i]
                 band_image_data = image_data[i]
                 min_val = self.config.get_min(
                     stat=stat, z=tile.z, sub_general=True)
@@ -388,7 +390,8 @@ class RasterTiler():
                     image_data=band_image_data,
                     palette=palette,
                     min_val=min_val,
-                    max_val=max_val)
+                    max_val=max_val,
+                    nodata_val=nodata_val)
                 img.save(output_path)
 
             message = f'Done creating web tile {tile}'
