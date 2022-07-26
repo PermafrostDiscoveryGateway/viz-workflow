@@ -22,7 +22,9 @@
           "aggregation_method": "sum",
           "resampling_method": "sum",
           "val_range": [0, null],
-          "palette": ["rgb(102 51 153 / 0.0)", "#d93fce", "lch(85% 100 85)"]
+          "palette": ["#66339952", "#d93fce", "#ffcc00"],
+          "nodata_val": 0,
+          "nodata_color": "#ffffff00"
       },
       {
           "name": "iwp_coverage",
@@ -31,7 +33,9 @@
           "aggregation_method": "sum",
           "resampling_method": "average",
           "val_range": [0, 1],
-          "palette": ["rgb(102 51 153 / 0.0)", "lch(85% 100 85)"]
+          "palette": ["#66339952", "#ffcc00"],
+          "nodata_val": 0,
+          "nodata_color": "#ffffff00"
       }
   ],
   "deduplicate_at": ["raster", "3dtiles"],
