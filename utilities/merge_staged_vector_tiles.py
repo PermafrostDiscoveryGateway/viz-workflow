@@ -16,9 +16,11 @@ It has methods that do the following:
 """
 
 import os
+import pathlib
 import shutil
-import time.monotonic
+import time
 from ast import Raise
+from datetime import datetime
 
 import geopandas as gpd
 import pandas as pd
@@ -74,10 +76,11 @@ def main():
     
     staged_dir_paths_list = ['/ime/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_13_FULL_SINGLE_RUN/gpub050/july_13_fifteennode/staged',
                             ]
-    merged_dir_path = '/ime/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_13_FULL_SINGLE_RUN/merged/july_13_fifteennode/staged'
+    merged_dir_path =        '/ime/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_13_FULL_SINGLE_RUN/merged/july_13_fifteennode/staged'
     stager = pdgstaging.TileStager(config=IWP_CONFIG, check_footprints=False)
     ext = '.gpkg'
     
+    print("Starting merge...")
     merge_all_staged_dirs(staged_dir_paths_list, merged_dir_path, stager, ext)
 
 
@@ -92,19 +95,38 @@ def collect_paths_from_dir(path_manager, base_dir_name_string, base_dir_path, ex
     base_dir_name_string
         A human-readable name to use as an alias for this path ()
     merged_dir_path
-    
+
     '''
     
-    start = time.monotonic()
-    print(f"Collecting paths in basedir named {base_dir_name_string}, recursively from base path: {base_dir_path}")
-    path_manager.add_base_dir(base_dir_name_string, base_dir_path, ext)
-    paths_list = path_manager.get_filenames_from_dir(base_dir_name_string)
-    paths_set = set(paths_list) # speed optimization
+    paths_list_local_filename = f'./path_lists/{base_dir_name_string}.txt'
     
-    assert len(paths_list) == len(paths_set), f"❌ Warning: There are duplicate paths in this base dir {base_dir_path}"
-    
-    print("Done collecting paths for one iteration.")
-    print(f"⏰ Elapsed time: {(time.monotonic() - start)/60:.2f}")
+    ## IF PATHS WERE SAVED to a file, much faster. ELSE: Collect all paths from NFS file server.
+    paths_list = []
+    pathlib_paths_list_local_filename = pathlib.Path(paths_list_local_filename)
+    if pathlib_paths_list_local_filename.exists():
+        with open(paths_list_local_filename, 'r') as fp:
+            for line in fp:
+                # remove linebreak from each line
+                paths_list.append(line[:-1])
+        paths_set = set(paths_list) # speed optimization
+        assert len(paths_list) == len(paths_set), f"❌ Warning: There are duplicate paths in this base dir: {base_dir_path}"
+    else:
+        start = time.monotonic()
+        print(f"Collecting paths in basedir named {base_dir_name_string}, \n\tpath:{base_dir_path}")
+        path_manager.add_base_dir(base_dir_name_string, base_dir_path, ext)
+        paths_list = path_manager.get_filenames_from_dir(base_dir_name_string)
+        paths_set = set(paths_list) # speed optimization
+        
+        assert len(paths_list) == len(paths_set), f"❌ Warning: There are duplicate paths in this base dir: {base_dir_path}"
+        
+        print("Done collecting paths for one iteration.")
+        print(f"⏰ Elapsed time: {(time.monotonic() - start)/60:.2f} minutes.")
+        
+        # write path list to disk
+        pathlib_paths_list_local_filename.parent.mkdir(parents=True, exist_ok=True)
+        pathlib_paths_list_local_filename.touch(exist_ok=True)
+        with open(paths_list_local_filename, "w") as outfile:
+            outfile.write("\n".join(str(path) for path in paths_list))
     
     return paths_list, paths_set
 
@@ -137,31 +159,43 @@ def merge_all_staged_dirs(staged_dir_paths_list, merged_dir_path, stager, ext=No
     
     # use same stager for whole merge job
     if isinstance(stager, (dict, str)):
-        stager = TileStager(stager)
+        stager = TileStager(stager, check_footprints=False)
     path_manager = stager.tiles
     
     # collect paths
     final_merged_paths, final_merged_paths_set = collect_paths_from_dir(path_manager, 'merged_dir_path', merged_dir_path, ext)
     
-    # MERGE! For each staged_dir! 
+    # MERGE! For each staged_dir (equal to number of original compute nodes)! 
     for i, staged_dir_path in enumerate(staged_dir_paths_list):
         
         # collect paths
         paths, paths_set = collect_paths_from_dir(path_manager, f'staged_dir_path{i}', staged_dir_path, ext)
+        incoming_length = len(paths_set)
         
-        for incoming_tile_in_path in paths:
+        for j, incoming_tile_in_path in enumerate(paths):
             # If file not exist, copy/create new.
             # if path already there, check if identical.
                 # if not identical, merge/append.
                 # if identical, skip.
-            
+            print(f"⏳ {j} of {incoming_length}...")
             incoming_tile_out_path = path_manager.path_from_tile(tile=incoming_tile_in_path, base_dir='merged_dir_path')
+            
+            print(f"\tIncoming in-path: {incoming_tile_in_path}")
+            print(f"\tIncoming out-path: {incoming_tile_out_path}")
+            
             
             # todo check that this comparison is lining up...
             if incoming_tile_out_path not in final_merged_paths_set:
+                print("File not in dest. Copying...")
                 # (1) add to final_merged_paths_set
                 # (2) copy incoming to destination 
                 final_merged_paths_set.add(incoming_tile_out_path)
+                
+                # check the destination folder structure exists
+                filepath = pathlib.Path(incoming_tile_out_path)
+                if not filepath.parent.is_dir():
+                    filepath.parent.mkdir(parents=True, exist_ok=True)
+                
                 # faster with pyfastcopy
                 shutil.copyfile(incoming_tile_in_path, incoming_tile_out_path)
             else:
