@@ -22,16 +22,16 @@ import viz_3dtiles  # import Cesium3DTile, Cesium3DTileset
 #######################
 #### Change me 😁  ####
 #######################
-RAY_ADDRESS       = 'ray://172.28.23.126:10001'  # SET ME!! Use output from `$ ray start --head --port=6379 --dashboard-port=8265`
-NUM_PARALLEL_CPU_CORES = 220 # 220/960 = 23% 220
+RAY_ADDRESS       = 'ray://172.28.23.106:10001'  # SET ME!! Ray head-node IP address (using port 10001). Use output from `$ ray start --head --port=6379 --dashboard-port=8265`
+NUM_PARALLEL_CPU_CORES = 920 # 220 # 220/960 = 23% 220
 
 # ALWAYS include the tailing slash "/"
-BASE_DIR_OF_INPUT = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/'   # The output data of MAPLE. Which is the input data for STAGING.
+BASE_DIR_OF_INPUT = '/ime/bbki/kastanday/maple_data_xsede_bridges2/outputs/'   # The output data of MAPLE. Which is the input data for STAGING.
 FOOTPRINTS_PATH   = BASE_DIR_OF_INPUT + 'footprints/staged_footprints/'
-# OUTPUT            = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_10_v1_shuffle/'       # Dir for results. High I/O is good.
-OUTPUT            = '/tmp/viz_output/july_13_fifteennode/'       # Dir for results. High I/O is good.
-# BASE_DIR_OF_INPUT = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs'                  # The output data of MAPLE. Which is the input data for STAGING.
-# OUTPUT            = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output'       # Dir for results. High I/O is good.
+
+OUTPUT            = '/tmp/viz_output/july_30_v2/'       # Dir for results. High I/O is good.
+# OUTPUT            = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_13_FULL_SINGLE_RUN/gpub052/july_13_fifteennode/'       # Dir for results.
+# OUTPUT            = '/ime/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_24_v2/'       # Dir for results.
 OUTPUT_OF_STAGING = OUTPUT + 'staged/'              # Output dirs for each sub-step
 GEOTIFF_PATH      = OUTPUT + 'geotiff/'
 WEBTILE_PATH      = OUTPUT + 'web_tiles/'
@@ -47,14 +47,7 @@ TEST_RUN_SIZE       = 10                              # Number of files to pre p
 ##################################
 #### ⛔️ don't change these ⛔️  ####
 ##################################
-IWP_CONFIG = {'dir_input': BASE_DIR_OF_INPUT, 'ext_input': '.shp', "dir_footprints": FOOTPRINTS_PATH, 'dir_geotiff': GEOTIFF_PATH, 'dir_web_tiles': WEBTILE_PATH, 'dir_staged': OUTPUT_OF_STAGING, 'filename_staging_summary': OUTPUT_OF_STAGING + 'staging_summary.csv', 'filename_rasterization_events': GEOTIFF_PATH + 'raster_events.csv', 'filename_rasters_summary': GEOTIFF_PATH + 'raster_summary.csv', 'version': datetime.now().strftime("%B%d,%Y"), 'simplify_tolerance': 0.1, 'tms_id': 'WorldCRS84Quad', 'z_range': [0, 16], 'geometricError': 57, 'z_coord': 0, 'statistics': [{'name': 'iwp_count', 'weight_by': 'count', 'property': 'centroids_per_pixel', 'aggregation_method': 'sum', 'resampling_method': 'sum', 'val_range': [0, None], 'palette': ['rgb(102 51 153 / 0.0)', '#d93fce', 'lch(85% 100 85)']}, {'name': 'iwp_coverage', 'weight_by': 'area', 'property': 'area_per_pixel_area', 'aggregation_method': 'sum', 'resampling_method': 'average', 'val_range': [0, 1], 'palette': ['rgb(102 51 153 / 0.0)', 'lch(85% 100 85)']}], 'deduplicate_at': ['raster', '3dtiles'], 'deduplicate_keep_rules': [['Date', 'larger']], 'deduplicate_method': 'footprints'}
-
-
-# total num input files to Staging
-# LEN_STAGING_FILES_LIST = None
-
-# TODO: return path names instead of 0. 
-# TODO: use logging instead of prints. 
+IWP_CONFIG = {"dir_input": BASE_DIR_OF_INPUT,"ext_input": ".shp","dir_footprints": FOOTPRINTS_PATH,"dir_geotiff": GEOTIFF_PATH,"dir_web_tiles": WEBTILE_PATH,"dir_staged": OUTPUT_OF_STAGING,"filename_staging_summary": OUTPUT_OF_STAGING + "staging_summary.csv","filename_rasterization_events": GEOTIFF_PATH + "raster_events.csv","filename_rasters_summary": GEOTIFF_PATH + "raster_summary.csv","version": datetime.now().strftime("%B%d,%Y"),"simplify_tolerance": 0.1,"tms_id": "WorldCRS84Quad","z_range": [0, 15],"geometricError": 57,"z_coord": 0,"statistics": [    {        "name": "iwp_count",        "weight_by": "count",        "property": "centroids_per_pixel",        "aggregation_method": "sum",        "resampling_method": "sum",        "val_range": [0, None],        "palette": ["#66339952", "#d93fce", "#ffcc00"],        "nodata_val": 0,        "nodata_color": "#ffffff00"    },    {        "name": "iwp_coverage",        "weight_by": "area",        "property": "area_per_pixel_area",        "aggregation_method": "sum",        "resampling_method": "average",        "val_range": [0, 1],        "palette": ["#66339952", "#ffcc00"],        "nodata_val": 0,        "nodata_color": "#ffffff00"    },],"deduplicate_at": ["raster", "3dtiles"],"deduplicate_keep_rules": [["Date", "larger"]],"deduplicate_method": "footprints",}
 
 def main():
     # ray.shutdown()
@@ -66,7 +59,7 @@ def main():
     # ray.init()                                                  # single-node only!
     assert ray.is_initialized() == True
     print("🎯 Ray initialized.")
-    print(f"Output dir: {OUTPUT}")
+    print(f"Writiall all results to output dir: {OUTPUT}")
     print_cluster_stats()
     
     # Logging
@@ -85,13 +78,10 @@ def main():
         ########## MAIN STEPS ##########
         print("Starting main...")
         
-
-        # step0_result = step0_staging()           # Staging 
-        step0_staging_actor_placement_group() #### <-------------- GOOD ONE ⭐️ 
-        # print(step0_result)
+        # step0_result = step0_staging()           # DEPRICATED Staging (using ray.task)
+        step0_staging_actor_placement_group() #### <-------------- ⭐️ GOOD STAGING (ray.actor) ⭐️ 
         # step1_3d_tiles(stager)                         # Create 3D tiles from .shp
         # step2_raster_highest()                   # rasterize highest Z level only 
-        # print(step2_result)                          
         # step3_raster_lower(batch_size_geotiffs=100)         # rasterize all LOWER Z levels
         # step4_webtiles(batch_size_web_tiles=200) # convert to web tiles.        
 
@@ -286,14 +276,14 @@ def start_actors_staging(staging_input_files_list):
     from ray.util.placement_group import placement_group
     
     print("\n\n👉 Starting Staging with Placement Group Actors (step_0) 👈\n\n")
-        
+    
 
     batch_size = 2
     print(f"Using batchsize {batch_size}, constructing filepath batches... ")
     filepath_batches = make_batch(staging_input_files_list, batch_size=batch_size)
     
     num_cpu_per_actor = 1
-    NUM_PARALLEL_CPU_CORES = 220
+    global NUM_PARALLEL_CPU_CORES
     max_open_files = (batch_size * NUM_PARALLEL_CPU_CORES) + NUM_PARALLEL_CPU_CORES
     NUM_PARALLEL_CPU_CORES = min(NUM_PARALLEL_CPU_CORES, len(filepath_batches)) # if few files, use few actors.
     
@@ -340,25 +330,10 @@ def start_actors_staging(staging_input_files_list):
         actor = SubmitActor.options(placement_group=pg).remote(work_queue, pg, start_time) 
         submit_actors.append(actor)
         app_futures.append(actor.submit_jobs.remote())
-        time.sleep(0.2) # help raylet timeout error on start && reduces initial spike of network traffic.
+        time.sleep(0.02) # help raylet timeout error on start && reduces initial spike of network traffic.
     
-    
-    # OLD: create all at once (failed to register)
-    # submit_actors = [SubmitActor.options(placement_group=pg).remote(work_queue, pg, start_time) for _ in range(NUM_PARALLEL_CPU_CORES)]
-    
-    
-    # # 3. start jobs
-    # app_futures = []
-    # for actor in submit_actors:
-    #     app_futures.append(actor.submit_jobs.remote())
-    #     time.sleep(0.5) # slow down burst of network traffic. Helps stability I hope??
-        
-    
-    # 4. collect results from each actor at end of job.
-    # for _ in range(0, len(submit_actors)): 
-    
-    # todo: refactor while loop. Purpose: ensure I'm collecting all app futures, even if they return more than once? idk.
-    # not sure if this helps, but I had a good run right after adding this.
+
+    # collect results from SubmitActors    
     for _ in range(len(app_futures)):
         try:
             ready, not_ready = ray.wait(app_futures)
@@ -437,7 +412,7 @@ def load_staging_checkpoints(staging_input_files_list):
     return [i for i in staging_input_files_list if i not in already_processed_files_list]
 
 # @workflow.step(name="Step0_Stage_All")
-def step0_staging_actor_placement_group(shuffle_input_filepaths=True):
+def step0_staging_actor_placement_group(shuffle_input_filepaths=False):
     # Input files! Now we use a list of files ('iwp-file-list.json')
     print("Step 0️⃣  -- Staging with SubmitActor Placement Group")
     
@@ -466,13 +441,12 @@ def step0_staging_actor_placement_group(shuffle_input_filepaths=True):
         print("Beofre shuffle:")
         print(staging_input_files_list[:3])
         random.shuffle(staging_input_files_list)
+        print("After shuffle:")
+        print(staging_input_files_list[:3])
     
-    print("After shuffle:")
-    print(staging_input_files_list[:3])
     '''
     SAVE RECORD OF CONFIG AND INPUT FILES to output dir.
     '''
-    
     # save len of input
     global LEN_STAGING_FILES_LIST
     LEN_STAGING_FILES_LIST = len(staging_input_files_list)
@@ -502,11 +476,6 @@ def prepend(mylist, mystr):
     Prepend str to front of each element of List. Typically filepaths.
     '''
     return [mystr + item for item in mylist]
-    
-    # Using format()
-    # mystr += '{0}'
-    # mylist = list((map(str.format, mylist)))
-    # return mylist
 
 # @workflow.step(name="Step1_3D_Tiles")
 def step1_3d_tiles(stager):
@@ -571,6 +540,7 @@ def step2_raster_highest(batch_size=100):
     print("2️⃣  Step 2 Rasterize only highest Z")
     stager = pdgstaging.TileStager(IWP_CONFIG)
     
+    print("Collecting all staged files...")
     # Get paths to all the newly staged tiles
     stager.tiles.add_base_dir('output_of_staging', OUTPUT_OF_STAGING, '.gpkg')
     staged_paths = stager.tiles.get_filenames_from_dir( base_dir = 'output_of_staging' )
@@ -582,6 +552,7 @@ def step2_raster_highest(batch_size=100):
     if ONLY_SMALL_TEST_RUN:
         staged_paths = staged_paths[:TEST_RUN_SIZE]
 
+    print(f"Step 2️⃣ -- Making batches of staged files... batch_size: {batch_size}")
     staged_batches = make_batch(staged_paths, batch_size)
 
     print(f"The input to this step, Rasterization, is the output of Staging.\n Using Staging path: {OUTPUT_OF_STAGING}")
@@ -591,11 +562,19 @@ def step2_raster_highest(batch_size=100):
 
     
     # ADD PLACEMENT GROUP FOR ADDED STABILITY WITH MANY NODES
-    print("Creating placement group for Step 2 -- raster highest")    
+    print("Creating placement group for Step 2 -- raster highest...")    
     from ray.util.placement_group import placement_group
     num_cpu_per_actor = 1
     pg = placement_group([{"CPU": num_cpu_per_actor}] * NUM_PARALLEL_CPU_CORES, strategy="SPREAD") # strategy="STRICT_SPREAD" strict = only one job per node. Bad. 
     ray.get(pg.ready()) # wait for it to be ready
+    
+    print(f"total filepaths: {len(staged_paths)}.")
+    print("total filepath batches: ", len(staged_batches), "<-- total number of jobs to submit")
+    print("total submit_actors: ", NUM_PARALLEL_CPU_CORES, "<-- expect this many CPUs utilized\n\n")
+    logging.info(f"total filepaths: {len(staged_paths)}.")
+    logging.info(f"total filepath batches: {len(staged_batches)} <-- total number of jobs to submit")
+    logging.info(f"total submit_actors: {NUM_PARALLEL_CPU_CORES} <-- expect this many CPUs utilized")
+    
 
     start = time.time()
 
@@ -718,7 +697,7 @@ def step4_webtiles(batch_size_web_tiles=100):
     # Update color ranges
     rasterizer.update_ranges()
 
-    print(f"Collecting all Geotiffs (.tif) in: {GEOTIFF_PATH}")
+    print(f"Collecting all Geotiffs (.tif) in: {GEOTIFF_PATH}...")
     stager.tiles.add_base_dir('geotiff_path', GEOTIFF_PATH, '.tif')
     geotiff_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_path')
 

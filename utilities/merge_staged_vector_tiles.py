@@ -74,9 +74,12 @@ def main():
     # todo: 
     # 1. add more paths to staged_dir_paths_list
     
-    staged_dir_paths_list = ['/ime/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_13_FULL_SINGLE_RUN/gpub050/july_13_fifteennode/staged',
+    # staged_dir_paths_list = ['/ime/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_13_FULL_SINGLE_RUN/gpub050/july_13_fifteennode/staged',
+    #                         ]
+    # merged_dir_path =        '/ime/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_13_FULL_SINGLE_RUN/merged/july_13_fifteennode/staged'
+    staged_dir_paths_list = ['/tmp/receive_tar/july_30_v2/staged',
                             ]
-    merged_dir_path =        '/ime/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_13_FULL_SINGLE_RUN/merged/july_13_fifteennode/staged'
+    merged_dir_path =        '/tmp/viz_output/july_30_v2/staged'
     stager = pdgstaging.TileStager(config=IWP_CONFIG, check_footprints=False)
     ext = '.gpkg'
     
@@ -97,8 +100,8 @@ def collect_paths_from_dir(path_manager, base_dir_name_string, base_dir_path, ex
     merged_dir_path
 
     '''
-    
-    paths_list_local_filename = f'./path_lists/{base_dir_name_string}.txt'
+    # This is where a cache of path lists (one for each compute node), will be stored.
+    paths_list_local_filename = f'./path_list_cache/{base_dir_name_string}.txt'
     
     ## IF PATHS WERE SAVED to a file, much faster. ELSE: Collect all paths from NFS file server.
     paths_list = []
@@ -112,7 +115,7 @@ def collect_paths_from_dir(path_manager, base_dir_name_string, base_dir_path, ex
         assert len(paths_list) == len(paths_set), f"❌ Warning: There are duplicate paths in this base dir: {base_dir_path}"
     else:
         start = time.monotonic()
-        print(f"Collecting paths in basedir named {base_dir_name_string}, \n\tpath:{base_dir_path}")
+        print(f"Collecting paths. Base dir named: {base_dir_name_string}, \n\tpath: {base_dir_path}")
         path_manager.add_base_dir(base_dir_name_string, base_dir_path, ext)
         paths_list = path_manager.get_filenames_from_dir(base_dir_name_string)
         paths_set = set(paths_list) # speed optimization
@@ -126,6 +129,7 @@ def collect_paths_from_dir(path_manager, base_dir_name_string, base_dir_path, ex
         pathlib_paths_list_local_filename.parent.mkdir(parents=True, exist_ok=True)
         pathlib_paths_list_local_filename.touch(exist_ok=True)
         with open(paths_list_local_filename, "w") as outfile:
+            # todo: write oritinal filepath too as first line!
             outfile.write("\n".join(str(path) for path in paths_list))
     
     return paths_list, paths_set
@@ -208,7 +212,7 @@ def merge_all_staged_dirs(staged_dir_paths_list, merged_dir_path, stager, ext=No
                                 
                 if incoming_tile == final_tile:
                     # skip 
-                    print("⚠️⚠️ Skipping... In & out are identical (paths above). ⚠️")
+                    print("⚠️ Skipping... In & out are identical (paths above). ⚠️")
                     pass
                 else:
                     # not same tile... append new polygons to existing tile...
