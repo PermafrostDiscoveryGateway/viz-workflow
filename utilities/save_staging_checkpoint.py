@@ -32,7 +32,7 @@ def main():
     success_write_path = f'{args.output_path}/success_paths.txt'
     
     # read in logs
-    with open(f'{args.path_to_log}/ray_client_server_23000.err', 'r') as f:
+    with open(f'{args.path_to_log}', 'r') as f:
       data = f.readlines()
     
     ####
