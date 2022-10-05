@@ -135,13 +135,15 @@ class StagedTo3DConverter():
 
     def parent_3dtiles_from_children(self, tiles, bv_limit=None):
         """
-            Create parent Cesium 3D Tileset json files that point to
-            of child JSON files in the tile tree hierarchy.
+            Create parent Cesium 3D Tileset json files that point to of child
+            JSON files in the tile tree hierarchy. This method will take a list
+            of parent tiles and search the 3D tile directory for any children
+            tiles to create.
 
             Parameters
             ----------
             tiles : list of morecantile.Tile
-                The list of tiles to create parent tiles for.
+                The list of parent tiles to create.
         """
 
         tile_manager = self.tiles
@@ -219,3 +221,30 @@ class StagedTo3DConverter():
             'east': bounds[2], 'north': bounds[3],
         }
         return region_bv
+
+    def make_top_level_tileset(self):
+        """
+        Create a top-level tileset.json file that sets all the min_z level
+        tiles as its children. This is needed to display the tiles in Cesium
+        when the min_z level has more than one tile.
+
+        Returns
+        -------
+        tileset : Tileset
+            The Cesium3DTileset object
+        """
+
+        tile_manager = self.tiles
+        config_manager = self.config
+        min_z = config_manager.get_min_z()
+
+        # Make a parent tileset.json - this will combine the top level tiles if
+        # there are 2, otherwise it will just refer to the top level tile.
+        top_level_tiles = tile_manager.get_filenames_from_dir(
+            '3dtiles', z=min_z)
+        top_level_dir = tile_manager.get_base_dir('3dtiles')['path']
+
+        return TreeGenerator.parent_tile_from_children_json(
+            children=top_level_tiles,
+            dir=top_level_dir
+        )

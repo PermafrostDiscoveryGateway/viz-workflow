@@ -299,6 +299,11 @@ def run_pdg_workflow(
         # Don't start the next z-level until the current z-level is complete
         [a.result() for a in app_futures]
 
+    # Make a top-level tileset.json file - essential when the min_z level
+    # comprises 2+ tiles, useful in any case so that the path to use in cesium
+    # is consistently path/to/3dtiles/dir/tileset.json
+    tiles3dmaker.make_top_level_tileset()
+
     end_time = datetime.now()
     logging.info(f'⏰ Total time to create parent 3d tiles: '
                  f'{end_time - start_time}')
