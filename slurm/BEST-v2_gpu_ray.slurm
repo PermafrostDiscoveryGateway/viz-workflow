@@ -2,7 +2,7 @@
 
 #SBATCH --job-name=pdg_viz
 #SBATCH --partition=gpuA40x4
-#SBATCH --account=bbki-delta-gpu
+#SBATCH --account=$PDG_ALLOCATION
 #SBATCH --time=24:00:00
 
 #SBATCH --export=ALL,RAY_worker_register_timeout_seconds=120

@@ -2,7 +2,7 @@
 
 #SBATCH --job-name=pdg_viz
 #SBATCH --partition=cpu
-#SBATCH --account=bbki-delta-cpu
+#SBATCH --account=$PDG_ALLOCATION_CPU
 #SBATCH --time=24:00:00
 
 #SBATCH --export=ALL,RAY_worker_register_timeout_seconds=120
