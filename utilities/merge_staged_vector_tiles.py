@@ -78,11 +78,11 @@ def main():
     base_dir = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/v1_debug_viz_output/staged'
     staged_dir_paths_list = [
         # f'{base_dir}/gpub090', # merged!
-        f'{base_dir}/gpub091',
-        f'{base_dir}/gpub092',
-        f'{base_dir}/gpub093',
-        f'{base_dir}/gpub094',
-        f'{base_dir}/gpub095',
+        # f'{base_dir}/gpub091', # merged!
+        # f'{base_dir}/gpub092', # using rsync src
+        # f'{base_dir}/gpub093', # using rsync dest
+        # f'{base_dir}/gpub094', # merged!
+        f'{base_dir}/gpub095', # in progress
         f'{base_dir}/gpub096',
         f'{base_dir}/gpub097',
         f'{base_dir}/gpub098',
@@ -162,17 +162,30 @@ class StagingMerger():
             try: 
                 # Start remote functions
                 app_futures = []
-                for incoming_tile_in_path in paths:
+                
+                path_batches = make_batch(paths, batch_size=800)
+                total_batches = len(path_batches)
+                for i, incoming_tile_in_path_batch in enumerate(path_batches):
+                    print(f'starting batch {i+1} of {total_batches}')
                     
-                    incoming_tile_out_path = path_manager.path_from_tile(tile=incoming_tile_in_path, base_dir='merged_dir_path')
-                    app_future = self.merge_tile.remote(incoming_tile_in_path, incoming_tile_out_path, self.isDestructive)
+                    # collect all the out paths
+                    incoming_tile_out_path_batch = []
+                    for incoming_tile_in_path in incoming_tile_in_path_batch:
+                        incoming_tile_out_path_batch.append( path_manager.path_from_tile(tile=incoming_tile_in_path, base_dir='merged_dir_path') )
+                    
+                    app_future = batch_merge_tile.remote(incoming_tile_in_path_batch, incoming_tile_out_path_batch, isDestructive=self.isDestructive)
                     app_futures.append(app_future)
+                # for incoming_tile_in_path in paths:
+                #     NOT BATCHED VERSION:
+                #     incoming_tile_out_path = path_manager.path_from_tile(tile=incoming_tile_in_path, base_dir='merged_dir_path')
+                #     app_future = self.merge_tile.remote(incoming_tile_in_path, incoming_tile_out_path, self.isDestructive)
+                #     app_futures.append(app_future)
 
                 # collect results
                 for i in range(0, len(app_futures)): 
                     ready, not_ready = ray.wait(app_futures)
                     
-                    print(f"✅ Completed {i+1} of {incoming_length}. Action taken: {ray.get(ready)}")
+                    print(f"✅ Completed batch {i+1} of {total_batches}. Action taken: {ray.get(ready)}")
                     # print(f"📌 Completed {i+1} of {incoming_length}")
                     # print(f"⏰ Running total of elapsed time: {(time.monotonic() - merge_all_vector_tiles_start_time)/60:.2f} minutes\n")
 
@@ -180,7 +193,7 @@ class StagingMerger():
                     if not app_futures:
                         break
             except Exception as e:
-                print(f"Cauth error in Ray loop: {str(e)}")
+                print(f"‼️‼️‼️‼️‼️ VERY BAD: Cauth error in Ray loop: {str(e)}")
             finally:
                 print(f"Runtime: {(time.monotonic() - merge_all_vector_tiles_start_time):.2f} seconds")
 
@@ -229,7 +242,6 @@ class StagingMerger():
             
             assert len(paths_list) == len(paths_set), f"❌ Warning: There are duplicate paths in this base dir: {base_dir_path}"
             
-            print("Done collecting paths for one iteration.")
             print(f"⏰ Elapsed time: {(time.monotonic() - start)/60:.2f} minutes.")
             
             # write path list to disk
@@ -240,90 +252,101 @@ class StagingMerger():
                 outfile.write("\n".join(str(path) for path in paths_list))
         
         return paths_list, paths_set
-    
-    def make_batch(items, batch_size):
-        """
-        Simple helper.
-        Create batches of a given size from a list of items.
-        """
-        return [items[i:i + batch_size] for i in range(0, len(items), batch_size)]
-    
-    def batch_merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive, batch_size=500):
-        '''
-        Merge a single tile with the final merged tile. 
-        '''
-        for itr, tile_in_path in enumerate(incoming_tile_in_path):
-            merge_tile.remote(tile_in_path, tile_out_path, isDestructive)
+'''
+###############################################
+End class methods
+###############################################
+'''
 
-    @ray.remote
-    def merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive):
-        # todo check that this comparison is lining up...
-        action_taken_string = ''
-        if not os.path.exists(incoming_tile_out_path):
-            # time.sleep(5)
-            # (1) add to final_merged_paths_set
-            # (2) copy incoming to destination 
-            
-            # NO NEED: final_merged_paths_set.add(incoming_tile_out_path)
-            
-            # check the destination folder structure exists
-            filepath = pathlib.Path(incoming_tile_out_path)
-            if not filepath.parent.is_dir():
-                filepath.parent.mkdir(parents=True, exist_ok=True)
-            
+def make_batch(items, batch_size):
+    """
+    Simple helper.
+    Create batches of a given size from a list of items.
+    """
+    return [items[i:i + batch_size] for i in range(0, len(items), batch_size)]
+
+@ray.remote
+def batch_merge_tile(incoming_tile_in_path_batch, incoming_tile_out_path_batch, isDestructive):
+    '''
+    Merge a batch of tiles. More efficient by making fewer ray remote calls.
+    '''
+    assert len(incoming_tile_in_path_batch) == len(incoming_tile_out_path_batch), f"❌ Error: the 'in-paths' and 'out-paths' must match. You gave me: {len(incoming_tile_in_path_batch)} != {len(incoming_tile_out_path_batch)}"
+    actions_taken = []
+    for incoming_tile_in_path, incoming_tile_out_path in zip(incoming_tile_in_path_batch, incoming_tile_out_path_batch):
+        action_taken_string = merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive)
+        actions_taken.append(action_taken_string)
+    
+    return actions_taken
+
+# @ray.remote
+def merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive):
+    # todo check that this comparison is lining up...
+    action_taken_string = ''
+    if not os.path.exists(incoming_tile_out_path):
+        # time.sleep(5)
+        # (1) add to final_merged_paths_set
+        # (2) copy incoming to destination 
+        
+        # NO NEED: final_merged_paths_set.add(incoming_tile_out_path)
+        
+        # check the destination folder structure exists
+        filepath = pathlib.Path(incoming_tile_out_path)
+        if not filepath.parent.is_dir():
+            filepath.parent.mkdir(parents=True, exist_ok=True)
+        
+        if isDestructive:
+            shutil.move(incoming_tile_in_path, incoming_tile_out_path)
+            # print("File moved.")
+            print("File not in dest. Moving to dest: ", incoming_tile_out_path)
+            action_taken_string += 'fast move'
+        else: 
+            # faster with pyfastcopy
+            shutil.copyfile(incoming_tile_in_path, incoming_tile_out_path)
+            print("File not in dest. Copying to dest: ", incoming_tile_out_path)
+            # print("File coppied.")
+            action_taken_string += 'fast copy'
+    else:
+        # if identical, skip. Else, merge/append-to the GDF.
+        if filecmp.cmp(incoming_tile_in_path, incoming_tile_out_path):
+            # identical, skip merge
             if isDestructive:
-                shutil.move(incoming_tile_in_path, incoming_tile_out_path)
-                # print("File moved.")
-                print("File not in dest. Moving to dest: ", incoming_tile_out_path)
-                action_taken_string += 'fast move'
-            else: 
-                # faster with pyfastcopy
-                shutil.copyfile(incoming_tile_in_path, incoming_tile_out_path)
-                print("File not in dest. Copying to dest: ", incoming_tile_out_path)
-                # print("File coppied.")
-                action_taken_string += 'fast copy'
-        else:
-            # if identical, skip. Else, merge/append-to the GDF.
-            if filecmp.cmp(incoming_tile_in_path, incoming_tile_out_path):
-                # identical, skip merge
-                if isDestructive:
-                    os.remove(incoming_tile_in_path)
-                    action_taken_string += 'identical. Deleted old.'
-                # self.skipped_merge_identical_file_count += 1
-                else:
-                    action_taken_string += 'identical. skipped'
-                print("⚠️ Skipping... In & out are identical. ⚠️")
-                print("In: ", incoming_tile_in_path)
-                print("Out: ", incoming_tile_out_path)
+                os.remove(incoming_tile_in_path)
+                action_taken_string += 'identical. Deleted old.'
+            # self.skipped_merge_identical_file_count += 1
             else:
-                # not same tile... append new polygons to existing tile...
-                # print("Appending...")
-                # start_append = time.monotonic()
+                action_taken_string += 'identical. skipped'
+            print("⚠️ Skipping... In & out are identical. ⚠️")
+            print("In: ", incoming_tile_in_path)
+            print("Out: ", incoming_tile_out_path)
+        else:
+            # not same tile... append new polygons to existing tile...
+            # print("Appending...")
+            # start_append = time.monotonic()
+            
+            # incoming tile, append to existing filepath. 
+            with warnings.catch_warnings():
+                # suppress 'FutureWarning: pandas.Int64Index is deprecated and will be removed from pandas in a future version. Use pandas.Index with the appropriate dtype instead.'
+                warnings.simplefilter("ignore")
                 
-                # incoming tile, append to existing filepath. 
-                with warnings.catch_warnings():
-                    # suppress 'FutureWarning: pandas.Int64Index is deprecated and will be removed from pandas in a future version. Use pandas.Index with the appropriate dtype instead.'
-                    warnings.simplefilter("ignore")
-                    
-                    in_path_lock = lock_file(incoming_tile_in_path)
-                    out_path_lock = lock_file(incoming_tile_out_path)
+                in_path_lock = lock_file(incoming_tile_in_path)
+                out_path_lock = lock_file(incoming_tile_out_path)
 
-                    incoming_gdf = gpd.read_file(incoming_tile_in_path)
-                    incoming_gdf.to_file(incoming_tile_out_path, mode='a')
-                    
-                    release_file(in_path_lock)
-                    release_file(out_path_lock)
+                incoming_gdf = gpd.read_file(incoming_tile_in_path)
+                incoming_gdf.to_file(incoming_tile_out_path, mode='a')
                 
-                    # if isDestructive:
-                    #     # delete original file
-                    
-                    # always delete after two tiles are merged, otherwise it's impossible to keep things consistent.
-                    os.remove(incoming_tile_in_path)
-                    
-                print("appended & old deleted.")
-                action_taken_string += f'Merged, old deleted.'
-                # self.append_count += 1
-        return action_taken_string
+                release_file(in_path_lock)
+                release_file(out_path_lock)
+            
+                # if isDestructive:
+                #     # delete original file
+                
+                # always delete after two tiles are merged, otherwise it's impossible to keep things consistent.
+                os.remove(incoming_tile_in_path)
+                
+            print("appended & old deleted.")
+            action_taken_string += f'Merged, old deleted.'
+            # self.append_count += 1
+    return action_taken_string
 
 def lock_file(path):
     """
