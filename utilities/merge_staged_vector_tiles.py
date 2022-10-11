@@ -75,16 +75,21 @@ def main():
     # staged_dir_paths_list = ['/tmp/direct_copy/v4_viz_output/staged',
     #                         ]
     # merged_dir_path =        '/tmp/v4_viz_output/staged'
-    
+    base_dir = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/v1_debug_viz_output/staged'
     staged_dir_paths_list = [
-        '/scratch/bbki/kastanday/maple_data_xsede_bridges2/v3_viz_output/gpub070',
-        '/scratch/bbki/kastanday/maple_data_xsede_bridges2/v3_viz_output/gpub071',
-        '/scratch/bbki/kastanday/maple_data_xsede_bridges2/v3_viz_output/gpub084',
-        '/scratch/bbki/kastanday/maple_data_xsede_bridges2/v3_viz_output/gpub091',
-                            ]
-    merged_dir_path =        '/scratch/bbki/kastanday/maple_data_xsede_bridges2/v3_viz_output/merged_with_base_gpub011'
+        # f'{base_dir}/gpub090', # merged!
+        f'{base_dir}/gpub091',
+        f'{base_dir}/gpub092',
+        f'{base_dir}/gpub093',
+        f'{base_dir}/gpub094',
+        f'{base_dir}/gpub095',
+        f'{base_dir}/gpub096',
+        f'{base_dir}/gpub097',
+        f'{base_dir}/gpub098',
+        ]
+    merged_dir_path = f'{base_dir}/gpub088'
     
-    print("Input dirs: ", staged_dir_paths_list)
+    print("Input dirs: ", "\n".join(staged_dir_paths_list))
     print("Final  dir: ", merged_dir_path)
     
     stager = pdgstaging.TileStager(config=IWP_CONFIG, check_footprints=False)
@@ -203,7 +208,9 @@ class StagingMerger():
         ## IF PATHS WERE SAVED to a file, much faster. ELSE: Collect all paths from NFS file server.
         paths_list = []
         pathlib_paths_list_local_filename = pathlib.Path(paths_list_local_filename)
-        if pathlib_paths_list_local_filename.exists():
+        
+        # DON'T USE A CACHE. CAUSES HARD BUGS. NO CACHE: Collect all paths from NFS file server.
+        if False: # pathlib_paths_list_local_filename.exists():
             with open(paths_list_local_filename, 'r') as fp:
                 for line in fp:
                     # remove linebreak from each line
@@ -233,6 +240,20 @@ class StagingMerger():
                 outfile.write("\n".join(str(path) for path in paths_list))
         
         return paths_list, paths_set
+    
+    def make_batch(items, batch_size):
+        """
+        Simple helper.
+        Create batches of a given size from a list of items.
+        """
+        return [items[i:i + batch_size] for i in range(0, len(items), batch_size)]
+    
+    def batch_merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive, batch_size=500):
+        '''
+        Merge a single tile with the final merged tile. 
+        '''
+        for itr, tile_in_path in enumerate(incoming_tile_in_path):
+            merge_tile.remote(tile_in_path, tile_out_path, isDestructive)
 
     @ray.remote
     def merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive):
@@ -264,7 +285,7 @@ class StagingMerger():
         else:
             # if identical, skip. Else, merge/append-to the GDF.
             if filecmp.cmp(incoming_tile_in_path, incoming_tile_out_path):
-                # skip
+                # identical, skip merge
                 if isDestructive:
                     os.remove(incoming_tile_in_path)
                     action_taken_string += 'identical. Deleted old.'
@@ -272,6 +293,8 @@ class StagingMerger():
                 else:
                     action_taken_string += 'identical. skipped'
                 print("⚠️ Skipping... In & out are identical. ⚠️")
+                print("In: ", incoming_tile_in_path)
+                print("Out: ", incoming_tile_out_path)
             else:
                 # not same tile... append new polygons to existing tile...
                 # print("Appending...")
@@ -293,7 +316,8 @@ class StagingMerger():
                 
                     # if isDestructive:
                     #     # delete original file
-                    # always delete after append, otherwise very hard to keep consistent.
+                    
+                    # always delete after two tiles are merged, otherwise it's impossible to keep things consistent.
                     os.remove(incoming_tile_in_path)
                     
                 print("appended & old deleted.")
