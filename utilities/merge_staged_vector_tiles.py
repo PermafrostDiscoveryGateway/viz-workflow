@@ -1,3 +1,11 @@
+'''
+Usage Instructions in main():
+    1. Set the RAY_ADDRESS variable to the IP address of the Ray head node.
+    2. Set the list of paths to the vector tiles `staged_dir_paths_list`
+    3. Choose one of the paths from step 2, remove it from the `staged_dir_paths_list` and set it as the `merged_dir_path` that will be used as the merged dir.
+'''
+
+
 """
 This file prepares staged, vector tiles for archiving in the DataONE network.
 It has methods that do the following:
@@ -23,6 +31,8 @@ import time
 import warnings
 from ast import Raise
 from datetime import datetime
+import logging
+import logging.config
 
 import geopandas as gpd
 import pandas as pd
@@ -44,6 +54,9 @@ RAY_ADDRESS       = 'auto'
 ###################################
 #### ⛔️ don't change these ⛔️  ####
 ###################################
+
+# todo: see if I can delete all of these constants....
+
 # These don't matter much in this workflow.
 # ALWAYS include the tailing slash "/"
 # BASE_DIR_OF_INPUT = '/ime/bbki/kastanday/maple_data_xsede_bridges2/outputs/'   # The output data of MAPLE. Which is the input data for STAGING.
@@ -59,35 +72,38 @@ WEBTILE_PATH      = OUTPUT + 'web_tiles/'
 THREE_D_PATH      = OUTPUT + '3d_tiles/'
 IWP_CONFIG = {"dir_input": BASE_DIR_OF_INPUT,"ext_input": ".shp", "dir_footprints": FOOTPRINTS_PATH,"dir_geotiff": GEOTIFF_PATH,"dir_web_tiles": WEBTILE_PATH,"dir_staged": OUTPUT_OF_STAGING,"filename_staging_summary": OUTPUT_OF_STAGING + "staging_summary.csv","filename_rasterization_events": GEOTIFF_PATH + "raster_events.csv","filename_rasters_summary": GEOTIFF_PATH + "raster_summary.csv","version": datetime.now().strftime("%B%d,%Y"),"simplify_tolerance": 0.1,"tms_id": "WorldCRS84Quad","z_range": [0, 16],"geometricError": 57,"z_coord": 0,"statistics": [    {        "name": "iwp_count",        "weight_by": "count",        "property": "centroids_per_pixel",        "aggregation_method": "sum",        "resampling_method": "sum",        "val_range": [0, None],        "palette": ["#66339952", "#d93fce", "#ffcc00"],        "nodata_val": 0,        "nodata_color": "#ffffff00"    },    {        "name": "iwp_coverage",        "weight_by": "area",        "property": "area_per_pixel_area",        "aggregation_method": "sum",        "resampling_method": "average",        "val_range": [0, 1],        "palette": ["#66339952", "#ffcc00"],        "nodata_val": 0,        "nodata_color": "#ffffff00"    },],"deduplicate_at": ["raster", "3dtiles"],"deduplicate_keep_rules": [["Date", "larger"]],"deduplicate_method": "footprints",}
 
+BASE_DIR = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/v1_debug_viz_output/staged'
 
 def main():
-    # Todo: add argparse support (need robust parsing of staged dirs)
-    # import argparse
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('--path', type=str, required=True)
-    # parser.add_argument('--stager', type=str, required=True)
-    # parser.add_argument('--archive_dir', type=str, required=True)
-    # parser.add_argument('--ext', type=str, required=False)
-    # args = parser.parse_args()
-    # archive_vector_tile(args.path, args.stager, args.archive_dir, args.ext)
-    # merge_all_staged_dirs(args.path, args.stager, args.archive_dir, args.ext)
+    '''
+    Usage Instructions:
+        1. Set the RAY_ADDRESS variable to the IP address of the Ray head node.
+        2. Set the list of paths to the vector tiles `staged_dir_paths_list`
+        3. Choose one of the paths from the last step, remove it from the `staged_dir_paths_list` and set it as the `merged_dir_path` that will be used as the merged dir.
+    '''
     
-    # staged_dir_paths_list = ['/tmp/direct_copy/v4_viz_output/staged',
-    #                         ]
-    # merged_dir_path =        '/tmp/v4_viz_output/staged'
-    base_dir = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/v1_debug_viz_output/staged'
+    # CHANGE ME!!! 😁  👇👇
+    
+    BASE_DIR = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/v1_debug_viz_output/staged'
+    
+    merged_dir_path = f'{BASE_DIR}/gpub088'  # this path SHOULD NOT be in the `staged_dir_paths_list`
     staged_dir_paths_list = [
-        # f'{base_dir}/gpub090', # merged!
-        # f'{base_dir}/gpub091', # merged!
-        # f'{base_dir}/gpub092', # using rsync src
-        # f'{base_dir}/gpub093', # using rsync dest
-        # f'{base_dir}/gpub094', # merged!
-        f'{base_dir}/gpub095', # in progress
-        f'{base_dir}/gpub096',
-        f'{base_dir}/gpub097',
-        f'{base_dir}/gpub098',
-        ]
-    merged_dir_path = f'{base_dir}/gpub088'
+        f'{BASE_DIR}/gpub090',
+        f'{BASE_DIR}/gpub091',
+        f'{BASE_DIR}/gpub092',
+        f'{BASE_DIR}/gpub093',
+        f'{BASE_DIR}/gpub094',
+        f'{BASE_DIR}/gpub095',
+        f'{BASE_DIR}/gpub096',
+        f'{BASE_DIR}/gpub097',
+        f'{BASE_DIR}/gpub098',
+    ]
+    
+    # validate input
+    for path in staged_dir_paths_list + [merged_dir_path]:
+        # check that path exists
+        if not os.path.exists(path):
+            raise ValueError(f'Path {path} does not exist. For usage instructions, read the top of this file.')
     
     print("Input dirs: ", "\n".join(staged_dir_paths_list))
     print("Final  dir: ", merged_dir_path)
@@ -96,6 +112,7 @@ def main():
     ext = '.gpkg'
     
     print("Starting merge...")
+    start_distributed_logging()
     merger = StagingMerger()
     merger.merge_all_staged_dirs(staged_dir_paths_list, merged_dir_path, stager, ext)
 
@@ -165,8 +182,8 @@ class StagingMerger():
                 
                 path_batches = make_batch(paths, batch_size=800)
                 total_batches = len(path_batches)
-                for i, incoming_tile_in_path_batch in enumerate(path_batches):
-                    print(f'starting batch {i+1} of {total_batches}')
+                for j, incoming_tile_in_path_batch in enumerate(path_batches):
+                    print(f'starting batch {j+1} of {total_batches}')
                     
                     # collect all the out paths
                     incoming_tile_out_path_batch = []
@@ -182,10 +199,12 @@ class StagingMerger():
                 #     app_futures.append(app_future)
 
                 # collect results
-                for i in range(0, len(app_futures)): 
+                for k in range(0, len(app_futures)): 
                     ready, not_ready = ray.wait(app_futures)
                     
-                    print(f"✅ Completed batch {i+1} of {total_batches}. Action taken: {ray.get(ready)}")
+                    print(f"{ray.get(ready)}\n✅ Completed batch {k+1} of {total_batches}. Actions taken ^^")
+                    print(f"using source dir     : {staged_dir_path}")
+                    print(f"using destination dir: {merged_dir_path}")
                     # print(f"📌 Completed {i+1} of {incoming_length}")
                     # print(f"⏰ Running total of elapsed time: {(time.monotonic() - merge_all_vector_tiles_start_time)/60:.2f} minutes\n")
 
@@ -194,12 +213,14 @@ class StagingMerger():
                         break
             except Exception as e:
                 print(f"‼️‼️‼️‼️‼️ VERY BAD: Cauth error in Ray loop: {str(e)}")
+                print(f"during processing of {staged_dir_path}")
+                exit()
             finally:
                 print(f"Runtime: {(time.monotonic() - merge_all_vector_tiles_start_time):.2f} seconds")
 
             print(f'⏰ Total time to merge {incoming_length} tiles: {(time.monotonic() - merge_all_vector_tiles_start_time)/60:.2f} minutes\n')
                 
-        print("Done")
+        print("Done, exiting...")
         return 
 
     def collect_paths_from_dir(self, path_manager, base_dir_name_string, base_dir_path, ext):
@@ -297,12 +318,12 @@ def merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive):
         if isDestructive:
             shutil.move(incoming_tile_in_path, incoming_tile_out_path)
             # print("File moved.")
-            print("File not in dest. Moving to dest: ", incoming_tile_out_path)
+            # print("File not in dest. Moving to dest: ", incoming_tile_out_path)
             action_taken_string += 'fast move'
         else: 
             # faster with pyfastcopy
             shutil.copyfile(incoming_tile_in_path, incoming_tile_out_path)
-            print("File not in dest. Copying to dest: ", incoming_tile_out_path)
+            # print("File not in dest. Copying to dest: ", incoming_tile_out_path)
             # print("File coppied.")
             action_taken_string += 'fast copy'
     else:
@@ -315,24 +336,30 @@ def merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive):
             # self.skipped_merge_identical_file_count += 1
             else:
                 action_taken_string += 'identical. skipped'
-            print("⚠️ Skipping... In & out are identical. ⚠️")
-            print("In: ", incoming_tile_in_path)
-            print("Out: ", incoming_tile_out_path)
+            # print("⚠️ Skipping... In & out are identical. ⚠️")
+            # print("In: ", incoming_tile_in_path)
+            # print("Out: ", incoming_tile_out_path)
         else:
             # not same tile... append new polygons to existing tile...
-            # print("Appending...")
-            # start_append = time.monotonic()
-            
-            # incoming tile, append to existing filepath. 
             with warnings.catch_warnings():
                 # suppress 'FutureWarning: pandas.Int64Index is deprecated and will be removed from pandas in a future version. Use pandas.Index with the appropriate dtype instead.'
                 warnings.simplefilter("ignore")
                 
                 in_path_lock = lock_file(incoming_tile_in_path)
                 out_path_lock = lock_file(incoming_tile_out_path)
-
-                incoming_gdf = gpd.read_file(incoming_tile_in_path)
-                incoming_gdf.to_file(incoming_tile_out_path, mode='a')
+                
+                # actually "merge" two tiles (via append operation)
+                try:
+                    incoming_gdf = gpd.read_file(incoming_tile_in_path)
+                    incoming_gdf.to_file(incoming_tile_out_path, mode='a')
+                except Exception as e:
+                    # todo: implement logging w/ ray's distributed logger. 
+                    print("❌ Error: ", e)
+                    print("❌ Error: ", incoming_tile_in_path)
+                    print("❌ Error: ", incoming_tile_out_path)
+                    print("one of the above files was probably corrupted.")
+                    logging.error(f'Error: {e} \n\tIncoming path: {incoming_tile_in_path} \n\tOutput path: {incoming_tile_out_path}')
+                    # exit()
                 
                 release_file(in_path_lock)
                 release_file(out_path_lock)
@@ -343,10 +370,30 @@ def merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive):
                 # always delete after two tiles are merged, otherwise it's impossible to keep things consistent.
                 os.remove(incoming_tile_in_path)
                 
-            print("appended & old deleted.")
+            # print("appended & old deleted.")
             action_taken_string += f'Merged, old deleted.'
             # self.append_count += 1
     return action_taken_string
+
+def start_distributed_logging():
+    '''
+    In output directory. 
+    '''
+    log_filename = make_workflow_id('merge_staged_tiles')
+    filepath = pathlib.Path(BASE_DIR + log_filename)
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    filepath.touch(exist_ok=True)
+    logging.basicConfig(level=logging.INFO, filename= BASE_DIR + 'workflow_log.txt', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.debug(f'Started ray at {RAY_ADDRESS}')
+    
+def make_workflow_id(name: str) -> str:
+    import pytz
+    from datetime import datetime
+
+    # Timezones: US/{Pacific, Mountain, Central, Eastern}
+    # All timezones `pytz.all_timezones`. Always use caution with timezones.
+    curr_time = datetime.now(pytz.timezone('US/Central'))
+    return f"{name}-{str(curr_time.strftime('%h_%d,%Y@%H:%M'))}"
 
 def lock_file(path):
     """
