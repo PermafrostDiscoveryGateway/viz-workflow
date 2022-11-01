@@ -169,14 +169,15 @@ class RasterTiler():
             id = self.__start_tracking('geotiffs_from_vectors')
             logger.info(f'Rasterizing {path} for tile {tile} to {out_path}.')
 
-            # Check if deduplication should be performed first
             gdf = gpd.read_file(path)
+
+            # Check if deduplication should be performed first
             dedup_here = self.config.deduplicate_at('raster')
             dedup_method = self.config.get_deduplication_method()
-            if dedup_here and (dedup_method is not None):
-                dedup_config = self.config.get_deduplication_config(gdf)
-                dedup = dedup_method(gdf, **dedup_config)
-                gdf = dedup['keep']
+            if dedup_here and dedup_method is not None:
+                prop_duplicated = self.config.polygon_prop('duplicated')
+                if prop_duplicated in gdf.columns:
+                    gdf = gdf[~gdf[prop_duplicated]]
 
             # Get properties to pass to the rasterizer
             raster_opts = self.config.get_raster_config()
