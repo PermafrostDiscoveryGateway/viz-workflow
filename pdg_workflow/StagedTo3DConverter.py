@@ -92,7 +92,7 @@ class StagedTo3DConverter():
                 logger.warning(
                     f'Vector tile {path} is empty. 3D tile will not be'
                     ' created.')
-                return
+                return None, None
 
             # Remove polygons with centroids that are outside the tile boundary
             prop_cent_in_tile = self.config.polygon_prop(
@@ -105,16 +105,16 @@ class StagedTo3DConverter():
 
             # Deduplicate if required
             if dedup_here and (dedup_method is not None):
-                dedup_config = self.config.get_deduplication_config(gdf)
-                dedup = dedup_method(gdf, **dedup_config)
-                gdf = dedup['keep']
+                prop_duplicated = self.config.polygon_prop('duplicated')
+                if prop_duplicated in gdf.columns:
+                    gdf = gdf[~gdf[prop_duplicated]]
 
                 # The tile could theoretically be empty after deduplication
                 if len(gdf) == 0:
                     logger.warning(
                         f'Vector tile {path} is empty after deduplication.'
                         ' 3D Tile will not be created.')
-                    return
+                    return None, None
 
             # Create & save the b3dm file
             ces_tile, ces_tileset = TreeGenerator.leaf_tile_from_gdf(
@@ -132,6 +132,7 @@ class StagedTo3DConverter():
         except Exception as e:
             logger.error(f'Error creating 3D Tile from {path}.')
             logger.error(e)
+            return None, None
 
     def parent_3dtiles_from_children(self, tiles, bv_limit=None):
         """
