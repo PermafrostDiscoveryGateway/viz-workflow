@@ -16,21 +16,25 @@ for hostname in hostnames:
   # to use ssh in rsync (over a remote sheel) use the following: `rsync -rv --rsh=ssh hostname::module /dest``
   # see https://manpages.ubuntu.com/manpages/focal/en/man1/rsync.1.html (USING RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL CONNECTION)
   
-  # mkdir then sync
-  mkdir = ['mkdir', '-p', f'/scratch/bbki/kastanday/maple_data_xsede_bridges2/v1_debug_viz_output/staged/{hostname}']
-  process = Popen(mkdir, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-  time.sleep(0.2)
+  # mkdir on scratch
+  # mkdir = ['mkdir', '-p', f'/scratch/bbki/kastanday/maple_data_xsede_bridges2/v6_debug_viz_output/staged/{hostname}']
+  # process = Popen(mkdir, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+  # time.sleep(0.2)
   
+  ## RSYNC TO /scratch
   ssh = ['ssh', f'{hostname}',]
-  rsync = ['rsync', '-r', '--update', '/tmp/v1_debug_viz_output/staged/', f'/scratch/bbki/kastanday/maple_data_xsede_bridges2/v1_debug_viz_output/staged/{hostname}']
+  # rsync = ['rsync', '-r', '--update', '/tmp/v6_debug_viz_output/staged/', f'/scratch/bbki/kastanday/maple_data_xsede_bridges2/v6_debug_viz_output/staged/{hostname}']
+  rsync = ['rsync', '/tmp/{hostname}_staged.tar.zstd', f'/scratch/bbki/kastanday/maple_data_xsede_bridges2/v6_debug_viz_output/staged']
   cmd = ssh + rsync
   print(f"'{count} of {len(hostnames)}'. running command: {cmd}")
   count += 1
-  
-  # Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-  
-  
   process = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+  
+  ## Compress 'staged' on each node's tmp dir, for faster copy later. 
+  # tar_and_zstd = [ f'tar cf - /tmp/v6_debug_viz_output | pv | zstd -2 > /tmp/{hostname}_staged.tar.zstd' ]
+  # cmd = ssh + tar_and_zstd
+  # process_2 = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+  
   # stdout, stderr = process.communicate()
   # print(stdout)
   # print(stderr)  

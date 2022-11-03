@@ -2,12 +2,12 @@
 
 #SBATCH --job-name=pdg_viz
 #SBATCH --partition=gpuA40x4
-#SBATCH --account=$PDG_ALLOCATION
+#SBATCH --account=
 #SBATCH --time=24:00:00
 
 #SBATCH --export=ALL,RAY_worker_register_timeout_seconds=120
 
-#SBATCH --nodes=15
+#SBATCH --nodes=5
 #SBATCH --mem=0
 #SBATCH --gpus-per-node=1
 #SBATCH --exclusive
@@ -22,6 +22,7 @@ set -x
 
 
 ## UPDATES ##
+## Crucial: Set mem=0 to allocate entire memory block. Much safer.
 ## 1. tasks-per-node used to be 1, but then I was only seeing 1 node of usage at a time.
 ## 2. I removed the --exclusive so it can run on multiple nodes at once.
 ## 3. Todo add #SBATCH --tasks=50... or something.
@@ -36,7 +37,7 @@ set -x
 echo "This is BEST-v2_gpu_ray.slurm"
 
 # global settings
-conda activate full_viz_pipeline
+conda activate v3_full_viz_pipeline
 export RAY_worker_register_timeout_seconds=120  # for sure necessary. Might be needed in user shell before `sbatch` is executed. 
 export RAY_max_pending_lease_requests_per_scheduling_category=2000 # probably not necessary
 
@@ -45,6 +46,8 @@ nodes=$(scontrol show hostnames "$SLURM_JOB_NODELIST")
 nodes_array=($nodes)
 head_node=${nodes_array[0]}
 head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
+
+printf "%s\n" "${nodes_array[@]}" > nodes_array.txt
 
 # if we detect a space character in the head node IP, we'll
 # convert it to an ipv4 address. This step is optional.

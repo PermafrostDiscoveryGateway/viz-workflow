@@ -41,22 +41,21 @@ import pyfastcopy  # monky patch shutil for faster copy
 import ray
 from filelock import FileLock, Timeout
 from pdgstaging.TileStager import TileStager
+import subprocess
 
-#######################
-#### Change me 😁  ####
-#######################
-RAY_ADDRESS       = 'ray://172.28.23.102:10001'  # SET ME!! Ray head-node IP address (using port 10001). Use output from `$ ray start --head --port=6379 --dashboard-port=8265`
-RAY_ADDRESS       = 'auto'  
-##############################
-#### END OF Change me 😁  ####
-##############################
 
 ###################################
 #### ⛔️ don't change these ⛔️  ####
 ###################################
+result = subprocess.run(["hostname", "-i"], capture_output=True, text=True)
+head_ip = result.stdout.strip()
+print(f"Connecting to Ray... at address ray://{head_ip}:10001")
+ray.init(address=f'ray://{head_ip}:10001', dashboard_port=8265)   # most reliable way to start Ray
+# use port-forwarding to see dashboard: `ssh -L 8265:localhost:8265 kastanday@kingfisher.ncsa.illinois.edu`
+assert ray.is_initialized() == True
+print("🎯 Ray initialized.")
 
 # todo: see if I can delete all of these constants....
-
 # These don't matter much in this workflow.
 # ALWAYS include the tailing slash "/"
 # BASE_DIR_OF_INPUT = '/ime/bbki/kastanday/maple_data_xsede_bridges2/outputs/'   # The output data of MAPLE. Which is the input data for STAGING.
@@ -82,10 +81,11 @@ def main():
         3. Choose one of the paths from the last step, remove it from the `staged_dir_paths_list` and set it as the `merged_dir_path` that will be used as the merged dir.
     '''
     
-    # CHANGE ME!!! 😁  👇👇
-    
+    #######################
+    #### Change me 😁  ####
+    #######################
+    # todo -- get files from dirs automatically, using os.lsdir().
     BASE_DIR = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/v1_debug_viz_output/staged'
-    
     merged_dir_path = f'{BASE_DIR}/gpub088'  # this path SHOULD NOT be in the `staged_dir_paths_list`
     staged_dir_paths_list = [
         f'{BASE_DIR}/gpub090',
@@ -98,6 +98,9 @@ def main():
         f'{BASE_DIR}/gpub097',
         f'{BASE_DIR}/gpub098',
     ]
+    ##############################
+    #### END OF Change me 😁  ####
+    ##############################
     
     # validate input
     for path in staged_dir_paths_list + [merged_dir_path]:

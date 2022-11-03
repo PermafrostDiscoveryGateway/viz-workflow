@@ -2,12 +2,12 @@
 
 #SBATCH --job-name=pdg_viz
 #SBATCH --partition=cpu
-#SBATCH --account=$PDG_ALLOCATION_CPU
+#SBATCH --account=
 #SBATCH --time=24:00:00
 
 #SBATCH --export=ALL,RAY_worker_register_timeout_seconds=120
 
-#SBATCH --nodes=15
+#SBATCH --nodes=8
 #SBATCH --mem=0
 #SBATCH --exclusive
 
@@ -41,6 +41,9 @@ nodes_array=($nodes)
 head_node=${nodes_array[0]}
 head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
 
+# save nodes to file
+printf "%s\n" "${nodes_array[@]}" > nodes_array.txt
+
 # if we detect a space character in the head node IP, we'll
 # convert it to an ipv4 address. This step is optional.
 if [[ "$head_node_ip" == *" "* ]]; then
@@ -61,7 +64,7 @@ export ip_head
 echo "IP Head: $ip_head"
 
 # conda init
-conda activate full_viz_pipeline
+conda activate v3_full_viz_pipeline
 
 # increase request limit
 export RAY_max_pending_lease_requests_per_scheduling_category=2000
@@ -80,7 +83,7 @@ srun --nodes=1 --ntasks=1 -w "$head_node" \
 
 # __doc_worker_ray_start__
 # optional, though may be useful in certain versions of Ray < 1.0.
-sleep 5
+sleep 1
 
 # number of nodes other than the head node
 worker_num=$((SLURM_JOB_NUM_NODES - 1))
@@ -96,7 +99,7 @@ for ((i = 1; i <= worker_num; i++)); do
       export RAY_worker_register_timeout_seconds=120
     srun --nodes=1 --ntasks=1 -w "$node_i" \
         ray start --address "$ip_head" --log-color true --block &
-    sleep 2
+    # sleep 1
     # TODO -- change num-gpus back to 0. 
     echo "WORKER $i has SLURM_CPUS_PER_TASK: ${SLURM_CPUS_PER_TASK}"
 done
