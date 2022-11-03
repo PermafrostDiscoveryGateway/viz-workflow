@@ -193,7 +193,7 @@ class StagingMerger():
                     for incoming_tile_in_path in incoming_tile_in_path_batch:
                         incoming_tile_out_path_batch.append( path_manager.path_from_tile(tile=incoming_tile_in_path, base_dir='merged_dir_path') )
                     
-                    app_future = batch_merge_tile.remote(incoming_tile_in_path_batch, incoming_tile_out_path_batch, isDestructive=self.isDestructive)
+                    app_future = batch_merge_tile.remote(incoming_tile_in_path_batch, incoming_tile_out_path_batch, isDestructive=self.isDestructive, stager.config.input_config)
                     app_futures.append(app_future)
                 # for incoming_tile_in_path in paths:
                 #     NOT BATCHED VERSION:
@@ -290,20 +290,22 @@ def make_batch(items, batch_size):
     return [items[i:i + batch_size] for i in range(0, len(items), batch_size)]
 
 @ray.remote
-def batch_merge_tile(incoming_tile_in_path_batch, incoming_tile_out_path_batch, isDestructive):
+def batch_merge_tile(incoming_tile_in_path_batch, incoming_tile_out_path_batch, isDestructive, stager):
     '''
     Merge a batch of tiles. More efficient by making fewer ray remote calls.
     '''
     assert len(incoming_tile_in_path_batch) == len(incoming_tile_out_path_batch), f"❌ Error: the 'in-paths' and 'out-paths' must match. You gave me: {len(incoming_tile_in_path_batch)} != {len(incoming_tile_out_path_batch)}"
     actions_taken = []
     for incoming_tile_in_path, incoming_tile_out_path in zip(incoming_tile_in_path_batch, incoming_tile_out_path_batch):
-        action_taken_string = merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive)
+        action_taken_string = merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive, stager)
         actions_taken.append(action_taken_string)
     
     return actions_taken
 
 # @ray.remote
-def merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive):
+def merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive, stager):
+    if isinstance(stager, (dict, str)):
+        stager = TileStager(stager, check_footprints=False)
     # todo check that this comparison is lining up...
     action_taken_string = ''
     if not os.path.exists(incoming_tile_out_path):
@@ -354,7 +356,14 @@ def merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive):
                 # actually "merge" two tiles (via append operation)
                 try:
                     incoming_gdf = gpd.read_file(incoming_tile_in_path)
-                    incoming_gdf.to_file(incoming_tile_out_path, mode='a')
+                    dedup_method = stager.config.get_deduplication_method()
+                    if dedup_method is not None:
+                        mode = 'w'
+                        incoming_gdf = stager.combine_and_deduplicate(
+                            incoming_gdf, incoming_tile_out_path)
+                    else:
+                        mode = 'a'
+                    incoming_gdf.to_file(incoming_tile_out_path, mode=mode)
                 except Exception as e:
                     # todo: implement logging w/ ray's distributed logger. 
                     print("❌ Error: ", e)
