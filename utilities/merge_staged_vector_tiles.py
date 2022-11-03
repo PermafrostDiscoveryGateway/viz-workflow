@@ -47,6 +47,7 @@ import subprocess
 ###################################
 #### ⛔️ don't change these ⛔️  ####
 ###################################
+# setup ray
 result = subprocess.run(["hostname", "-i"], capture_output=True, text=True)
 head_ip = result.stdout.strip()
 print(f"Connecting to Ray... at address ray://{head_ip}:10001")
@@ -127,12 +128,6 @@ class StagingMerger():
         self.fast_copy_count = 0
         self.isDestructive = False  # Decide between mv and cp! 
         
-        print("Connecting to Ray...")
-        ray.init(address=RAY_ADDRESS, dashboard_port=8265)   # most reliable way to start Ray
-        # use port-forwarding to see dashboard: `ssh -L 8265:localhost:8265 kastanday@kingfisher.ncsa.illinois.edu`
-        # ray.init(address='auto')                                    # multinode, but less reliable than above.
-        # ray.init()                                                  # single-node only!
-        assert ray.is_initialized() == True
 
     def merge_all_staged_dirs(self, staged_dir_paths_list, merged_dir_path, stager, ext=None):
         """
@@ -396,7 +391,6 @@ def start_distributed_logging():
     filepath.parent.mkdir(parents=True, exist_ok=True)
     filepath.touch(exist_ok=True)
     logging.basicConfig(level=logging.INFO, filename= BASE_DIR + 'workflow_log.txt', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
-    logging.debug(f'Started ray at {RAY_ADDRESS}')
     
 def make_workflow_id(name: str) -> str:
     import pytz
