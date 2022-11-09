@@ -44,16 +44,21 @@ class RasterTiler():
         palettes = self.config.get_palettes()
         self.palettes = [Palette(*pal) for pal in palettes]
 
-    def rasterize_all(self):
+    def rasterize_all(self, overwrite=True):
         """
             The main method for the RasterTiler class. Uses all the information
             provided in the config to create both GeoTiffs and web tiles at all
             of the specified z-levels.
+
+            overwrite : bool
+                Optional, defaults to True. If set to False, then if there is
+                an existing tile at the output path created, then the Tiler
+                will skip re-creating GeoTiffs / Webtiles for that tile.
         """
 
         paths = self.tiles.get_filenames_from_dir('staged')
-        self.rasterize_vectors(paths)
-        self.webtiles_from_all_geotiffs()
+        self.rasterize_vectors(paths, overwrite=overwrite)
+        self.webtiles_from_all_geotiffs(overwrite=overwrite)
 
     def rasterize_vectors(
             self,
@@ -220,13 +225,15 @@ class RasterTiler():
             self.__end_tracking(id, tile=tile, error=e, message=message)
             return None
 
-    def parent_geotiffs_from_children(self, tiles, recursive=True):
+    def parent_geotiffs_from_children(
+            self, tiles, recursive=True, overwrite=True):
         """
             Make geotiffs for a list of parent tiles by merging and resampling
             the four child geotiffs that comprise each parent tile. All tiles
             passed to this method must be of the same z-level. The child
             geotiffs must be in the dir_geotiff specified in the config file.
-            If the output geotiffs already exist, they will be overwritten.
+            If the output geotiffs already exist, they will be overwritten,
+            unless the overwrite argument is set to False.
 
             When recursive is True (default), this method will recursively call
             itself until all parent tiles have been made up to the lowest
@@ -236,6 +243,11 @@ class RasterTiler():
             ----------
             tiles : set of morecantile.Tile
                 A set of tiles. All tiles must be at the same z-level.
+
+            overwrite : bool
+                Optional, defaults to True. If set to False, then if there is
+                an existing tile at the output path for the parent tile, then
+                the Tiler will skip creating that GeoTiff.
         """
         # tiles may be a set
         tiles = list(tiles)
@@ -259,7 +271,8 @@ class RasterTiler():
             f'Start creating {len(tiles)} parent geotiffs at level {z}.')
 
         for tile in tiles:
-            new_tile = self.parent_geotiff_from_children(tile)
+            new_tile = self.parent_geotiff_from_children(
+                tile, overwrite=overwrite)
             if new_tile is not None:
                 parent_tiles.add(self.tiles.get_parent_tile(new_tile))
 
@@ -269,19 +282,26 @@ class RasterTiler():
 
         # Create the web tiles for the parent tiles.
         if recursive:
-            self.parent_geotiffs_from_children(parent_tiles)
+            self.parent_geotiffs_from_children(
+                parent_tiles, overwrite=overwrite)
 
-    def parent_geotiff_from_children(self, tile):
+    def parent_geotiff_from_children(self, tile, overwrite=True):
         """
             Make a geotiff for a parent tile by merging and resampling the four
             child geotiffs that comprise it. The child geotiffs must be in the
             dir_geotiff specified in the config file. If the output geotiff
-            already exists, it will be overwritten.
+            already exists, it will be overwritten, unless overwrite is set
+            to False.
 
             Parameters
             ----------
             tile : morecantile.Tile
                 The tile to make a geotiff for.
+
+            overwrite : bool
+                Optional, defaults to True. If set to False, then if there is
+                an existing tile at the output path for the parent tile, then
+                the Tiler will skip creating that GeoTiff.
 
             Returns
             -------
@@ -289,6 +309,13 @@ class RasterTiler():
                 The tile that was created or None if there was an error.
         """
         try:
+
+            out_path = self.tiles.path_from_tile(tile, base_dir='geotiff')
+            if os.path.isfile(out_path) and not overwrite:
+                logger.info(f'Skip making parent GeoTIFF tile {tile}.'
+                            ' Tile already exists.')
+                return None
+
             message = f'Creating tile {tile} from child geotiffs.'
             id = self.__start_tracking(
                 'parent_geotiffs_from_children', message=message)
@@ -297,7 +324,6 @@ class RasterTiler():
             # composite, parent geotiff.
             children = self.tiles.get_child_paths(tile, base_dir='geotiff')
             children = self.tiles.remove_nonexistent_paths(children)
-            out_path = self.tiles.path_from_tile(tile, base_dir='geotiff')
             bounds = self.tiles.get_bounding_box(tile)
 
             raster = Raster.from_rasters(
@@ -319,23 +345,32 @@ class RasterTiler():
             self.__end_tracking(id, tile=tile, error=e, message=message)
             return None
 
-    def webtiles_from_all_geotiffs(self, update_ranges=True):
+    def webtiles_from_all_geotiffs(self, update_ranges=True, overwrite=True):
         """
             Create web tiles from all geotiffs in the dir_geotiff specified in
             the config file. If the output web tiles already exist, they will
-            be overwritten.
+            be overwritten, unless overwrite is set to False.
 
             Parameters
             ----------
             update_ranges : bool
-                If True, the minimum and maximum values for each z-level in
-                the config will be updated using the geotiff data that
-                has already been processed with this Tiler.
+                If True, the minimum and maximum values for each z-level in the
+                config will be updated using the geotiff data that has already
+                been processed with this Tiler.
+
+            overwrite : bool
+                Optional, defaults to True. If set to False, then if there is
+                an existing image tile at the output path for the web tile,
+                then the Tiler will skip it.
         """
         geotiff_paths = self.tiles.get_filenames_from_dir('geotiff')
-        self.webtiles_from_geotiffs(geotiff_paths, update_ranges)
+        self.webtiles_from_geotiffs(geotiff_paths, update_ranges, overwrite)
 
-    def webtiles_from_geotiffs(self, geotiff_paths=None, update_ranges=True):
+    def webtiles_from_geotiffs(
+            self,
+            geotiff_paths=None,
+            update_ranges=True,
+            overwrite=True):
         """
             Create web tiles given a list of geotiffs
 
@@ -348,6 +383,10 @@ class RasterTiler():
                 If True, the minimum and maximum values for each z-level in
                 the config will be updated using the geotiff data that
                 has already been processed with this Tiler.
+            overwrite : bool
+                Optional, defaults to True. If set to False, then if there is
+                an existing image tile at the output path for the that tile,
+                then the Tiler will skip it.
         """
 
         # We need min and max for each z-level to create tiles with a
@@ -360,11 +399,11 @@ class RasterTiler():
         logger.info(f'Beginning creation of {len(geotiff_paths)} web tiles')
 
         for geotiff_path in geotiff_paths:
-            self.webtile_from_geotiff(geotiff_path)
+            self.webtile_from_geotiff(geotiff_path, overwrite=overwrite)
 
         logger.info(f'Finished creating {len(geotiff_paths)} web tiles.')
 
-    def webtile_from_geotiff(self, geotiff_path):
+    def webtile_from_geotiff(self, geotiff_path, overwrite=True):
         """
             Given the path to a GeoTIFF tile created by this Tiler, create a
             web tile for it and save it to the web_tiles directory.
@@ -373,6 +412,10 @@ class RasterTiler():
             ----------
             geotiff_path : str
                 The path to the GeoTiff tile.
+            overwrite : bool
+                Optional, defaults to True. If set to False, then if there is
+                an existing image tile at the output path for the tile,
+                then the Tiler will skip creating that image tile.
 
             Returns
             -------
@@ -397,6 +440,14 @@ class RasterTiler():
 
             for i in range(len(stats)):
                 stat = stats[i]
+                # Get the path for the output web tile
+                output_path = self.tiles.path_from_tile(
+                    tile, base_dir='web_tiles', style=stat)
+                if os.path.isfile(output_path) and not overwrite:
+                    logger.info(f'Skip creating web tile for tile {tile} and '
+                                f'stat {stat}. Web tile already exists at '
+                                f'{output_path}')
+                    continue
                 palette = palettes[i]
                 nodata_val = nodata_vals[i]
                 band_image_data = image_data[i]
@@ -404,9 +455,6 @@ class RasterTiler():
                     stat=stat, z=tile.z, sub_general=True)
                 max_val = self.config.get_max(
                     stat=stat, z=tile.z, sub_general=True)
-                # Get the path for the output web tile
-                output_path = self.tiles.path_from_tile(
-                    tile, base_dir='web_tiles', style=stat)
                 img = WebImage(
                     image_data=band_image_data,
                     palette=palette,
