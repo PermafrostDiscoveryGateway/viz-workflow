@@ -58,14 +58,17 @@ class RasterTiler():
     def rasterize_vectors(
             self,
             paths,
-            make_parents=True):
+            make_parents=True,
+            overwrite=True
+    ):
         """
             Given a list of files which are output from the viz-staging step,
             process them into geotiffs at the min z-level specified in the
             config (which must match the z-level of the staged tiles). The
             output geotiffs will be placed in the dir_geotiff specified in the
-            config file. If the output geotiffs already exist, they will be
-            overwritten.
+            config file. By default, if the output geotiffs already exist, they
+            will be overwritten. To change this behaviour, set overwrite to
+            False.
 
             During this process, the min and max values of the data arrays that
             comprise the geotiffs for each band will be tracked. These ranges
@@ -83,6 +86,11 @@ class RasterTiler():
                 Optional. If True (the default), then the parent geotiff tiles
                 all the way up to the smallest z-level configured will be
                 created.
+
+            overwrite : bool
+                Optional, defaults to True. If set to False, then if there is
+                an existing GeoTiff tile at the output path created,
+                rasterization will be skipped.
         """
 
         if isinstance(paths, dict):
@@ -124,7 +132,7 @@ class RasterTiler():
         # Assume that tile paths have followed the convention configured for
         # the tilePathManager.
         for path in paths:
-            tile = self.rasterize_vector(path)
+            tile = self.rasterize_vector(path, overwrite=overwrite)
             # Add the parent tile to the set of parent tiles.
             if tile is not None:
                 parent_tiles.add(self.tiles.get_parent_tile(tile))
@@ -135,11 +143,12 @@ class RasterTiler():
         if make_parents:
             self.parent_geotiffs_from_children(parent_tiles)
 
-    def rasterize_vector(self, path):
+    def rasterize_vector(self, path, overwrite=True):
         """
             Given a path to an output file from the viz-staging step, create a
-            GeoTIFF and save it to the configured dir_geotiff directory. If the
-            output geotiff already exists, it will be overwritten.
+            GeoTIFF and save it to the configured dir_geotiff directory. By
+            default, if the output geotiff already exists, it will be
+            overwritten. To change this behaviour, set overwrite to False.
 
             During this process, the min and max values (and other summary
             stats) of the data arrays that comprise the GeoTIFFs for each band
@@ -150,6 +159,11 @@ class RasterTiler():
 
             path : str
                 Path to the staged vector file to rasterize.
+
+            overwrite : bool
+                Optional, defaults to True. If set to False, then if there is
+                an existing GeoTiff tile at the output path created,
+                rasterization will be skipped.
 
             Returns
             -------
@@ -162,8 +176,14 @@ class RasterTiler():
 
             # Get information about the tile from the path
             tile = self.tiles.tile_from_path(path)
-            bounds = self.tiles.get_bounding_box(tile)
             out_path = self.tiles.path_from_tile(tile, 'geotiff')
+
+            if os.path.isfile(out_path) and not overwrite:
+                logger.info(f'Skip rasterizing {path} for tile {tile}.'
+                            ' Tile already exists.')
+                return None
+
+            bounds = self.tiles.get_bounding_box(tile)
 
             # Track and log the event
             id = self.__start_tracking('geotiffs_from_vectors')
