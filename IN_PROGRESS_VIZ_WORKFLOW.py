@@ -6,7 +6,6 @@ import os
 import pathlib
 import socket  # for seeing where jobs run when distributed
 import sys
-# from ray import workflow
 import time
 import traceback
 import warnings
@@ -17,6 +16,7 @@ from copy import deepcopy
 from datetime import datetime
 import subprocess
 import pprint
+import argparse
 
 import pdgraster
 import pdgstaging  # For staging
@@ -27,6 +27,10 @@ import viz_3dtiles  # import Cesium3DTile, Cesium3DTileset
 ONLY_SMALL_TEST_RUN = False                            # For testing, this ensures only a small handful of files are processed.
 TEST_RUN_SIZE       = 10_000                              # Number of files to pre processed during testing (only effects testing)
 
+
+# help flag provides flag help
+# store_true actions stores argument as True
+
 ##################################
 #### ⛔️ don't change these ⛔️ ####
 ##################################
@@ -35,7 +39,7 @@ IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
 print("Using config: ")
 pprint.pprint(IWP_CONFIG)
 
-def main():
+def main(args=None):
     result = subprocess.run(["hostname", "-i"], capture_output=True, text=True)
     head_ip = result.stdout.strip()
     print(f"Connecting to Ray... at address ray://{head_ip}:10001")
@@ -47,6 +51,7 @@ def main():
     print(f"Write all results to output dir: {IWP_CONFIG['dir_output']}")
     print_cluster_stats()
     start_logging()
+    args = parse_cmd_line_args()
     start = time.time()
     
     try:
@@ -55,19 +60,20 @@ def main():
         
         # (optionally) Comment out steps you don't need 😁
         # todo: sync footprints to nodes.
-        step0_staging()                                     # Good staging. Simple & reliable. 
+        # step0_staging()                                     # Good staging. Simple & reliable. 
         # todo: merge_staging()
         # step1_3d_tiles()
         
-        mem_testing = False        
-        if mem_testing:
-            from pympler import tracker
-            tr = tracker.SummaryTracker()
-            tr.print_diff()
-            step2_raster_highest(batch_size=100)                # rasterize highest Z level only 
-            tr.print_diff()
+        # mem_testing = False        
+        # if mem_testing:
+        #     from pympler import tracker
+        #     tr = tracker.SummaryTracker()
+        #     tr.print_diff()
+        #     step2_raster_highest(batch_size=100)                # rasterize highest Z level only 
+        #     tr.print_diff()
         
-        # step2_raster_highest(batch_size=100)                # rasterize highest Z level only 
+        # args = 
+        step2_raster_highest(batch_size=100, cmd_line_args = args)                # rasterize highest Z level only 
         # step3_raster_lower(batch_size_geotiffs=100)         # rasterize all LOWER Z levels
         # step4_webtiles(batch_size_web_tiles=250)            # convert to web tiles.        
 
@@ -78,6 +84,23 @@ def main():
         print(f"Runtime: {(time.time() - start)/60:.2f} minutes")
         ray.shutdown()
         assert ray.is_initialized() == False
+
+def parse_cmd_line_args():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('-s', '--start_index', type=int,
+        help="int: START index of step2_raster_highest(). Work-around for mem overflow error.")
+    parser.add_argument('-e', '--end_index', type=int,
+        help="int: END index of step2_raster_highest(). Work-around for mem overflow error.")
+
+    args = parser.parse_args()
+    print("args: ", args)
+    
+    if args.start_index:
+        print("Args.start_index: ", args.start_index)
+        print("Args.end_index: ", args.end_index)
+    
+    return args
 
 ############### 👇 MAIN STEPS FUNCTIONS 👇 ###############
 
@@ -316,21 +339,21 @@ def step1_3d_tiles(batch_size=300):
             print(f"    {failure_text} on {ip_address}")
 
 # @workflow.step(name="Step2_Rasterize_only_higest_z_level")
-def step2_raster_highest(batch_size=100):
-    from pympler import tracker
-    tr_within_raster_highest = tracker.SummaryTracker()
-    tr_outside_for_loop = tracker.SummaryTracker()
+def step2_raster_highest(batch_size=100, cmd_line_args = None):
+    # from pympler import tracker
+    # tr_within_raster_highest = tracker.SummaryTracker()
+    # tr_outside_for_loop = tracker.SummaryTracker()
     """
     TODO: There is a memory leak. Something is not being deleted. This will eventually crash the Ray cluster.
     
     This is a BLOCKING step (but it can run in parallel).
     Rasterize all staged tiles (only highest z-level).
     """
-    import gc
-    from random import randrange
-    from pympler import muppy, summary, tracker
+    # import gc
+    # from random import randrange
+    # from pympler import muppy, summary, tracker
     
-    os.makedirs(GEOTIFF_PATH, exist_ok=True)
+    os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok=True)
 
     print("2️⃣  Step 2 Rasterize only highest Z")
     stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
@@ -378,7 +401,7 @@ def step2_raster_highest(batch_size=100):
     
     start = time.time()
     
-    tr_outside_for_loop.print_diff()
+    # tr_outside_for_loop.print_diff()
     
     # catch kill signal to shutdown on command (ctrl + c)
     try: 
@@ -387,13 +410,16 @@ def step2_raster_highest(batch_size=100):
         for i, batch in enumerate(staged_batches):            
             
             # skip already done work.
-            already_seen_completed_batches = 0
-            if i < already_seen_completed_batches:
-                print("🚩🚩🚩🚩🚩 SKIPPING ALREADY COMPLETED WORK!")
-                # continue
-            else:
+            # if i >= cmd_line_args.start_index and i < cmd_line_args.end_index:
+            if i >= int(args.start_index) and i < int(args.end_index):
+                # greater than start, less than end.
+                # print(f"Launching batch {i} of {len(staged_batches)}. (Start: {cmd_line_args.start_index}, End: {cmd_line_args.end_index})")
                 app_future = rasterize.remote(batch, IWP_CONFIG)
                 app_futures.append(app_future)
+            else:
+                print(f"🚩🚩🚩🚩🚩 SKIPPING ALREADY COMPLETED WORK! Index: {i}")
+                continue
+                
 
         for i in range(0, len(app_futures)): 
             ready, not_ready = ray.wait(app_futures)
@@ -402,8 +428,8 @@ def step2_raster_highest(batch_size=100):
             print(f"⏰ Running total of elapsed time: {(time.time() - start)/60:.2f} minutes\n🔮 Estimated total runtime: { ((time.time() - start)/60) / ((i+1)/len(staged_batches)) :.2f} minutes.\n")
 
             # todo: memory debugging
-            tr_within_raster_highest.print_diff()
-            print(f"☝️ Inside ray app_future collection loop {i}")
+            # tr_within_raster_highest.print_diff()
+            # print(f"☝️ Inside ray app_future collection loop {i}")
             
             # snapshot = tracemalloc.take_snapshot()
             # print("========== SNAPSHOT =============")
@@ -430,7 +456,7 @@ def step2_raster_highest(batch_size=100):
         ray.shutdown()
         assert ray.is_initialized() == False
     
-    tr_outside_for_loop.print_diff()
+    # tr_outside_for_loop.print_diff()
     
     print(f'⏰ Total time to rasterize {len(staged_paths)} tiles: {(time.time() - start)/60:.2f} minutes\n')
     return "Done rasterize all only highest z level"
@@ -576,30 +602,29 @@ def rasterize(staged_paths, config, logging_dict=None):
 
     try:
         rasterizer = pdgraster.RasterTiler(config)
-        from pympler.classtracker import ClassTracker
-        tracker = ClassTracker()
-        tracker.track_object(rasterizer, resolution_level=4) # todo try resolution 2
-        tracker.track_class(pdgraster.RasterTiler, resolution_level=4)
-        tracker.create_snapshot()
+        # from pympler.classtracker import ClassTracker
+        # tracker = ClassTracker()
+        # tracker.track_object(rasterizer, resolution_level=4) # todo try resolution 2
+        # tracker.track_class(pdgraster.RasterTiler, resolution_level=4)
+        # tracker.create_snapshot()
         # todo: fix warning `python3.9/site-packages/geopandas/base.py:31: UserWarning: The indices of the two GeoSeries are different.`
         # with suppress(UserWarning): 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             rasterizer.rasterize_vectors(staged_paths, make_parents=False)
-        tracker.create_snapshot()
-        tracker.stats.print_summary()
+        # tracker.create_snapshot()
+        # tracker.stats.print_summary()
     except Exception as e:
         print("⚠️ Failed to rasterize path: ", staged_paths, "\nWith error: ", e, "\nTraceback", traceback.print_exc())
     finally:
         # MEMORY LEAK (related to loggers being created)
         # for handler in logger.handlers:
         #     handler.close()
-        del rasterizer
-        tracker.create_snapshot()
-        tracker.stats.print_summary()
-        print("After deleting rasterizer")
-        
-    return staged_paths
+        # del rasterizer
+        # tracker.create_snapshot()
+        # tracker.stats.print_summary()
+        # print("After deleting rasterizer")
+        return staged_paths
 
 @ray.remote
 def create_composite_geotiffs(tiles, config, logging_dict=None):
@@ -764,14 +789,13 @@ def three_d_tile_batches(file_batch, output_dir):
     ## todo: there is optimization here. 
     # todo: refactor this to check if the output exists first thing (save metadata ops):  tileset.set_json_filename(filename)
 
-    try:
-        # Check if the output exists. If so, skip. Do this in outer loop (less ray tasks to make)
-        # absolute_path = save_to + filename + ".json"
-        
-        # todo: use robyn's new 3d-tiles code. 
-        
-        for filepath in file_batch:
-            
+    # Check if the output exists. If so, skip. Do this in outer loop (less ray tasks to make)
+    # absolute_path = save_to + filename + ".json"
+    
+    # todo: use robyn's new 3d-tiles code. 
+    
+    for filepath in file_batch:
+        try:
             # build final path & check if output exists
             filename, save_to_dir = build_step1_3d_filepath(output_dir, filepath)
             absolute_path = os.path.join(save_to_dir, filename) + ".json"
@@ -791,11 +815,12 @@ def three_d_tile_batches(file_batch, output_dir):
             tileset.set_save_to_path(save_to_dir)
             tileset.set_json_filename(filename)
             tileset.write_file()
-            
-    except Exception as e:
-        return [f"‼️ ‼️ ❌ ❌ ❌ ❌ -- THIS TASK FAILED ❌ ❌ ❌ ❌ ‼️ ‼️ with path (some part of this list): {file_batch} and \nError: {e}\nTraceback: {traceback.print_exc()}", 
-    socket.gethostbyname(socket.gethostname())]
-    
+            print("Success on 3d tile")
+        
+        except Exception as e:
+            print(f"‼️ ‼️ ❌ ❌ ❌ ❌ -- THIS TASK FAILED ❌ ❌ ❌ ❌ ‼️ ‼️ with path (some part of this list): {filepath} and \nError: {e}\nTraceback: {traceback.print_exc()}", \
+                socket.gethostbyname(socket.gethostname()))
+        
     # success case
     return [f"Path {file_batch}", socket.gethostbyname(socket.gethostname())]
 
@@ -809,5 +834,7 @@ def start_logging():
     logging.basicConfig(level=logging.INFO, filename= IWP_CONFIG['dir_output'] + 'workflow_log.txt', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
 
 if __name__ == '__main__':
-    main()
+    # args = None
+    args = parse_cmd_line_args()
+    main(args)
 
