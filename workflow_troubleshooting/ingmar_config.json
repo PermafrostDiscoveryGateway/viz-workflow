@@ -1,0 +1,35 @@
+{
+    "simplify_tolerance": 0.0001,
+    "tms_id": "WorldCRS84Quad",
+    "z_range": [0, 11],
+    "statistics": [
+        {
+            "name": "polygon_count",
+            "weight_by": "count",
+            "property": "centroids_per_pixel",
+            "aggregation_method": "sum",
+            "resampling_method": "sum",
+            "val_range": [0, null],
+            "nodata_val": 0,
+            "nodata_color": "#ffffff00",
+            "palette": ["#d9c43f", "#d93fce"]
+        },
+        {
+            "name": "coverage",
+            "weight_by": "area",
+            "property": "area_per_pixel_area",
+            "aggregation_method": "sum",
+            "resampling_method": "average",
+            "val_range": [0, 1],
+            "nodata_val": 0,
+            "nodata_color": "#ffffff00",
+            "palette": ["#d9c43f", "#d93fce"]
+        }
+    ],
+    "deduplicate_at": ["staging"],
+    "deduplicate_method": "neighbor",
+    "deduplicate_keep_rules": [["staging_filename", "larger"]],
+    "deduplicate_overlap_tolerance": 0.1,
+    "deduplicate_overlap_both": false,
+    "deduplicate_centroid_tolerance": null
+  }
