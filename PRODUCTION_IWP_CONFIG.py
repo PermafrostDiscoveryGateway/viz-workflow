@@ -36,4 +36,72 @@ TEST_RUN_SIZE       = 10_000                              # Number of files to p
 ##############################
 
 """ FINAL config is exporred here, and imported in the IPW Workflow python file. """
-IWP_CONFIG = {"deduplicate_clip_to_footprint": True, "dir_output": OUTPUT, "dir_input": BASE_DIR_OF_INPUT,"ext_input": ".shp","dir_footprints": FOOTPRINTS_PATH,"dir_geotiff": GEOTIFF_PATH,"dir_web_tiles": WEBTILE_PATH,"dir_staged": OUTPUT_OF_STAGING,"filename_staging_summary": OUTPUT_OF_STAGING + "staging_summary.csv","filename_rasterization_events": GEOTIFF_PATH + "raster_events.csv","filename_rasters_summary": GEOTIFF_PATH + "raster_summary.csv","version": datetime.now().strftime("%B%d,%Y"),"simplify_tolerance": 0.1,"tms_id": "WorldCRS84Quad","z_range": [0, 15],"geometricError": 57,"z_coord": 0,"statistics": [    {        "name": "iwp_count",        "weight_by": "count",        "property": "centroids_per_pixel",        "aggregation_method": "sum",        "resampling_method": "sum",        "val_range": [0, None],        "palette": ["#66339952", "#d93fce", "#ffcc00"],        "nodata_val": 0,        "nodata_color": "#ffffff00"    },    {        "name": "iwp_coverage",        "weight_by": "area",        "property": "area_per_pixel_area",        "aggregation_method": "sum",        "resampling_method": "average",        "val_range": [0, 1],        "palette": ["#66339952", "#ffcc00"],        "nodata_val": 0,        "nodata_color": "#ffffff00"    },],"deduplicate_at": ["raster", "3dtiles"],"deduplicate_keep_rules": [["Date", "larger"]],"deduplicate_method": "footprints",}
+IWP_CONFIG = {
+  "deduplicate_clip_to_footprint": True,
+  "dir_output": OUTPUT,
+  "dir_input": BASE_DIR_OF_INPUT,
+  "ext_input": ".shp",
+  "dir_footprints": FOOTPRINTS_PATH,
+  "dir_geotiff": GEOTIFF_PATH,
+  "dir_web_tiles": WEBTILE_PATH,
+  "dir_staged": OUTPUT_OF_STAGING,
+  "filename_staging_summary": OUTPUT_OF_STAGING + "staging_summary.csv",
+  "filename_rasterization_events": GEOTIFF_PATH + "raster_events.csv",
+  "filename_rasters_summary": GEOTIFF_PATH + "raster_summary.csv",
+  "version": datetime.now().strftime("%B%d,%Y"),
+  "simplify_tolerance": 0.1,
+  "tms_id": "WGS1984Quad",
+  "z_range": [
+    0,
+    15
+  ],
+  "geometricError": 57,
+  "z_coord": 0,
+  "statistics": [
+    {
+      "name": "iwp_count",
+      "weight_by": "count",
+      "property": "centroids_per_pixel",
+      "aggregation_method": "sum",
+      "resampling_method": "sum",
+      "val_range": [
+        0, None
+      ],
+      "palette": [
+        "#66339952",
+        "#d93fce",
+        "#ffcc00"
+      ],
+      "nodata_val": 0,
+      "nodata_color": "#ffffff00"
+    },
+    {
+      "name": "iwp_coverage",
+      "weight_by": "area",
+      "property": "area_per_pixel_area",
+      "aggregation_method": "sum",
+      "resampling_method": "average",
+      "val_range": [
+        0,
+        1
+      ],
+      "palette": [
+        "#66339952",
+        "#ffcc00"
+      ],
+      "nodata_val": 0,
+      "nodata_color": "#ffffff00"
+    },
+  ],
+  "deduplicate_at": [
+    "raster",
+    "3dtiles"
+  ],
+  "deduplicate_keep_rules": [
+    [
+      "Date",
+      "larger"
+    ]
+  ],
+  "deduplicate_method": "footprints",
+}
