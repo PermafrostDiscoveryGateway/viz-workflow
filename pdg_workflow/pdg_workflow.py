@@ -204,6 +204,7 @@ def run_pdg_workflow(
 
     # Update ranges
     rasterizer.update_ranges()
+    updated_workflow_config = rasterizer.config.config
 
     # Process web tiles in batches
     geotiff_paths = tile_manager.get_filenames_from_dir('geotiff')
@@ -211,7 +212,7 @@ def run_pdg_workflow(
 
     app_futures = []
     for batch in geotiff_batches:
-        app_future = create_web_tiles(batch, workflow_config, logging_dict)
+        app_future = create_web_tiles(batch, updated_workflow_config, logging_dict)
         app_futures.append(app_future)
 
     # Don't record end time until all web tiles have been created

@@ -10,7 +10,7 @@
   "version": "DATE",
   "ext_input": ".shp",
   "simplify_tolerance": 0.1,
-  "tms_id": "WorldCRS84Quad",
+  "tms_id": "WGS1984Quad",
   "z_range": [0, 16],
   "geometricError": 57,
   "z_coord": 0,
@@ -40,5 +40,6 @@
   ],
   "deduplicate_at": ["raster", "3dtiles"],
   "deduplicate_method": "footprints",
-  "deduplicate_keep_rules": [["Date", "larger"]]
+  "deduplicate_keep_rules": [["Date", "larger"]],
+  "deduplicate_clip_to_footprint": true
 }
