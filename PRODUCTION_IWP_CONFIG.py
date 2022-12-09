@@ -104,4 +104,5 @@ IWP_CONFIG = {
     ]
   ],
   "deduplicate_method": "footprints",
+  "deduplicate_clip_to_footprint": True
 }
