@@ -1,4 +1,5 @@
-# same as ~/viz-workflow/parsl_update_check/workflow.py but with 1/3 of the input files, and z-levels 1-5 rather than 1-16
+# 1000 polygons of the input files
+# and z-levels 1-11 rather than 1-16
 
 # file paths
 import os
@@ -33,11 +34,9 @@ from parsl.channels import LocalChannel
 from parsl.executors import HighThroughputExecutor
 from parsl.providers import LocalProvider
 
-# use sample of 30 polygons from each of the 3 files from Ingmar
+# use sample of 30 random polygons from each of the 3 files from Ingmar
 base_dir = Path('/home/jcohen/viz-workflow/parsl_update_check_subsample/data_subsample')
 filename = 'lake_change_data.gpkg'
-#to define each .gpkg file within each UTM subdir as a string representation with forward slashes, use as_posix() for each iteration
-#of base_dir + filename. The ** represents that any subdir string can be present between the base_dir and the filename
 data_paths = [p.as_posix() for p in base_dir.glob('**/' + filename)]
 
 workflow_config = '/home/jcohen/viz-workflow/parsl_update_check_subsample/ice-wedge-polygons.json'
@@ -303,6 +302,7 @@ tiles3dmaker = StagedTo3DConverter(workflow_config)
 # raster tilerconfiguration 
 rasterizer = pdgraster.RasterTiler(workflow_config)
 
+# set up parsl provider
 # bash command to activate virtual environment
 activate_env = 'source /home/jcohen/.bashrc; conda activate parsl_update_check'
 
@@ -329,7 +329,8 @@ htex_config_local = Config(
 parsl.clear() # first clear the current configuration since we will likely run this script multiple times
 parsl.load(htex_config_local) # load the config we just outlined
 
-batch_size_staging=1 # change this depending on data sample size!!!!!
+# set batch sizes
+batch_size_staging=1
 batch_size_rasterization=30
 batch_size_3dtiles=20
 batch_size_parent_3dtiles=500
@@ -345,6 +346,7 @@ def make_batch(items, batch_size):
 input_batches = make_batch(data_paths, batch_size_staging)
 input_batches # 3 batches, 1 file each
 
+# STAGING
 @python_app
 def stage(paths, config, logging_dict = logging_dict): 
     """
@@ -368,6 +370,7 @@ for batch in input_batches:
 
 logger.info('staging done!')
 
+# RASTERIZATION FOR HIGHEST Z-LEVEL
 staged_paths = stager.tiles.get_filenames_from_dir('staged')
 staged_batches = make_batch(staged_paths, batch_size_rasterization)
 
@@ -392,8 +395,7 @@ for batch in staged_batches:
 
 logger.info('rasterization for highest z-level done!')
 
-# make parent geotiffs
-
+# RASTERIZATION FOR PARENTS
 @python_app
 def create_composite_geotiffs(tiles, config, logging_dict = logging_dict):
     """
@@ -444,6 +446,7 @@ updated_workflow_config = rasterizer.config.config
 
 logger.info('updated workflow config with Robyns new code addition, moving on to web tiling')
 
+# WEB TILING
 geotiff_paths = tile_manager.get_filenames_from_dir('geotiff')
 geotiff_batches = make_batch(geotiff_paths, batch_size_web_tiles)
 
@@ -467,4 +470,4 @@ for batch in geotiff_batches:
 
 [a.result() for a in app_futures]
 
-# web tiling done! end of script.
+logger.info('web tiling done!')
