@@ -37,6 +37,9 @@ from parsl.channels import LocalChannel
 from parsl.executors import HighThroughputExecutor
 from parsl.providers import LocalProvider
 
+# to corrupt 1 gpkg file
+import sqlite3
+
 # use sample of 1000 random polygons from each of the 3 files from Ingmar
 base_dir = Path('/home/jcohen/viz-workflow/raster-retry/data_subsample')
 filename = 'lake_change_data.gpkg'
@@ -136,7 +139,24 @@ for batch in input_batches:
 
 [a.result() for a in app_futures]
 
-logger.info('staging done!')
+logger.info('staging done! Moving on to corrupt 1 gpkg file.')
+
+# CORRUPT 1 GPKG FILE
+# create database connection to one staged file
+conn = sqlite3.connect('/home/jcohen/viz-workflow/raster-retry/OUTPUT_STAGING_TILES/WGS1984Quad/11/408/244.gpkg')
+# define database cursor to fetch results from SQL queries
+cur = conn.cursor()
+# delete data from ref_sys_table
+cur.execute("""
+DROP TABLE gpkg_spatial_ref_sys;
+""")
+# save the change to the database
+conn.commit()
+# close connections
+cur.close()
+conn.close()
+
+logger.info('Corrupted gpkg file 11/408/244.gpkg by dropping the entire table gpkg_spatial_ref_sys.')
 
 # RASTERIZATION FOR HIGHEST Z-LEVEL
 staged_paths = stager.tiles.get_filenames_from_dir('staged')
@@ -241,3 +261,5 @@ logger.info('web tiling done!')
 
 htex_config_local.executors[0].shutdown()
 parsl.clear()
+
+logger.info('shutdown parsl. End of script.')
