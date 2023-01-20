@@ -5,7 +5,7 @@ from subprocess import PIPE, Popen
 
 ''' get hostnames from slurm file '''
 # /u/kastanday/viz/viz-workflow/slurm/nodes_array.txt
-with open('/u/kastanday/viz/viz-workflow/slurm/nodes_array.txt', 'r') as f:
+with open('/u/julietcohen/viz-workflow/slurm/nodes_array.txt', 'r') as f:
   hostnames = f.read().splitlines()
 
 print("Syncing footprints to nodes:\n\t", '\n\t'.join(hostnames))
@@ -19,7 +19,7 @@ for hostname in hostnames:
   # rsync = ["conda activate v2_full_viz_pipeline && ray start --address '141.142.145.101:6379'" ]
   
   # SYNC FOOTPRINTS TO COMPUTE NOTES
-  rsync = ['rsync', '-r', '--update', '--delete', '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/footprints/staged_footprints', '/tmp' ]
+  rsync = ['rsync', '-r', '--update', '--delete', '/scratch/bbou/julietcohen/IWP/input/2023-01-19/...', '/tmp' ]
   
   # sync geotiff to /scratch
   # rsync = ['rsync', '-r', '--update', '/tmp/v3_viz_output/geotiff/WorldCRS84Quad/15/', '/scratch/bbki/kastanday/maple_data_xsede_bridges2/v3_viz_output/merged_geotiff_sep9/WorldCRS84Quad/15' ]

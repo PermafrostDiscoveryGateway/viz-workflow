@@ -2,7 +2,7 @@
 
 #SBATCH --job-name=pdg_viz
 #SBATCH --partition=gpuA40x4
-#SBATCH --account=
+#SBATCH --account= 
 #SBATCH --time=24:00:00
 
 #SBATCH --export=ALL,RAY_worker_register_timeout_seconds=120
@@ -37,7 +37,7 @@ set -x
 echo "This is BEST-v2_gpu_ray.slurm"
 
 # global settings
-conda activate v3_full_viz_pipeline
+conda activate # {INSERT ENV NAME}
 export RAY_worker_register_timeout_seconds=120  # for sure necessary. Might be needed in user shell before `sbatch` is executed. 
 export RAY_max_pending_lease_requests_per_scheduling_category=2000 # probably not necessary
 

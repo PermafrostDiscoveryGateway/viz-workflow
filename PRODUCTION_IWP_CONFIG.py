@@ -1,30 +1,24 @@
 from datetime import datetime
+import subprocess
 #######################
 #### Change me 😁  ####
 #######################
 # ALWAYS include the tailing slash "/"
-# BASE_DIR_OF_INPUT = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/'   # The output data of MAPLE. Which is the input data for STAGING.
-# BASE_DIR_OF_INPUT = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/high_ice/'   # The output data of MAPLE. Which is the input data for STAGING.
 
-# Use Elias' new shape files (cleaned. Oct 31, 2022)
-BASE_DIR_OF_INPUT = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/glacier_water_cleaned_shp/high_ice/'   # The output data of MAPLE. Which is the input data for STAGING.
-# BASE_DIR_OF_INPUT = '/ime/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/aug_28_alaska_high_only/'   # The output data of MAPLE. Which is the input data for STAGING.
-# FOOTPRINTS_PATH   = BASE_DIR_OF_INPUT + 'footprints/staged_footprints/'
-# FOOTPRINTS_PATH = '/tmp/staged_footprints/'
-FOOTPRINTS_PATH = '/scratch/bbki/thiessenbock/pdg/staged_footprints/high_ice/'
+# define user on Delta, avoid writing files to other user's dir
+user = subprocess.check_output("whoami").strip().decode("ascii")
 
-# OUTPUT            = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/aug_28_alaska_high_only/viz_output/'       # Dir for results. High I/O is good.
-# OUTPUT            = '/tmp/v7_debug_viz_output/'       # Dir for results. High I/O is good.
-OUTPUT            = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/viz_pipline_outputs/v7_debug_viz_output/staged/cn094/'       # Dir for results. High I/O is good.
-# OUTPUT            = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/viz_output/'
-# OUTPUT            = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_13_FULL_SINGLE_RUN/gpub052/july_13_fifteennode/'       # Dir for results.
-# OUTPUT            = '/ime/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_24_v2/'       # Dir for results.
+# define desired location for output files within user dir
+# ensures a new subfolder every run as long as new run is not started within same day as last run
+datetime_obj = datetime.now().strftime("%b-%d-%y")
+output_dir = f'IWP_OUTPUT_{datetime_obj}/'
+
+# Use Elias' new shape files
+BASE_DIR_OF_INPUT = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/.../high_ice/'   # The output data of MAPLE. Which is the input data for STAGING.
+FOOTPRINTS_PATH = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/.../high_ice/'
+OUTPUT            = f'/scratch/bbou/{user}/IWP/output/{output_dir}/'       # Dir for results. High I/O is good.
 OUTPUT_OF_STAGING = OUTPUT  + 'staged/'              # Output dirs for each sub-step
-# OUTPUT_OF_STAGING = '/scratch/bbki/thiessenbock/pdg/staged/gpub044'
-# OUTPUT_OF_STAGING = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/v1_debug_viz_output/staged/merged/'
-# GEOTIFF_PATH      = OUTPUT + 'geotiff/'
-GEOTIFF_PATH      = '/tmp/v7_debug_viz_output/' + 'geotiff/'
-# GEOTIFF_PATH      = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/v3_viz_output/merged_geotiff_sep9/'
+GEOTIFF_PATH      = '/tmp/' + 'geotiff/'
 WEBTILE_PATH      = OUTPUT + 'web_tiles/'
 THREE_D_PATH      = OUTPUT + '3d_tiles/'
 

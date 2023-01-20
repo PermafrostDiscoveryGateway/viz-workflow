@@ -27,6 +27,8 @@ import viz_3dtiles  # import Cesium3DTile, Cesium3DTileset
 ONLY_SMALL_TEST_RUN = False                            # For testing, this ensures only a small handful of files are processed.
 TEST_RUN_SIZE       = 10_000                              # Number of files to pre processed during testing (only effects testing)
 
+# define user on Delta, avoid writing files to other user's dir
+user = subprocess.check_output("whoami").strip().decode("ascii")
 
 # help flag provides flag help
 # store_true actions stores argument as True
@@ -60,7 +62,7 @@ def main(args=None):
         
         # (optionally) Comment out steps you don't need 😁
         # todo: sync footprints to nodes.
-        # step0_staging()                                     # Good staging. Simple & reliable. 
+        step0_staging()                                     # Good staging. Simple & reliable. 
         # todo: merge_staging()
         # step1_3d_tiles()
         
@@ -73,7 +75,7 @@ def main(args=None):
         #     tr.print_diff()
         
         # args = 
-        step2_raster_highest(batch_size=100, cmd_line_args = args)                # rasterize highest Z level only 
+        # step2_raster_highest(batch_size=100, cmd_line_args = args)                # rasterize highest Z level only 
         # step3_raster_lower(batch_size_geotiffs=100)         # rasterize all LOWER Z levels
         # step4_webtiles(batch_size_web_tiles=250)            # convert to web tiles.        
 
@@ -209,7 +211,7 @@ def load_staging_checkpoints(staging_input_files_list):
     use CHECKPOINTS -- don't rerun already-processed-input files
     '''
     print("Using checkpoints. Skipping files that are already processed...")
-    checkpoint_paths = ['/u/kastanday/success_paths.txt',
+    checkpoint_paths = [f'/u/{user}/success_paths.txt',
     ]
                         # '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_10_v0/success_paths.txt',
                         # '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_12_v0_tmp_resumable/success_paths.txt',
@@ -722,7 +724,7 @@ def build_filepath(input_file):
 def build_step1_3d_filepath(outpit_dir, input_file):
     '''
     Usage: 
-        input_file = '/home/kastanday/output/staged/WorldCRS84Quad/13/1047/104699.gpkg'
+        input_file = f'/home/{user}/output/staged/WorldCRS84Quad/13/1047/104699.gpkg'
         output_dir = '/temp/v3_viz_output/'
         
     Returns:

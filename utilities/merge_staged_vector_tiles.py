@@ -59,20 +59,16 @@ print("🎯 Ray initialized.")
 # todo: see if I can delete all of these constants....
 # These don't matter much in this workflow.
 # ALWAYS include the tailing slash "/"
-# BASE_DIR_OF_INPUT = '/ime/bbki/kastanday/maple_data_xsede_bridges2/outputs/'   # The output data of MAPLE. Which is the input data for STAGING.
-BASE_DIR_OF_INPUT = '/tmp/'   # The output data of MAPLE. Which is the input data for STAGING.
+BASE_DIR_OF_INPUT = '/tmp/'  
 FOOTPRINTS_PATH   = BASE_DIR_OF_INPUT + 'staged_footprints/'
 
-OUTPUT            = '/tmp/'       # Dir for results. High I/O is good.
-# OUTPUT            = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_13_FULL_SINGLE_RUN/gpub052/july_13_fifteennode/'       # Dir for results.
-# OUTPUT            = '/ime/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_24_v2/'       # Dir for results.
-OUTPUT_OF_STAGING = OUTPUT + 'staged/'              # Output dirs for each sub-step
+OUTPUT            = '/tmp/' # Dir for results. High I/O is good.
+# Output dirs for each sub-step:
+OUTPUT_OF_STAGING = OUTPUT + 'staged/' 
 GEOTIFF_PATH      = OUTPUT + 'geotiff/'
 WEBTILE_PATH      = OUTPUT + 'web_tiles/'
 THREE_D_PATH      = OUTPUT + '3d_tiles/'
 IWP_CONFIG = {"dir_input": BASE_DIR_OF_INPUT,"ext_input": ".shp", "dir_footprints": FOOTPRINTS_PATH,"dir_geotiff": GEOTIFF_PATH,"dir_web_tiles": WEBTILE_PATH,"dir_staged": OUTPUT_OF_STAGING,"filename_staging_summary": OUTPUT_OF_STAGING + "staging_summary.csv","filename_rasterization_events": GEOTIFF_PATH + "raster_events.csv","filename_rasters_summary": GEOTIFF_PATH + "raster_summary.csv","version": datetime.now().strftime("%B%d,%Y"),"simplify_tolerance": 0.1,"tms_id": "WorldCRS84Quad","z_range": [0, 16],"geometricError": 57,"z_coord": 0,"statistics": [    {        "name": "iwp_count",        "weight_by": "count",        "property": "centroids_per_pixel",        "aggregation_method": "sum",        "resampling_method": "sum",        "val_range": [0, None],        "palette": ["#66339952", "#d93fce", "#ffcc00"],        "nodata_val": 0,        "nodata_color": "#ffffff00"    },    {        "name": "iwp_coverage",        "weight_by": "area",        "property": "area_per_pixel_area",        "aggregation_method": "sum",        "resampling_method": "average",        "val_range": [0, 1],        "palette": ["#66339952", "#ffcc00"],        "nodata_val": 0,        "nodata_color": "#ffffff00"    },],"deduplicate_at": ["raster", "3dtiles"],"deduplicate_keep_rules": [["Date", "larger"]],"deduplicate_method": "footprints",}
-
-BASE_DIR = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/v1_debug_viz_output/staged'
 
 def main():
     '''
@@ -86,7 +82,7 @@ def main():
     #### Change me 😁  ####
     #######################
     # todo -- get files from dirs automatically, using os.lsdir().
-    BASE_DIR = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/v1_debug_viz_output/staged'
+    BASE_DIR = '/scratch/bbou/julietcohen/IWP/output/...'
     merged_dir_path = f'{BASE_DIR}/gpub088'  # this path SHOULD NOT be in the `staged_dir_paths_list`
     staged_dir_paths_list = [
         f'{BASE_DIR}/gpub090',
