@@ -62,9 +62,12 @@ def main(args=None):
         
         # (optionally) Comment out steps you don't need 😁
         # todo: sync footprints to nodes.
-        step0_staging()                                     # Good staging. Simple & reliable. 
+        step0_staging()        
         # todo: merge_staging()
-        # step1_3d_tiles()
+        # step1_3d_tiles() # default parameter batch_size = 300
+        # step2_raster_highest() # rasterize highest Z level only, default batch_size = 100, default cmd_line_args = None 
+        # step3_raster_lower(batch_size_geotiffs=100) # rasterize all LOWER Z levels
+        # step4_webtiles(batch_size_web_tiles=250) # convert to web tiles.
         
         # mem_testing = False        
         # if mem_testing:
@@ -72,12 +75,7 @@ def main(args=None):
         #     tr = tracker.SummaryTracker()
         #     tr.print_diff()
         #     step2_raster_highest(batch_size=100)                # rasterize highest Z level only 
-        #     tr.print_diff()
-        
-        # args = 
-        # step2_raster_highest(batch_size=100, cmd_line_args = args)                # rasterize highest Z level only 
-        # step3_raster_lower(batch_size_geotiffs=100)         # rasterize all LOWER Z levels
-        # step4_webtiles(batch_size_web_tiles=250)            # convert to web tiles.        
+        #     tr.print_diff()        
 
     except Exception as e:
         print(f"Caught error in main(): {str(e)}", "\nTraceback", traceback.print_exc())

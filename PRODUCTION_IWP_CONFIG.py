@@ -7,16 +7,16 @@ import subprocess
 
 # define user on Delta, avoid writing files to other user's dir
 user = subprocess.check_output("whoami").strip().decode("ascii")
-
 # define desired location for output files within user dir
 # ensures a new subfolder every run as long as new run is not started within same day as last run
-datetime_obj = datetime.now().strftime("%b-%d-%y")
-output_dir = f'IWP_OUTPUT_{datetime_obj}/'
+#output_subdir = datetime.now().strftime("%b-%d-%y")
+# don't use subprocess to retrieve date for subdir because runs might span over 2 days if they go overnight
+output_subdir = '2023-01-20'
 
 # Use Elias' new shape files
 BASE_DIR_OF_INPUT = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/.../high_ice/'   # The output data of MAPLE. Which is the input data for STAGING.
 FOOTPRINTS_PATH = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/.../high_ice/'
-OUTPUT            = f'/scratch/bbou/{user}/IWP/output/{output_dir}/'       # Dir for results. High I/O is good.
+OUTPUT            = f'/scratch/bbou/{user}/IWP/output/{output_subdir}/'       # Dir for results. High I/O is good.
 OUTPUT_OF_STAGING = OUTPUT  + 'staged/'              # Output dirs for each sub-step
 GEOTIFF_PATH      = '/tmp/' + 'geotiff/'
 WEBTILE_PATH      = OUTPUT + 'web_tiles/'
