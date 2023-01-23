@@ -4,16 +4,19 @@ import subprocess
 import time
 from subprocess import PIPE, Popen
 
+# define user on Delta, avoid writing files to other user's dir
+user = subprocess.check_output("whoami").strip().decode("ascii")
+output_subdir = '2023-01-20'
+
 ''' get hostnames from slurm file '''
-# /u/kastanday/viz/viz-workflow/slurm/nodes_array.txt
-with open('/u/kastanday/viz/viz-workflow/slurm/nodes_array.txt', 'r') as f:
+with open(f'/u/{user}/viz-workflow/slurm/nodes_array.txt', 'r') as f:
   hostnames = f.read().splitlines()
 
 print("Moving geotiffs to main server, from worker nodes\n\t", '\n\t'.join(hostnames))
 
-# Warning: Delets source files after rsync. 
-DESTINATION = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/viz_pipline_outputs/v7_debug_viz_output/staged/cn094/geotiff'
-SOURCE = '/tmp/v7_debug_viz_output/geotiff/'
+# Warning: Deletes source files after rsync. 
+SOURCE = '/tmp/geotiff/'
+DESTINATION = f'/scratch/bbou/{user}/IWP/output/{output_subdir}/geotiff'
 
 count = 0
 for hostname in hostnames:  

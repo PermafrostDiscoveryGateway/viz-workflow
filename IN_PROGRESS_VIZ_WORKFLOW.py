@@ -64,8 +64,9 @@ def main(args=None):
         # todo: sync footprints to nodes.
         step0_staging()        
         # todo: merge_staging()
-        # step1_3d_tiles() # default parameter batch_size = 300
-        # step2_raster_highest() # rasterize highest Z level only, default batch_size = 100, default cmd_line_args = None 
+        # step1_3d_tiles() # default parameter batch_size = 300 
+        # step2_raster_highest(batch_size=100, cmd_line_args = args) # rasterize highest Z level only
+        # todo: immediately after initiating above step, start rsync script to continuously sync geotiff files  
         # step3_raster_lower(batch_size_geotiffs=100) # rasterize all LOWER Z levels
         # step4_webtiles(batch_size_web_tiles=250) # convert to web tiles.
         
@@ -74,7 +75,7 @@ def main(args=None):
         #     from pympler import tracker
         #     tr = tracker.SummaryTracker()
         #     tr.print_diff()
-        #     step2_raster_highest(batch_size=100)                # rasterize highest Z level only 
+        #     step2_raster_highest(batch_size=100, cmd_line_args = args)                # rasterize highest Z level only 
         #     tr.print_diff()        
 
     except Exception as e:
@@ -139,8 +140,6 @@ def step0_staging():
     # make paths absolute 
     staging_input_files_list = prepend(staging_input_files_list_raw, BASE_DIR_OF_INPUT)
     
-    # todo: automate checkpointing so it's more usable. Currently it's all manual.
-    staging_input_files_list = load_staging_checkpoints(staging_input_files_list)
     """
     
     # catch kill signal to shutdown on command (ctrl + c)
@@ -202,39 +201,6 @@ def print_cluster_stats():
         {ray.cluster_resources()['memory']/1e9:.2f} GB CPU memory in total''')
     if ('GPU' in str(ray.cluster_resources())):
         print(f"        {ray.cluster_resources()['GPU']} GRAPHICCSSZZ cards in total")
-        
-
-def load_staging_checkpoints(staging_input_files_list):
-    '''
-    use CHECKPOINTS -- don't rerun already-processed-input files
-    '''
-    print("Using checkpoints. Skipping files that are already processed...")
-    checkpoint_paths = [f'/u/{user}/success_paths.txt',
-    ]
-                        # '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_10_v0/success_paths.txt',
-                        # '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_12_v0_tmp_resumable/success_paths.txt',
-                        # '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_12_v0_tmp_resumable/run_2/success_paths.txt',
-                        # '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_12_v0_tmp_resumable/run_3/success_paths.txt',]
-
-    # combine all checkpoints
-    already_processed_files_list = []
-    for checkpoint_path in checkpoint_paths:
-        print(f"Checkpoint path: {checkpoint_path}")
-        already_processed_files_list_raw = None
-        with open(checkpoint_path, 'r') as f:
-            already_processed_files_list_raw = f.readlines()
-
-        # append to list of input files to skip (already processed)
-        # for filepath in already_processed_files_list_raw: 
-        #     already_processed_files_list.append(filepath.strip("\n"))
-            
-        already_processed_files_list.extend(filepath.strip("\n") for filepath in already_processed_files_list_raw)
-
-    # remove already processed files
-    print(f"Before checkpoint total files = {len(staging_input_files_list)}. \nTotal length of already processed files: {len(already_processed_files_list)}")
-    
-    # return input file list minus checkpoint files
-    return [i for i in staging_input_files_list if i not in already_processed_files_list]
 
 def prep_only_high_ice_input_list():
     try:
@@ -407,20 +373,11 @@ def step2_raster_highest(batch_size=100, cmd_line_args = None):
     try: 
         # Start remote functions
         app_futures = []
-        for i, batch in enumerate(staged_batches):            
-            
-            # skip already done work.
-            # if i >= cmd_line_args.start_index and i < cmd_line_args.end_index:
-            if i >= int(args.start_index) and i < int(args.end_index):
-                # greater than start, less than end.
-                # print(f"Launching batch {i} of {len(staged_batches)}. (Start: {cmd_line_args.start_index}, End: {cmd_line_args.end_index})")
-                app_future = rasterize.remote(batch, IWP_CONFIG)
-                app_futures.append(app_future)
-            else:
-                print(f"🚩🚩🚩🚩🚩 SKIPPING ALREADY COMPLETED WORK! Index: {i}")
-                continue
+        for i, batch in enumerate(staged_batches):
+            # following two rows were extract from if statement to fix command line args
+            app_future = rasterize.remote(batch, IWP_CONFIG)
+            app_futures.append(app_future)
                 
-
         for i in range(0, len(app_futures)): 
             ready, not_ready = ray.wait(app_futures)
             # print(f"✅ Finished {ray.get(ready)}")
