@@ -53,7 +53,6 @@ def main(args=None):
     print(f"Write all results to output dir: {IWP_CONFIG['dir_output']}")
     print_cluster_stats()
     start_logging()
-    args = parse_cmd_line_args()
     start = time.time()
     
     try:
@@ -85,23 +84,6 @@ def main(args=None):
         print(f"Runtime: {(time.time() - start)/60:.2f} minutes")
         ray.shutdown()
         assert ray.is_initialized() == False
-
-def parse_cmd_line_args():
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument('-s', '--start_index', type=int,
-        help="int: START index of step2_raster_highest(). Work-around for mem overflow error.")
-    parser.add_argument('-e', '--end_index', type=int,
-        help="int: END index of step2_raster_highest(). Work-around for mem overflow error.")
-
-    args = parser.parse_args()
-    print("args: ", args)
-    
-    if args.start_index:
-        print("Args.start_index: ", args.start_index)
-        print("Args.end_index: ", args.end_index)
-    
-    return args
 
 ############### 👇 MAIN STEPS FUNCTIONS 👇 ###############
 
@@ -305,7 +287,7 @@ def step1_3d_tiles(batch_size=300):
             print(f"    {failure_text} on {ip_address}")
 
 # @workflow.step(name="Step2_Rasterize_only_higest_z_level")
-def step2_raster_highest(batch_size=100, cmd_line_args = None):
+def step2_raster_highest(batch_size=100):
     # from pympler import tracker
     # tr_within_raster_highest = tracker.SummaryTracker()
     # tr_outside_for_loop = tracker.SummaryTracker()
