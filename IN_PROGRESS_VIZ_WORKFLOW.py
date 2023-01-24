@@ -15,6 +15,7 @@ from contextlib import suppress
 from copy import deepcopy
 from datetime import datetime
 import subprocess
+import shlex
 import pprint
 import argparse
 
@@ -39,7 +40,7 @@ IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
 print("Using config: ")
 pprint.pprint(IWP_CONFIG)
 
-def main(args=None):
+def main():
     result = subprocess.run(["hostname", "-i"], capture_output=True, text=True)
     head_ip = result.stdout.strip()
     print(f"Connecting to Ray... at address ray://{head_ip}:10001")
@@ -51,7 +52,6 @@ def main(args=None):
     print(f"Write all results to output dir: {IWP_CONFIG['dir_output']}")
     print_cluster_stats()
     start_logging()
-    args = parse_cmd_line_args()
     start = time.time()
     
     try:
@@ -60,22 +60,12 @@ def main(args=None):
         
         # (optionally) Comment out steps you don't need 😁
         # todo: sync footprints to nodes.
-        # step0_staging()                                     # Good staging. Simple & reliable. 
-        # todo: merge_staging()
-        # step1_3d_tiles()
-        
-        # mem_testing = False        
-        # if mem_testing:
-        #     from pympler import tracker
-        #     tr = tracker.SummaryTracker()
-        #     tr.print_diff()
-        #     step2_raster_highest(batch_size=100)                # rasterize highest Z level only 
-        #     tr.print_diff()
-        
-        # args = 
-        step2_raster_highest(batch_size=100, cmd_line_args = args)                # rasterize highest Z level only 
-        # step3_raster_lower(batch_size_geotiffs=100)         # rasterize all LOWER Z levels
-        # step4_webtiles(batch_size_web_tiles=250)            # convert to web tiles.        
+        step0_staging()                                              # Good staging. Simple & reliable. 
+        # todo: merge_staging()                                        # ./utilities/merge_staged_vector_tiles.py
+        # step1_3d_tiles() # todo: not working currently.
+        # step2_raster_highest(batch_size=100)   # rasterize highest Z level only 
+        # step3_raster_lower(batch_size_geotiffs=5)                    # rasterize all LOWER Z levels
+        # step4_webtiles(batch_size_web_tiles=50)                     # convert to web tiles.        
 
     except Exception as e:
         print(f"Caught error in main(): {str(e)}", "\nTraceback", traceback.print_exc())
@@ -84,23 +74,6 @@ def main(args=None):
         print(f"Runtime: {(time.time() - start)/60:.2f} minutes")
         ray.shutdown()
         assert ray.is_initialized() == False
-
-def parse_cmd_line_args():
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument('-s', '--start_index', type=int,
-        help="int: START index of step2_raster_highest(). Work-around for mem overflow error.")
-    parser.add_argument('-e', '--end_index', type=int,
-        help="int: END index of step2_raster_highest(). Work-around for mem overflow error.")
-
-    args = parser.parse_args()
-    print("args: ", args)
-    
-    if args.start_index:
-        print("Args.start_index: ", args.start_index)
-        print("Args.end_index: ", args.end_index)
-    
-    return args
 
 ############### 👇 MAIN STEPS FUNCTIONS 👇 ###############
 
@@ -203,38 +176,6 @@ def print_cluster_stats():
     if ('GPU' in str(ray.cluster_resources())):
         print(f"        {ray.cluster_resources()['GPU']} GRAPHICCSSZZ cards in total")
         
-
-def load_staging_checkpoints(staging_input_files_list):
-    '''
-    use CHECKPOINTS -- don't rerun already-processed-input files
-    '''
-    print("Using checkpoints. Skipping files that are already processed...")
-    checkpoint_paths = ['/u/kastanday/success_paths.txt',
-    ]
-                        # '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_10_v0/success_paths.txt',
-                        # '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_12_v0_tmp_resumable/success_paths.txt',
-                        # '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_12_v0_tmp_resumable/run_2/success_paths.txt',
-                        # '/scratch/bbki/kastanday/maple_data_xsede_bridges2/outputs/viz_output/july_12_v0_tmp_resumable/run_3/success_paths.txt',]
-
-    # combine all checkpoints
-    already_processed_files_list = []
-    for checkpoint_path in checkpoint_paths:
-        print(f"Checkpoint path: {checkpoint_path}")
-        already_processed_files_list_raw = None
-        with open(checkpoint_path, 'r') as f:
-            already_processed_files_list_raw = f.readlines()
-
-        # append to list of input files to skip (already processed)
-        # for filepath in already_processed_files_list_raw: 
-        #     already_processed_files_list.append(filepath.strip("\n"))
-            
-        already_processed_files_list.extend(filepath.strip("\n") for filepath in already_processed_files_list_raw)
-
-    # remove already processed files
-    print(f"Before checkpoint total files = {len(staging_input_files_list)}. \nTotal length of already processed files: {len(already_processed_files_list)}")
-    
-    # return input file list minus checkpoint files
-    return [i for i in staging_input_files_list if i not in already_processed_files_list]
 
 def prep_only_high_ice_input_list():
     try:
@@ -476,16 +417,23 @@ def step3_raster_lower(batch_size_geotiffs=20):
     max_z = stager.config.get_max_z()
     parent_zs = range(max_z - 1, min_z - 1, -1)
     
-    print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG['dir_geotiff']}")
-    stager.tiles.add_base_dir('geotiff_path', IWP_CONFIG['dir_geotiff'], '.tif') # already added ??
-    
+    print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG['geotiff_input']}")
+    stager.tiles.add_base_dir('geotiff_path', IWP_CONFIG['geotiff_input'], '.tif') # already added ??
     
     start = time.time()
+    # Loop thru Z levels 
     # Can't start lower z-level until higher z-level is complete.
     for z in parent_zs:
-        print(f"👉 Starting Z level {z} of {len(parent_zs)}")
-        # Loop thru Z levels 
+        
+        # TODO REMOVE ME. quick hack for finishing .
+        if int(z) > 9: # doing 9 to 1. 
+            continue
+        
         # Make lower z-levels based on the path names of the files just created
+        print(f"👉 Starting Z level {z} of {len(parent_zs)}")
+        print("Number of geotiffs to process (for this zoom): ", len(child_paths))
+        
+        # this part is very slow. Can we avoid checking in directories that are below the current z level?
         child_paths = stager.tiles.get_filenames_from_dir( base_dir = 'geotiff_path', z=z + 1)
 
         if ONLY_SMALL_TEST_RUN:
@@ -499,7 +447,7 @@ def step3_raster_lower(batch_size_geotiffs=20):
 
         # Break all parent tiles at level z into batches
         parent_tile_batches = make_batch(parent_tiles, batch_size_geotiffs)
-        print(f"📦 Rasterizing {len(parent_tiles)} parents into {len(child_paths)} children tifs (using {len(parent_tile_batches)} batches)")
+        print(f"📦 Rasterizing (Z-{z}) {len(child_paths)} children into {len(parent_tiles)} parents tifs (using {len(parent_tile_batches)} batches)")
         # print(f"📦 Rasterizing {parent_tile_batches} parents")
 
         # PARALLELIZE batches WITHIN one zoom level (best we can do for now).
@@ -522,6 +470,11 @@ def step3_raster_lower(batch_size_geotiffs=20):
                     break
         except Exception as e:
             print(f"Cauth error in Ray loop in step 3: {str(e)}")
+            
+        # NOT NECESSARY -- it uses fileserver for input and output.
+        # After each zoom level, rsycn to main fileserver
+        # print("Starting rsync")
+        # subprocess.run(shlex.split("python /u/kastanday/viz/viz-workflow/utilities/rsync_merge_raster_to_scratch.py"))
 
     print(f"⏰ Total time to create parent geotiffs: {(time.time() - start)/60:.2f} minutes\n")
     return "Done step 3."
@@ -602,28 +555,14 @@ def rasterize(staged_paths, config, logging_dict=None):
 
     try:
         rasterizer = pdgraster.RasterTiler(config)
-        # from pympler.classtracker import ClassTracker
-        # tracker = ClassTracker()
-        # tracker.track_object(rasterizer, resolution_level=4) # todo try resolution 2
-        # tracker.track_class(pdgraster.RasterTiler, resolution_level=4)
-        # tracker.create_snapshot()
         # todo: fix warning `python3.9/site-packages/geopandas/base.py:31: UserWarning: The indices of the two GeoSeries are different.`
         # with suppress(UserWarning): 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             rasterizer.rasterize_vectors(staged_paths, make_parents=False)
-        # tracker.create_snapshot()
-        # tracker.stats.print_summary()
     except Exception as e:
         print("⚠️ Failed to rasterize path: ", staged_paths, "\nWith error: ", e, "\nTraceback", traceback.print_exc())
     finally:
-        # MEMORY LEAK (related to loggers being created)
-        # for handler in logger.handlers:
-        #     handler.close()
-        # del rasterizer
-        # tracker.create_snapshot()
-        # tracker.stats.print_summary()
-        # print("After deleting rasterizer")
         return staged_paths
 
 @ray.remote
@@ -833,8 +772,13 @@ def start_logging():
     filepath.touch(exist_ok=True)
     logging.basicConfig(level=logging.INFO, filename= IWP_CONFIG['dir_output'] + 'workflow_log.txt', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
 
+@ray.remote
+def rsync_raster_to_scatch(rsync_python_file='utilities/rsync_merge_raster_to_scratch.py'):
+    while True:
+        rsync_raster = f'python {rsync_python_file}'
+        subprocess.run(shlex.split(rsync_raster))
+        time.sleep(30)
+
 if __name__ == '__main__':
-    # args = None
-    args = parse_cmd_line_args()
-    main(args)
+    main()
 
