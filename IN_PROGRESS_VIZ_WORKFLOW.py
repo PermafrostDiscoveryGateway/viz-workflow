@@ -417,8 +417,8 @@ def step3_raster_lower(batch_size_geotiffs=20):
     max_z = stager.config.get_max_z()
     parent_zs = range(max_z - 1, min_z - 1, -1)
     
-    print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG['geotiff_input']}")
-    stager.tiles.add_base_dir('geotiff_path', IWP_CONFIG['geotiff_input'], '.tif') # already added ??
+    print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG['dir_geotiff']}")
+    stager.tiles.add_base_dir('geotiff_path', IWP_CONFIG['dir_geotiff'], '.tif') # already added ??
     
     start = time.time()
     # Loop thru Z levels 
@@ -489,15 +489,15 @@ def step4_webtiles(batch_size_web_tiles=300):
     
     # instantiate classes for their helper functions
     rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
-    stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
     
     start = time.time()
     # Update color ranges
+    print(f"Updating ranges...")
     rasterizer.update_ranges()
+    new_config_dict = rasterizer.config.config
 
     print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG['dir_geotiff']}...")
-    stager.tiles.add_base_dir('geotiff_path', IWP_CONFIG['dir_geotiff'], '.tif')
-    geotiff_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_path')
+    geotiff_paths = rasterizer.tiles.get_filenames_from_dir(base_dir = 'geotiff')
 
     if ONLY_SMALL_TEST_RUN:
         geotiff_paths = geotiff_paths[:TEST_RUN_SIZE]
@@ -519,7 +519,7 @@ def step4_webtiles(batch_size_web_tiles=300):
         for batch in geotiff_batches:
             # MANDATORY: include placement_group for better stability on 200+ cpus.
             # app_future = create_web_tiles.options(placement_group=pg).remote(batch, IWP_CONFIG)
-            app_future = create_web_tiles.remote(batch, IWP_CONFIG)
+            app_future = create_web_tiles.remote(batch, new_config_dict)
             app_futures.append(app_future)
 
         for i in range(0, len(app_futures)): 
