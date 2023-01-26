@@ -16,7 +16,6 @@ from copy import deepcopy
 from datetime import datetime
 import subprocess
 import pprint
-import argparse
 
 import pdgraster
 import pdgstaging  # For staging
@@ -41,7 +40,7 @@ IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
 print("Using config: ")
 pprint.pprint(IWP_CONFIG)
 
-def main(args=None):
+def main():
     result = subprocess.run(["hostname", "-i"], capture_output=True, text=True)
     head_ip = result.stdout.strip()
     print(f"Connecting to Ray... at address ray://{head_ip}:10001")
@@ -64,7 +63,7 @@ def main(args=None):
         step0_staging()        
         # todo: merge_staging()
         # step1_3d_tiles() # default parameter batch_size = 300 
-        # step2_raster_highest(batch_size=100, cmd_line_args = args) # rasterize highest Z level only
+        # step2_raster_highest(batch_size=100) # rasterize highest Z level only
         # todo: immediately after initiating above step, start rsync script to continuously sync geotiff files  
         # step3_raster_lower(batch_size_geotiffs=100) # rasterize all LOWER Z levels
         # step4_webtiles(batch_size_web_tiles=250) # convert to web tiles.
@@ -74,7 +73,7 @@ def main(args=None):
         #     from pympler import tracker
         #     tr = tracker.SummaryTracker()
         #     tr.print_diff()
-        #     step2_raster_highest(batch_size=100, cmd_line_args = args)                # rasterize highest Z level only 
+        #     step2_raster_highest(batch_size=100)                # rasterize highest Z level only 
         #     tr.print_diff()        
 
     except Exception as e:
@@ -105,6 +104,7 @@ def step0_staging():
     staging_input_files_list = stager.tiles.get_filenames_from_dir(base_dir = 'base_input')
     
     # write list staging_input_files_list to file 
+    # write file to STAGING_REMOTE dir
     with open( os.path.join(IWP_CONFIG['dir_staged'], "staging_input_files_list.json") , "w") as f:
         json.dump(staging_input_files_list, f)
     
@@ -356,7 +356,6 @@ def step2_raster_highest(batch_size=100):
         # Start remote functions
         app_futures = []
         for i, batch in enumerate(staged_batches):
-            # following two rows were extract from if statement to fix command line args
             app_future = rasterize.remote(batch, IWP_CONFIG)
             app_futures.append(app_future)
                 
@@ -773,7 +772,5 @@ def start_logging():
     logging.basicConfig(level=logging.INFO, filename= IWP_CONFIG['dir_output'] + 'workflow_log.txt', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
 
 if __name__ == '__main__':
-    # args = None
-    args = parse_cmd_line_args()
-    main(args)
+    main()
 
