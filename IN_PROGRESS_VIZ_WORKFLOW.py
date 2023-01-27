@@ -61,11 +61,15 @@ def main():
         # (optionally) Comment out steps you don't need 😁
         # todo: sync footprints to nodes.
         step0_staging()        
-        # todo: merge_staging()
-        # step1_3d_tiles() # default parameter batch_size = 300 
+        # todo: rsync staging to /scratch
+        # todo: merge staged files in /scratch
+        # DO NOT RUN 3d-tiling UNTIL WORKFLOW CAN ACCOMODATE FILE HIERARCHY:step1_3d_tiles() # default parameter batch_size = 300 
         # step2_raster_highest(batch_size=100) # rasterize highest Z level only
-        # todo: immediately after initiating above step, start rsync script to continuously sync geotiff files  
+        # todo: immediately after initiating above step, start rsync script to continuously sync geotiff files,
+        # or immediately after the above step is done, rsync all files at once if there is time left in job  
         # step3_raster_lower(batch_size_geotiffs=100) # rasterize all LOWER Z levels
+        # todo: immediately after initiating above step, start rsync script to continuously sync geotiff files,
+        # or immediately after the above step is done, rsync all files at once if there is time left in job
         # step4_webtiles(batch_size_web_tiles=250) # convert to web tiles.
         
         # mem_testing = False        
@@ -93,19 +97,23 @@ def step0_staging():
     IP_ADDRESSES_OF_WORK = []
     app_futures = []
     start = time.time()
-    os.makedirs(IWP_CONFIG['dir_staged'], exist_ok=True)
+
+    # update the config for the current context: pull staged files from /scratch
+    IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_local']
+    # make directories in /tmp so geotiffs can populate there
+    os.makedirs(IWP_CONFIG['dir_staged'], exist_ok = True)
     
     # OLD METHOD "glob" all files. 
     stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
     missing_footprints = stager.check_footprints()
     print(f"⚠️ Num missing footprints: {len(missing_footprints)}")
     
+    # define the input dir as the base dir for the satging step
     stager.tiles.add_base_dir('base_input', IWP_CONFIG['dir_input'], '.shp')
     staging_input_files_list = stager.tiles.get_filenames_from_dir(base_dir = 'base_input')
     
-    # write list staging_input_files_list to file 
-    # write file to STAGING_REMOTE dir
-    with open( os.path.join(IWP_CONFIG['dir_staged'], "staging_input_files_list.json") , "w") as f:
+    # write list staging_input_files_list to file stored in STAGING_REMOTE dir
+    with open( os.path.join(IWP_CONFIG['dir_staged_remote'], "staging_input_files_list.json") , "w") as f:
         json.dump(staging_input_files_list, f)
     
     """
@@ -211,80 +219,81 @@ def prepend(mylist, mystr):
     return [mystr + item for item in mylist]
 
 # @workflow.step(name="Step1_3D_Tiles")
-def step1_3d_tiles(batch_size=300):
+# def step1_3d_tiles(batch_size=300):
     
-    # instantiate classes for their helper functions
-    # rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
-    stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
+#     # instantiate classes for their helper functions
+#     # rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
+#     stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
     
-    IP_ADDRESSES_OF_WORK_3D_TILES = []
-    FAILURES_3D_TILES = []
+#     IP_ADDRESSES_OF_WORK_3D_TILES = []
+#     FAILURES_3D_TILES = []
     
-    print("1️⃣  Step 1 3D Tiles from Geotifs.")
+#     print("1️⃣  Step 1 3D Tiles from staged files.")
 
-    try:
-        # collect staged files
-        stager.tiles.add_base_dir('staging', IWP_CONFIG['dir_staged'], '.gpkg')
-        staged_files_list = stager.tiles.get_filenames_from_dir(base_dir = 'staging')
-        staged_files_list.reverse()
+#     try:
+#         # collect staged files from STAGING_REMOTE dir
+#         # first define the dir that contains the staged files into a base dir to pull all filepaths correctly
+#         stager.tiles.add_base_dir('staging', IWP_CONFIG['dir_staged_remote'], '.gpkg')
+#         staged_files_list = stager.tiles.get_filenames_from_dir(base_dir = 'staging')
+#         staged_files_list.reverse()
         
-        staged_batches = make_batch(staged_files_list, batch_size)
+#         staged_batches = make_batch(staged_files_list, batch_size)
 
-        if ONLY_SMALL_TEST_RUN:
-            staged_files_list = staged_files_list[:TEST_RUN_SIZE]
-        print("total staged files len:", len(staged_files_list))
+#         if ONLY_SMALL_TEST_RUN:
+#             staged_files_list = staged_files_list[:TEST_RUN_SIZE]
+#         print("total staged files len:", len(staged_files_list))
 
-        # START JOBS
-        start = time.time()
-        app_futures = []
-        for itr, filepath_batch in enumerate(staged_batches):
-            # check if file is already done
-            # filename, save_to_dir = build_filepath(filepath)
+#         # START JOBS
+#         start = time.time()
+#         app_futures = []
+#         for itr, filepath_batch in enumerate(staged_batches):
+#             # check if file is already done
+#             # filename, save_to_dir = build_filepath(filepath)
             
-            # check_if_exists = False
-            # if check_if_exists:
-            #     filename, save_to_dir = build_step1_3d_filepath(OUTPUT, filepath)
-            #     absolute_path = os.path.join(save_to_dir, filename) + ".json"
-            #     if os.path.exists(absolute_path):
-            #         print(f"Output already exists, skipping: {absolute_path}")
-            #         continue
-            #     else:
-            #         print(f"Starting job ({itr}/{len(staged_files_list)}): {absolute_path}")
-            #         app_futures.append(three_d_tile.remote(filepath, filename, save_to_dir))
+#             # check_if_exists = False
+#             # if check_if_exists:
+#             #     filename, save_to_dir = build_step1_3d_filepath(OUTPUT, filepath)
+#             #     absolute_path = os.path.join(save_to_dir, filename) + ".json"
+#             #     if os.path.exists(absolute_path):
+#             #         print(f"Output already exists, skipping: {absolute_path}")
+#             #         continue
+#             #     else:
+#             #         print(f"Starting job ({itr}/{len(staged_files_list)}): {absolute_path}")
+#             #         app_futures.append(three_d_tile.remote(filepath, filename, save_to_dir))
             
-            # batched version        
-            app_futures.append(three_d_tile_batches.remote(filepath_batch, IWP_CONFIG['dir_output']))
+#             # batched version        
+#             app_futures.append(three_d_tile_batches.remote(filepath_batch, IWP_CONFIG['dir_output']))
 
-        # get 3D tiles, send to Tileset
-        for i in range(0,len(staged_files_list)): 
-            ready, not_ready = ray.wait(app_futures)
+#         # get 3D tiles, send to Tileset
+#         for i in range(0,len(staged_files_list)): 
+#             ready, not_ready = ray.wait(app_futures)
             
-            # Check for failures
-            if any(err in ray.get(ready)[0] for err in ["FAILED", "Failed", "❌"]):
-                # failure case
-                FAILURES_3D_TILES.append( [ray.get(ready)[0], ray.get(ready)[0][1]] )
-                print(f"❌ Failed {ray.get(ready)[0]}")
-            else:
-                # success case
-                print(f"✅ Finished {ray.get(ready)[0]}")
-                print(f"📌 Completed {i+1} of {len(staged_batches)}, {(i+1)/len(staged_batches)*100:.2f}%, ⏰ Elapsed time: {(time.time() - start)/60:.2f} min\n")
-                IP_ADDRESSES_OF_WORK_3D_TILES.append(ray.get(ready)[0])
+#             # Check for failures
+#             if any(err in ray.get(ready)[0] for err in ["FAILED", "Failed", "❌"]):
+#                 # failure case
+#                 FAILURES_3D_TILES.append( [ray.get(ready)[0], ray.get(ready)[0][1]] )
+#                 print(f"❌ Failed {ray.get(ready)[0]}")
+#             else:
+#                 # success case
+#                 print(f"✅ Finished {ray.get(ready)[0]}")
+#                 print(f"📌 Completed {i+1} of {len(staged_batches)}, {(i+1)/len(staged_batches)*100:.2f}%, ⏰ Elapsed time: {(time.time() - start)/60:.2f} min\n")
+#                 IP_ADDRESSES_OF_WORK_3D_TILES.append(ray.get(ready)[0])
 
-            app_futures = not_ready
-            if not app_futures:
-                break
+#             app_futures = not_ready
+#             if not app_futures:
+#                 break
             
-    except Exception as e:
-        print("❌❌  Failed in main Ray loop (of Viz-3D). Error:", e)
-    finally:
-        print(f"⏰ Running total of elapsed time: {(time.time() - start)/60:.2f} minutes\n")
-        print("Which nodes were used?")
-        for ip_address, num_tasks in Counter(IP_ADDRESSES_OF_WORK_3D_TILES).items():
-            print('    {} tasks on {}'.format(num_tasks, ip_address))
-        print(f"There were {len(FAILURES_3D_TILES)} failures.")
-        # todo -- group failures by node IP address...
-        for failure_text, ip_address in FAILURES_3D_TILES:
-            print(f"    {failure_text} on {ip_address}")
+#     except Exception as e:
+#         print("❌❌  Failed in main Ray loop (of Viz-3D). Error:", e)
+#     finally:
+#         print(f"⏰ Running total of elapsed time: {(time.time() - start)/60:.2f} minutes\n")
+#         print("Which nodes were used?")
+#         for ip_address, num_tasks in Counter(IP_ADDRESSES_OF_WORK_3D_TILES).items():
+#             print('    {} tasks on {}'.format(num_tasks, ip_address))
+#         print(f"There were {len(FAILURES_3D_TILES)} failures.")
+#         # todo -- group failures by node IP address...
+#         for failure_text, ip_address in FAILURES_3D_TILES:
+#             print(f"    {failure_text} on {ip_address}")
 
 # @workflow.step(name="Step2_Rasterize_only_higest_z_level")
 def step2_raster_highest(batch_size=100):
@@ -300,16 +309,23 @@ def step2_raster_highest(batch_size=100):
     # import gc
     # from random import randrange
     # from pympler import muppy, summary, tracker
-    
-    os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok=True)
+
+    # update the config for the current context: pull staged files from /scratch
+    IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local']
+    # make directories in /tmp so geotiffs can populate there
+    os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok = True)
 
     print("2️⃣  Step 2 Rasterize only highest Z")
+
+    # update the config for the current context: pull staged files from /scratch
+    IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote']
     stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
+    # first define the dir that contains the staged files into a base dir to pull all filepaths correctly
     stager.tiles.add_base_dir('output_of_staging', IWP_CONFIG['dir_staged'], '.gpkg')
     
     print(f"Collecting all STAGED files from `{IWP_CONFIG['dir_staged']}`...")
     # Get paths to all the newly staged tiles
-    staged_paths = stager.tiles.get_filenames_from_dir( base_dir = 'output_of_staging' )
+    staged_paths = stager.tiles.get_filenames_from_dir(base_dir = 'output_of_staging')
     
     # stager.kas_check_footprints(staged_paths)
     
@@ -329,7 +345,7 @@ def step2_raster_highest(batch_size=100):
     print(f"Step 2️⃣ -- Making batches of staged files... batch_size: {batch_size}")
     staged_batches = make_batch(staged_paths, batch_size)
 
-    print(f"The input to this step, Rasterization, is the output of Staging.\n Using Staging path: {IWP_CONFIG['dir_staged']}")
+    print(f"The input to this step, Rasterization, is the output of Staging.\n Using Staging path: {IWP_CONFIG['dir_staged_remote']}")
 
     print(f"🌄 Rasterize total files {len(staged_paths)} gpkgs, using batch size: {batch_size}")
     print(f"🏎  Parallel batches of jobs: {len(staged_batches)}...\n")
@@ -407,16 +423,23 @@ def step3_raster_lower(batch_size_geotiffs=20):
     👉 WE DO PARALLELIZE BATCHES WITHIN one zoom level.
     '''
     print("3️⃣ Step 3: Create parent geotiffs for all lower z-levels (everything except highest zoom)")
+
+    # update the config for the current context: pull stager that represents staged files in /scratch
+    # not sure that this next line is necessary but might as well keep the config up to date
+    # with where files currently are
+    IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote']
     stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
     
     # find all Z levels
     min_z = stager.config.get_min_z()
     max_z = stager.config.get_max_z()
     parent_zs = range(max_z - 1, min_z - 1, -1)
-    
+
+    # update the config for the current context: pull highest rasters from /scratch
+    IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
+
     print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG['dir_geotiff']}")
     stager.tiles.add_base_dir('geotiff_path', IWP_CONFIG['dir_geotiff'], '.tif') # already added ??
-    
     
     start = time.time()
     # Can't start lower z-level until higher z-level is complete.
@@ -424,7 +447,7 @@ def step3_raster_lower(batch_size_geotiffs=20):
         print(f"👉 Starting Z level {z} of {len(parent_zs)}")
         # Loop thru Z levels 
         # Make lower z-levels based on the path names of the files just created
-        child_paths = stager.tiles.get_filenames_from_dir( base_dir = 'geotiff_path', z=z + 1)
+        child_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_path', z=z + 1)
 
         if ONLY_SMALL_TEST_RUN:
             child_paths = child_paths[:TEST_RUN_SIZE]
@@ -473,6 +496,10 @@ def step4_webtiles(batch_size_web_tiles=300):
     print("4️⃣ -- Creating web tiles from geotiffs...")
     
     # instantiate classes for their helper functions
+    # not sure that the next line is necessary but might as well keep the config up to date
+    # with where files currently are
+    IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote']
+    IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
     rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
     stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
     

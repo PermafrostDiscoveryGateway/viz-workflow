@@ -1,11 +1,22 @@
 # import os
-# import subprocess
+import subprocess
 # import time
 from subprocess import PIPE, Popen
+import PRODUCTION_IWP_CONFIG
+IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
+
+# define user on Delta, avoid writing files to other user's dir
+user = subprocess.check_output("whoami").strip().decode("ascii")
+
+# define where footprints are pulled from, using the correct property in config
+IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_remote']
+SOURCE = IWP_CONFIG['dir_footprints']
+# define where footprints should be transferred to, using the correct property in config
+IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local']
+DESTINATION = IWP_CONFIG['dir_footprints']
 
 ''' get hostnames from slurm file '''
-# /u/kastanday/viz/viz-workflow/slurm/nodes_array.txt
-with open('/u/julietcohen/viz-workflow/slurm/nodes_array.txt', 'r') as f:
+with open(f'/u/{user}/viz-workflow/slurm/nodes_array.txt', 'r') as f:
   hostnames = f.read().splitlines()
 
 print("Syncing footprints to nodes:\n\t", '\n\t'.join(hostnames))
@@ -19,13 +30,8 @@ for hostname in hostnames:
   # rsync = ["conda activate v2_full_viz_pipeline && ray start --address '141.142.145.101:6379'" ]
   
   # SYNC FOOTPRINTS TO COMPUTE NOTES
-  rsync = ['rsync', '-r', '--update', '--delete', '/scratch/bbou/julietcohen/IWP/input/2023-01-19/...', '/tmp' ]
-  
-  # sync geotiff to /scratch
-  # rsync = ['rsync', '-r', '--update', '/tmp/v3_viz_output/geotiff/WorldCRS84Quad/15/', '/scratch/bbki/kastanday/maple_data_xsede_bridges2/v3_viz_output/merged_geotiff_sep9/WorldCRS84Quad/15' ]
-  # sync web_tiles to /scratch
-  # rsync = ['rsync', '-r', '--update', '/tmp/_viz_output/3d_tiles/', '/scratch/bbki/kastanday/maple_data_xsede_bridges2/v3_viz_output/3d_tiles_sep_23' ]
-  # rsync = ['find /tmp/v3_viz_output/web_tiles/ -type f | wc -l', ]
+  # -r = recursive, so no need to mkdir before transfer
+  rsync = ['rsync', '-r', '--update', '--delete', SOURCE, DESTINATION]
   cmd = ssh + rsync
   print(f"'{count} of {len(hostnames)}'. running command: {cmd}")
   count += 1

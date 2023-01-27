@@ -63,13 +63,14 @@ print("🎯 Ray initialized.")
 # THREE_D_PATH      = OUTPUT + '3d_tiles/'
 # IWP_CONFIG = {"dir_input": BASE_DIR_OF_INPUT,"ext_input": ".shp", "dir_footprints": FOOTPRINTS_PATH,"dir_geotiff": GEOTIFF_PATH,"dir_web_tiles": WEBTILE_PATH,"dir_staged": OUTPUT_OF_STAGING,"filename_staging_summary": OUTPUT_OF_STAGING + "staging_summary.csv","filename_rasterization_events": GEOTIFF_PATH + "raster_events.csv","filename_rasters_summary": GEOTIFF_PATH + "raster_summary.csv","version": datetime.now().strftime("%B%d,%Y"),"simplify_tolerance": 0.1,"tms_id": "WorldCRS84Quad","z_range": [0, 16],"geometricError": 57,"z_coord": 0,"statistics": [    {        "name": "iwp_count",        "weight_by": "count",        "property": "centroids_per_pixel",        "aggregation_method": "sum",        "resampling_method": "sum",        "val_range": [0, None],        "palette": ["#66339952", "#d93fce", "#ffcc00"],        "nodata_val": 0,        "nodata_color": "#ffffff00"    },    {        "name": "iwp_coverage",        "weight_by": "area",        "property": "area_per_pixel_area",        "aggregation_method": "sum",        "resampling_method": "average",        "val_range": [0, 1],        "palette": ["#66339952", "#ffcc00"],        "nodata_val": 0,        "nodata_color": "#ffffff00"    },],"deduplicate_at": ["raster", "3dtiles"],"deduplicate_keep_rules": [["Date", "larger"]],"deduplicate_method": "footprints",}
 
-# Juliet's edit: commented out Kastan's manual config settings above to import config for workflow
+# Juliet's edit: commented out Kastan's manual config settings to instead import config for workflow
 # in order to make this work, took Robyn's suggestion to move this file out of the utilities subdir 
 # to be same level as config
 import PRODUCTION_IWP_CONFIG
 IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
-print("Using config: ")
-pprint.pprint(IWP_CONFIG)
+# update the config for the current context
+IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote']
+
 
 def main():
     '''
@@ -82,18 +83,18 @@ def main():
     #### Change me 😁  ####
     #######################
     # todo -- get files from dirs automatically, using os.lsdir().
-    BASE_DIR = '/scratch/bbou/julietcohen/IWP/output/...'
-    merged_dir_path = f'{BASE_DIR}/gpub088'  # this path SHOULD NOT be in the `staged_dir_paths_list`
+    #BASE_DIR = '/scratch/bbou/julietcohen/IWP/output/...'
+    merged_dir_path = f"{IWP_CONFIG['dir_staged']}/gpub088"  # this path SHOULD NOT be in the `staged_dir_paths_list`
     staged_dir_paths_list = [
-        f'{BASE_DIR}/gpub090',
-        f'{BASE_DIR}/gpub091',
-        f'{BASE_DIR}/gpub092',
-        f'{BASE_DIR}/gpub093',
-        f'{BASE_DIR}/gpub094',
-        f'{BASE_DIR}/gpub095',
-        f'{BASE_DIR}/gpub096',
-        f'{BASE_DIR}/gpub097',
-        f'{BASE_DIR}/gpub098',
+        f"{IWP_CONFIG['dir_staged']}/gpub090",
+        f"{IWP_CONFIG['dir_staged']}/gpub091",
+        f"{IWP_CONFIG['dir_staged']}/gpub092",
+        f"{IWP_CONFIG['dir_staged']}/gpub093",
+        f"{IWP_CONFIG['dir_staged']}/gpub094",
+        f"{IWP_CONFIG['dir_staged']}/gpub095",
+        f"{IWP_CONFIG['dir_staged']}/gpub096",
+        f"{IWP_CONFIG['dir_staged']}/gpub097",
+        f"{IWP_CONFIG['dir_staged']}/gpub098",
     ]
     ##############################
     #### END OF Change me 😁  ####
@@ -383,10 +384,10 @@ def start_distributed_logging():
     In output directory. 
     '''
     log_filename = make_workflow_id('merge_staged_tiles')
-    filepath = pathlib.Path(BASE_DIR + log_filename)
+    filepath = pathlib.Path(IWP_CONFIG['dir_staged'] + log_filename)
     filepath.parent.mkdir(parents=True, exist_ok=True)
     filepath.touch(exist_ok=True)
-    logging.basicConfig(level=logging.INFO, filename= BASE_DIR + 'workflow_log.txt', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=logging.INFO, filename= IWP_CONFIG['dir_staged'] + 'workflow_log.txt', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
     
 def make_workflow_id(name: str) -> str:
     import pytz

@@ -1,12 +1,14 @@
-
 # import os
 import subprocess
 import time
 from subprocess import PIPE, Popen
+import pprint
+import PRODUCTION_IWP_CONFIG
+IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
 
 # define user on Delta, avoid writing files to other user's dir
 user = subprocess.check_output("whoami").strip().decode("ascii")
-output_subdir = '2023-01-20'
+#output_subdir = '2023-01-20'
 
 ''' get hostnames from slurm file '''
 with open(f'/u/{user}/viz-workflow/slurm/nodes_array.txt', 'r') as f:
@@ -15,16 +17,27 @@ with open(f'/u/{user}/viz-workflow/slurm/nodes_array.txt', 'r') as f:
 print("Moving geotiffs to main server, from worker nodes\n\t", '\n\t'.join(hostnames))
 
 # Warning: Deletes source files after rsync. 
-SOURCE = '/tmp/geotiff/'
-DESTINATION = f'/scratch/bbou/{user}/IWP/output/{output_subdir}/geotiff'
+#SOURCE = '/tmp/geotiff/'
+#DESTINATION = f'/scratch/bbou/{user}/IWP/output/{output_subdir}/geotiff'
+
+# define where geotiffs are pulled from, using the correct property in config
+IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local']
+SOURCE = IWP_CONFIG['dir_geotiff']
+# define where geotiffs should be transferred to, using the correct property in config
+IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
+DESTINATION = IWP_CONFIG['dir_geotiff']
 
 count = 0
 for hostname in hostnames:  
-  # mkdir then sync
+  # mkdir -p = make directories and parent directories in destination first
+  # note from Juliet: do we need the mkdir command if we already have -r (recussive)
+  # in the rsync command? maybe that -recursively deletes instead of creates dirs
+  # because it follows --remove-source-files?
   mkdir = ['mkdir', '-p', DESTINATION]
   process = Popen(mkdir, stdin=PIPE, stdout=PIPE, stderr=PIPE)
   time.sleep(0.2)
   
+  # ssh into the node, and rsync!
   ssh = ['ssh', f'{hostname}',]
   rsync = ['rsync', '--remove-source-files', '-r', '--update', SOURCE, DESTINATION]
   cmd = ssh + rsync

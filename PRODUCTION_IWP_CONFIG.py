@@ -18,13 +18,13 @@ INPUT = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/.../high_ice/' # The out
 OUTPUT  = f'/scratch/bbou/{user}/IWP/output/{output_subdir}/' # Dir for results. High I/O is good.
 
 FOOTPRINTS_LOCAL = '/tmp/staged_footprints/'
-FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/.../high_ice/'
+FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/staged_footprints/'
 
 STAGING_LOCAL = '/tmp/staged/'
 STAGING_REMOTE = OUTPUT  + 'staged/'
 
 GEOTIFF_LOCAL = '/tmp/geotiff/'
-GEOTIFF_REMOTE = OUTPUT + '/geotiff' # Kastan used pathlib.Path(OUTPUT) / pathlib.Path('merged_geotiff_sep9') for this so if it errors try something similar
+GEOTIFF_REMOTE = OUTPUT + 'geotiff' # Kastan used pathlib.Path(OUTPUT) / pathlib.Path('merged_geotiff_sep9') for this so if it errors try something similar
 
 #WEBTILE_LOCAL = '/tmp/web_tiles/' # we do not use /tmp for webtile step, it is unique in that way
 WEBTILE_REMOTE = OUTPUT + 'web_tiles/'
@@ -42,12 +42,15 @@ TEST_RUN_SIZE       = 10_000                              # Number of files to p
 IWP_CONFIG = {
   "deduplicate_clip_to_footprint": True,
   "dir_output": OUTPUT,
-  "dir_input": INPUT,
+  "dir_input": INPUT, # used to define base dir of all .shp files to be staged
   "ext_input": ".shp",
-  "dir_footprints": FOOTPRINTS_LOCAL, # we rsync footprints from /scratch to /tmp before we use them
-  "dir_geotiff": GEOTIFF_LOCAL,
-  "dir_web_tiles": WEBTILE_REMOTE, # we do not use /tmp for webtile step, it is unique in that way
-  "dir_staged": STAGING_REMOTE, # we pull staged files from /scratch to write staging_input_files_list
+  "dir_footprints_remote": FOOTPRINTS_REMOTE, # the footprints start on /scratch
+  "dir_footprints_local": FOOTPRINTS_LOCAL, # we rsync footprints from /scratch to /tmp before we use them for deduplication
+  "dir_geotiff_remote": GEOTIFF_REMOTE, # we pull geotiffs from /scratch to webtile
+  "dir_geotiff_local": GEOTIFF_LOCAL, # we pull geotiffs from /tmp to merge & rsync to /scratch
+  "dir_web_tiles": WEBTILE_REMOTE, # we do not use /tmp for webtile step, it writes directly to /scratch
+  "dir_staged_remote": STAGING_REMOTE, # we pull staged files from /scratch to rasterize and 3dtile
+  "dir_staged_local": STAGING_LOCAL,
   "filename_staging_summary": STAGING_REMOTE + "staging_summary.csv",
   "filename_rasterization_events": GEOTIFF_REMOTE + "raster_events.csv",
   "filename_rasters_summary": GEOTIFF_REMOTE + "raster_summary.csv",
