@@ -3,11 +3,11 @@
 #SBATCH --job-name=pdg_viz
 #SBATCH --partition=cpu
 #SBATCH --account=
-#SBATCH --time=24:00:00
+#SBATCH --time=04:00:00
 
 #SBATCH --export=ALL,RAY_worker_register_timeout_seconds=120
 
-#SBATCH --nodes=8
+#SBATCH --nodes=3
 #SBATCH --mem=0
 #SBATCH --exclusive
 
@@ -30,7 +30,7 @@ set -x
 # OMP_NUM_THREADS=600
 # export OMP_NUM_THREADS
 
-echo "This is cpu_ray.slurm"
+echo "This is BEST_cpu_ray_double_srun.slurm"
 
 export RAY_worker_register_timeout_seconds=120
 
@@ -64,7 +64,9 @@ export ip_head
 echo "IP Head: $ip_head"
 
 # conda init
-conda activate v3_full_viz_pipeline
+#conda activate v3_full_viz_pipeline
+# venv init
+source `/scratch/bbou/julietcohen/venv/iwp_2/bin/activate`
 
 # increase request limit
 export RAY_max_pending_lease_requests_per_scheduling_category=2000

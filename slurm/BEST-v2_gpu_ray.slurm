@@ -2,14 +2,14 @@
 
 #SBATCH --job-name=pdg_viz
 #SBATCH --partition=gpuA40x4
-#SBATCH --account= 
-#SBATCH --time=24:00:00
+#SBATCH --account=
+#SBATCH --time=5:00:00
 
 #SBATCH --export=ALL,RAY_worker_register_timeout_seconds=120
-
-#SBATCH --nodes=5
-#SBATCH --mem=0
 #SBATCH --gpus-per-node=1
+#SBATCH --nodes=3
+#SBATCH --mem=0
+
 #SBATCH --exclusive
 
 set -x
@@ -37,7 +37,8 @@ set -x
 echo "This is BEST-v2_gpu_ray.slurm"
 
 # global settings
-conda activate # {INSERT ENV NAME}
+# juliet's IWP workflow env:
+source `/scratch/bbou/julietcohen/venv/iwp_2/bin/activate`
 export RAY_worker_register_timeout_seconds=120  # for sure necessary. Might be needed in user shell before `sbatch` is executed. 
 export RAY_max_pending_lease_requests_per_scheduling_category=2000 # probably not necessary
 

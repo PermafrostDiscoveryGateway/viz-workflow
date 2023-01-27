@@ -84,17 +84,17 @@ def main():
     #######################
     # todo -- get files from dirs automatically, using os.lsdir().
     #BASE_DIR = '/scratch/bbou/julietcohen/IWP/output/...'
-    merged_dir_path = f"{IWP_CONFIG['dir_staged']}/gpub088"  # this path SHOULD NOT be in the `staged_dir_paths_list`
+    merged_dir_path = f"{IWP_CONFIG['dir_staged']}/cn033"  # this path SHOULD NOT be in the `staged_dir_paths_list`
     staged_dir_paths_list = [
-        f"{IWP_CONFIG['dir_staged']}/gpub090",
-        f"{IWP_CONFIG['dir_staged']}/gpub091",
-        f"{IWP_CONFIG['dir_staged']}/gpub092",
-        f"{IWP_CONFIG['dir_staged']}/gpub093",
-        f"{IWP_CONFIG['dir_staged']}/gpub094",
-        f"{IWP_CONFIG['dir_staged']}/gpub095",
-        f"{IWP_CONFIG['dir_staged']}/gpub096",
-        f"{IWP_CONFIG['dir_staged']}/gpub097",
-        f"{IWP_CONFIG['dir_staged']}/gpub098",
+        f"{IWP_CONFIG['dir_staged']}/cn034",
+        f"{IWP_CONFIG['dir_staged']}/cn035",
+     #   f"{IWP_CONFIG['dir_staged']}/gpub092",
+     #   f"{IWP_CONFIG['dir_staged']}/gpub093",
+     #   f"{IWP_CONFIG['dir_staged']}/gpub094",
+     #   f"{IWP_CONFIG['dir_staged']}/gpub095",
+     #   f"{IWP_CONFIG['dir_staged']}/gpub096",
+     #   f"{IWP_CONFIG['dir_staged']}/gpub097",
+     #   f"{IWP_CONFIG['dir_staged']}/gpub098",
     ]
     ##############################
     #### END OF Change me 😁  ####

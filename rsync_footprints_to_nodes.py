@@ -30,7 +30,7 @@ for hostname in hostnames:
   # rsync = ["conda activate v2_full_viz_pipeline && ray start --address '141.142.145.101:6379'" ]
   
   # SYNC FOOTPRINTS TO COMPUTE NOTES
-  # -r = recursive, so no need to mkdir before transfer
+  # -r = recursive, so no need to mkdir -p before transfer
   rsync = ['rsync', '-r', '--update', '--delete', SOURCE, DESTINATION]
   cmd = ssh + rsync
   print(f"'{count} of {len(hostnames)}'. running command: {cmd}")

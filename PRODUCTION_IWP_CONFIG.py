@@ -11,14 +11,27 @@ user = subprocess.check_output("whoami").strip().decode("ascii")
 # ensures a new subfolder every run as long as new run is not started within same day as last run
 #output_subdir = datetime.now().strftime("%b-%d-%y")
 # don't use subprocess to retrieve date for subdir because runs might span over 2 days if they go overnight
-output_subdir = '2023-01-20'
+# following path is the output subdir for test run, using just on subdir of the alaska files that is only 7.78% of the Alaska dir, 45.57 GB
+output_subdir = 'iwp_testRun_20230127'
+#output_subdir = '2023-01-20'
 
 # Use Elias' new shape files
-INPUT = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/.../high_ice/' # The output data of MAPLE. Which is the input data for STAGING.
-OUTPUT  = f'/scratch/bbou/{user}/IWP/output/{output_subdir}/' # Dir for results. High I/O is good.
+# following path is the INPUT for test run, using just one _iwp subdir of the alaska files that is only 7.78% of the Alaska dir, 45.57 GB
+INPUT = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/glacier_water_cleaned_shp/high_ice/alaska/146_157_iwp/'
+# input path for all data, when it is available:
+#INPUT = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/.../high_ice/' # The output data of MAPLE. Which is the input data for STAGING.
+# following path is the OUTPUT for test run, using just on subdir of the alaska files that is only 7.78% of the Alaska dir, 45.57 GB
+OUTPUT  = f'/scratch/bbki/{user}/{output_subdir}/' # Dir for results. High I/O is good.
+# output path for all data, when it is available:
+#OUTPUT  = f'/scratch/bbou/{user}/IWP/output/{output_subdir}/' # Dir for results. High I/O is good.
 
+# following 2 paths are for test run, using just on subdir of the alaska files that is only 7.78% of the Alaska dir, 45.57 GB
 FOOTPRINTS_LOCAL = '/tmp/staged_footprints/'
-FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/staged_footprints/'
+FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/old_staged_footprints/high_ice/alaska/146_157_iwp/'
+
+# footprints paths for all data, when it is available:
+#FOOTPRINTS_LOCAL = '/tmp/staged_footprints/'
+#FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/staged_footprints/'
 
 STAGING_LOCAL = '/tmp/staged/'
 STAGING_REMOTE = OUTPUT  + 'staged/'

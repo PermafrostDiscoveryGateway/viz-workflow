@@ -60,14 +60,14 @@ def main():
         
         # (optionally) Comment out steps you don't need 😁
         # todo: sync footprints to nodes.
-        step0_staging()        
+        # step0_staging()        
         # todo: rsync staging to /scratch
         # todo: merge staged files in /scratch
         # DO NOT RUN 3d-tiling UNTIL WORKFLOW CAN ACCOMODATE FILE HIERARCHY:step1_3d_tiles() # default parameter batch_size = 300 
         # step2_raster_highest(batch_size=100) # rasterize highest Z level only
         # todo: immediately after initiating above step, start rsync script to continuously sync geotiff files,
         # or immediately after the above step is done, rsync all files at once if there is time left in job  
-        # step3_raster_lower(batch_size_geotiffs=100) # rasterize all LOWER Z levels
+        step3_raster_lower(batch_size_geotiffs=100) # rasterize all LOWER Z levels
         # todo: immediately after initiating above step, start rsync script to continuously sync geotiff files,
         # or immediately after the above step is done, rsync all files at once if there is time left in job
         # step4_webtiles(batch_size_web_tiles=250) # convert to web tiles.
@@ -98,11 +98,10 @@ def step0_staging():
     app_futures = []
     start = time.time()
 
-    # update the config for the current context: pull staged files from /scratch
-    IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_local']
-    # make directories in /tmp so geotiffs can populate there
-    # is the following line necessary? I don't think we need to create 
-    # staged folder in /tmp cause Robyn's viz-staging makes the dir by default?
+    # update the config for the current context
+    IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote']
+    # make directories in /scratch so geotiffs can populate there
+    # is the following line necessary? I don't think so
     os.makedirs(IWP_CONFIG['dir_staged'], exist_ok = True)
     
     # OLD METHOD "glob" all files. 
@@ -114,8 +113,8 @@ def step0_staging():
     stager.tiles.add_base_dir('base_input', IWP_CONFIG['dir_input'], '.shp')
     staging_input_files_list = stager.tiles.get_filenames_from_dir(base_dir = 'base_input')
     
-    # write list staging_input_files_list to file stored in STAGING_REMOTE dir
-    with open( os.path.join(IWP_CONFIG['dir_staged_remote'], "staging_input_files_list.json") , "w") as f:
+    # write list staging_input_files_list to file to /scratch (remote) staged dir
+    with open(os.path.join(IWP_CONFIG['dir_staged'], "staging_input_files_list.json") , "w") as f:
         json.dump(staging_input_files_list, f)
     
     """
@@ -314,9 +313,8 @@ def step2_raster_highest(batch_size=100):
 
     # update the config for the current context: pull staged files from /scratch
     IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local']
-    # make directories in /tmp so geotiffs can populate there
-    # is the following line necessary? I don't think we need to create 
-    # staged folder in /tmp cause Robyn's viz-staging makes the dir by default?
+    # make directories in /scratch so geotiffs can populate there
+    # is the following line necessary? I don't think so
     os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok = True)
 
     print("2️⃣  Step 2 Rasterize only highest Z")
@@ -341,7 +339,7 @@ def step2_raster_highest(batch_size=100):
         staged_paths = staged_paths[:TEST_RUN_SIZE]
     
     # save a copy of the files we're rasterizing.
-    staged_path_json_filepath = os.path.join(IWP_CONFIG['dir_output'], "staged_paths_to_rasterize_higest.json")
+    staged_path_json_filepath = os.path.join(IWP_CONFIG['dir_output'], "staged_paths_to_rasterize_highest.json")
     print(f"Writing a copy of the files we're rasterizing to {staged_path_json_filepath}...")
     with open(staged_path_json_filepath, "w") as f:
         json.dump(staged_paths, f, indent=2)
@@ -349,7 +347,7 @@ def step2_raster_highest(batch_size=100):
     print(f"Step 2️⃣ -- Making batches of staged files... batch_size: {batch_size}")
     staged_batches = make_batch(staged_paths, batch_size)
 
-    print(f"The input to this step, Rasterization, is the output of Staging.\n Using Staging path: {IWP_CONFIG['dir_staged_remote']}")
+    print(f"The input to this step, Rasterization, is the output of Staging.\n Using Staging path: {IWP_CONFIG['dir_staged']}")
 
     print(f"🌄 Rasterize total files {len(staged_paths)} gpkgs, using batch size: {batch_size}")
     print(f"🏎  Parallel batches of jobs: {len(staged_batches)}...\n")
@@ -444,7 +442,7 @@ def step3_raster_lower(batch_size_geotiffs=20):
 
     print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG['dir_geotiff']}")
     stager.tiles.add_base_dir('geotiff_path', IWP_CONFIG['dir_geotiff'], '.tif') # already added ??
-    
+
     start = time.time()
     # Can't start lower z-level until higher z-level is complete.
     for z in parent_zs:
@@ -466,6 +464,10 @@ def step3_raster_lower(batch_size_geotiffs=20):
         parent_tile_batches = make_batch(parent_tiles, batch_size_geotiffs)
         print(f"📦 Rasterizing {len(parent_tiles)} parents into {len(child_paths)} children tifs (using {len(parent_tile_batches)} batches)")
         # print(f"📦 Rasterizing {parent_tile_batches} parents")
+
+        # now that geotiff_path has been created as a base dir and batched, switch the dir_geotiff back to _remote
+        # so that new raster lower files are written to /tmp rather than /scratch
+        IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local']
 
         # PARALLELIZE batches WITHIN one zoom level (best we can do for now).
         try:
@@ -504,6 +506,8 @@ def step4_webtiles(batch_size_web_tiles=300):
     # with where files currently are
     IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote']
     IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
+    # define rasterizer here just to updates_ranges(), define rasterizer in each of 
+    # the 3 functions that need it too: raster highest, raster lower, and webtile functions
     rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
     stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
     
