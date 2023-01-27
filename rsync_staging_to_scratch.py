@@ -10,6 +10,12 @@ import pprint
 # to be same level as config
 import PRODUCTION_IWP_CONFIG
 IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
+# set config properties for current context
+IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_local']
+SOURCE = IWP_CONFIG['dir_staged']
+IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote']
+DESTINATION = IWP_CONFIG['dir_staged']
+
 print("Using config: ")
 pprint.pprint(IWP_CONFIG)
 
@@ -33,15 +39,15 @@ for hostname in hostnames:
   # see https://manpages.ubuntu.com/manpages/focal/en/man1/rsync.1.html (USING RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL CONNECTION)
   
   # mkdir then sync
-  mkdir = ['mkdir', '-p', f"{IWP_CONFIG['dir_staged']}{hostname}"]
+  mkdir = ['mkdir', '-p', f"{DESTINATION}{hostname}"]
   process = Popen(mkdir, stdin=PIPE, stdout=PIPE, stderr=PIPE)
   time.sleep(0.2)
   
-  ssh = ['ssh', f'{hostname}',]
+  ssh = ['ssh', f'{hostname}',] # form juliet: why does the ssh command as a subprocess always end in a comma?
   # old command before we separated paths into LOCAL and REMOTE:
   # rsync = ['rsync', '-r', '--update', '/tmp/staged/', f'/scratch/bbou/{user}/IWP/output/{output_subdir}/staged/{hostname}']
   # new command now that we separated paths into LOCAL and REMOTE:
-  rsync = ['rsync', '-r', '--update', IWP_CONFIG['dir_staged_local'], f"{IWP_CONFIG['dir_staged']}{hostname}"]
+  rsync = ['rsync', '-r', '--update', SOURCE, f"{DESTINATION}{hostname}"]
   cmd = ssh + rsync
   print(f"'{count} of {len(hostnames)}'. running command: {cmd}")
   count += 1

@@ -101,6 +101,8 @@ def step0_staging():
     # update the config for the current context: pull staged files from /scratch
     IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_local']
     # make directories in /tmp so geotiffs can populate there
+    # is the following line necessary? I don't think we need to create 
+    # staged folder in /tmp cause Robyn's viz-staging makes the dir by default?
     os.makedirs(IWP_CONFIG['dir_staged'], exist_ok = True)
     
     # OLD METHOD "glob" all files. 
@@ -313,6 +315,8 @@ def step2_raster_highest(batch_size=100):
     # update the config for the current context: pull staged files from /scratch
     IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local']
     # make directories in /tmp so geotiffs can populate there
+    # is the following line necessary? I don't think we need to create 
+    # staged folder in /tmp cause Robyn's viz-staging makes the dir by default?
     os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok = True)
 
     print("2️⃣  Step 2 Rasterize only highest Z")
