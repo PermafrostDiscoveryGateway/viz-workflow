@@ -12,7 +12,7 @@ user = subprocess.check_output("whoami").strip().decode("ascii")
 #output_subdir = datetime.now().strftime("%b-%d-%y")
 # don't use subprocess to retrieve date for subdir because runs might span over 2 days if they go overnight
 # following path is the output subdir for test run, using just on subdir of the alaska files that is only 7.78% of the Alaska dir, 45.57 GB
-output_subdir = 'iwp_testRun_20230127'
+output_subdir = 'iwp_testRun_20230130'
 #output_subdir = '2023-01-20'
 
 # Use Elias' new shape files
