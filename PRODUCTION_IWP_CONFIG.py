@@ -78,23 +78,6 @@ IWP_CONFIG = {
   "z_coord": 0,
   "statistics": [
     {
-      "name": "iwp_count",
-      "weight_by": "count",
-      "property": "centroids_per_pixel",
-      "aggregation_method": "sum",
-      "resampling_method": "sum",
-      "val_range": [
-        0, None
-      ],
-      "palette": [
-        "#66339952",
-        "#d93fce",
-        "#ffcc00"
-      ],
-      "nodata_val": 0,
-      "nodata_color": "#ffffff00"
-    },
-    {
       "name": "iwp_coverage",
       "weight_by": "area",
       "property": "area_per_pixel_area",
@@ -123,4 +106,5 @@ IWP_CONFIG = {
     ]
   ],
   "deduplicate_method": "footprints",
+  "deduplicate_clip_to_footprint": True
 }

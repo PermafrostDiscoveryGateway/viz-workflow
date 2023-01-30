@@ -185,7 +185,9 @@ class StagingMerger():
                     for incoming_tile_in_path in incoming_tile_in_path_batch:
                         incoming_tile_out_path_batch.append( path_manager.path_from_tile(tile=incoming_tile_in_path, base_dir='merged_dir_path') )
                     
-                    app_future = batch_merge_tile.remote(incoming_tile_in_path_batch, incoming_tile_out_path_batch, isDestructive=self.isDestructive, stager.config.input_config)
+                    #app_future = batch_merge_tile.remote(incoming_tile_in_path_batch, incoming_tile_out_path_batch, isDestructive=self.isDestructive, stager.config.input_config)
+                    # batch_merge_tile(incoming_tile_in_path_batch, incoming_tile_out_path_batch, isDestructive, stager):                    
+                    app_future = batch_merge_tile.remote(incoming_tile_in_path_batch, incoming_tile_out_path_batch, isDestructive=self.isDestructive, stager=stager.config.input_config)
                     app_futures.append(app_future)
                 # for incoming_tile_in_path in paths:
                 #     NOT BATCHED VERSION:
@@ -375,7 +377,7 @@ def merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive, sta
                 os.remove(incoming_tile_in_path)
                 
             # print("appended & old deleted.")
-            action_taken_string += f'Merged, old deleted.'
+            action_taken_string += f'Merged and old deleted.'
             # self.append_count += 1
     return action_taken_string
 

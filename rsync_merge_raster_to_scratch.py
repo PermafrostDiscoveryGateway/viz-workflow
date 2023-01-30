@@ -27,25 +27,22 @@ SOURCE = IWP_CONFIG['dir_geotiff']
 IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
 DESTINATION = IWP_CONFIG['dir_geotiff']
 
+# mkdir -p = make directories and parent directories in destination first
+# note from Juliet: do we need the mkdir command if we already have -r (recussive)
+# in the rsync command? maybe that -recursively deletes instead of creates dirs
+# because it follows --remove-source-files?
+mkdir = ['mkdir', '-p', DESTINATION]
+process = Popen(mkdir, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+time.sleep(0.2)
+
 count = 0
 for hostname in hostnames:  
-  # mkdir -p = make directories and parent directories in destination first
-  # note from Juliet: do we need the mkdir command if we already have -r (recussive)
-  # in the rsync command? maybe that -recursively deletes instead of creates dirs
-  # because it follows --remove-source-files?
-  mkdir = ['mkdir', '-p', DESTINATION]
-  process = Popen(mkdir, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-  time.sleep(0.2)
-  
-  # ssh into the node, and rsync!
+    # ssh into the node, and rsync!
   ssh = ['ssh', f'{hostname}',]
-  rsync = ['rsync', '--remove-source-files', '-r', '--update', SOURCE, DESTINATION]
+  rsync = ['rsync', '-r', '--update', SOURCE, DESTINATION]
   cmd = ssh + rsync
   print(f"'{count} of {len(hostnames)}'. running command: {cmd}")
   count += 1
   process = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
 
 print("All jobs launched! They will work in the background WITHOUT stdout printing. ")
-
-# otpional improvement
-# shlex.split(s)  -- turn cmd line args into a list. 

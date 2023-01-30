@@ -25,7 +25,8 @@ user = subprocess.check_output("whoami").strip().decode("ascii")
 # ensures a new subfolder every run as long as new run is not started within same day as last run
 #output_subdir = datetime.now().strftime("%b-%d-%y")
 # don't use subprocess to retrieve date for subdir because runs might span over 2 days if they go overnight
-output_subdir = '2023-01-20'
+output_subdir = "iwp_testRun_20230130"
+#output_subdir = '2023-01-20'
 
 ''' get hostnames from slurm file '''
 with open(f'/u/{user}/viz-workflow/slurm/nodes_array.txt', 'r') as f:

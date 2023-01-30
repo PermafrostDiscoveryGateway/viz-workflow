@@ -16,6 +16,7 @@ from copy import deepcopy
 from datetime import datetime
 import subprocess
 import pprint
+import shlex
 
 import pdgraster
 import pdgstaging  # For staging
@@ -62,7 +63,7 @@ def main():
         # todo: sync footprints to nodes.
         step0_staging()        
         # todo: rsync staging to /scratch
-        # todo: merge staged files in /scratch
+        # todo: merge staged files in /scratch    # ./merge_staged_vector_tiles.py
         # DO NOT RUN 3d-tiling UNTIL WORKFLOW CAN ACCOMODATE FILE HIERARCHY:step1_3d_tiles() # default parameter batch_size = 300 
         # step2_raster_highest(batch_size=100) # rasterize highest Z level only
         # todo: immediately after initiating above step, start rsync script to continuously sync geotiff files,
@@ -102,7 +103,7 @@ def step0_staging():
     IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_local']
     # make directories in /scratch so geotiffs can populate there
     # is the following line necessary? I don't think so
-    os.makedirs(IWP_CONFIG['dir_staged'], exist_ok = True)
+    # os.makedirs(IWP_CONFIG['dir_staged'], exist_ok = True)
     
     # OLD METHOD "glob" all files. 
     stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
@@ -316,7 +317,7 @@ def step2_raster_highest(batch_size=100):
     IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local']
     # make directories in /scratch so geotiffs can populate there
     # is the following line necessary? I don't think so
-    os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok = True)
+    #os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok = True)
 
     print("2️⃣  Step 2 Rasterize only highest Z")
 
@@ -442,7 +443,7 @@ def step3_raster_lower(batch_size_geotiffs=20):
     IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
 
     print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG['dir_geotiff']}")
-    stager.tiles.add_base_dir('geotiff_path', IWP_CONFIG['dir_geotiff'], '.tif') # already added ??
+    #stager.tiles.add_base_dir('geotiff_path', IWP_CONFIG['dir_geotiff'], '.tif') # already added ?? remove this line
 
     start = time.time()
     # Can't start lower z-level until higher z-level is complete.
@@ -450,7 +451,8 @@ def step3_raster_lower(batch_size_geotiffs=20):
         print(f"👉 Starting Z level {z} of {len(parent_zs)}")
         # Loop thru Z levels 
         # Make lower z-levels based on the path names of the files just created
-        child_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_path', z=z + 1)
+        # child_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_path', z=z + 1) # remove this line
+        child_paths = stager.tiles.get_filenames_from_dir( base_dir = 'geotiff', z=z + 1)
 
         if ONLY_SMALL_TEST_RUN:
             child_paths = child_paths[:TEST_RUN_SIZE]
@@ -463,7 +465,8 @@ def step3_raster_lower(batch_size_geotiffs=20):
 
         # Break all parent tiles at level z into batches
         parent_tile_batches = make_batch(parent_tiles, batch_size_geotiffs)
-        print(f"📦 Rasterizing {len(parent_tiles)} parents into {len(child_paths)} children tifs (using {len(parent_tile_batches)} batches)")
+        # print(f"📦 Rasterizing {len(parent_tiles)} parents into {len(child_paths)} children tifs (using {len(parent_tile_batches)} batches)")
+        print(f"📦 Rasterizing (Z-{z}) {len(child_paths)} children into {len(parent_tiles)} parents tifs (using {len(parent_tile_batches)} batches)")
         # print(f"📦 Rasterizing {parent_tile_batches} parents")
 
         # now that geotiff_path has been created as a base dir and batched, switch the dir_geotiff to _local
@@ -513,18 +516,27 @@ def step4_webtiles(batch_size_web_tiles=300):
     IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
     # define rasterizer here just to updates_ranges()
     rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
-    stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
+    # stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False) remove this line, no point in defining the stager right before we update the config, do it after!
     
     start = time.time()
     # Update color ranges
+    print(f"Updating ranges...")
     rasterizer.update_ranges()
+    IWP_CONFIG_NEW = rasterizer.config.config
 
-    # Note: we also define rasterizer latermin each of the 3 functions:
+    # note: pull in updated config? check if new congif is written
+    # new config should have been written, so update the stager
+    # so we can create a base dir out of the geotiff dir in a few lines
+    #stager = pdgstaging.TileStager(IWP_CONFIG_NEW, check_footprints=False)
+
+    # Note: we also define rasterizer later in each of the 3 functions:
     # raster highest, raster lower, and webtile functions
 
-    print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG['dir_geotiff']}...")
-    stager.tiles.add_base_dir('geotiff_path', IWP_CONFIG['dir_geotiff'], '.tif')
-    geotiff_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_path')
+    print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG['dir_geotiff']}...") # the original config here is correct, it is just printing the filepath we are using for source of geotiff files
+    #print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG_NEW['dir_geotiff']}...")
+    #stager.tiles.add_base_dir('geotiff_path', IWP_CONFIG_NEW['dir_geotiff'], '.tif')
+    #geotiff_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_path')
+    geotiff_paths = rasterizer.tiles.get_filenames_from_dir(base_dir = 'geotiff')
 
     if ONLY_SMALL_TEST_RUN:
         geotiff_paths = geotiff_paths[:TEST_RUN_SIZE]
@@ -546,7 +558,8 @@ def step4_webtiles(batch_size_web_tiles=300):
         for batch in geotiff_batches:
             # MANDATORY: include placement_group for better stability on 200+ cpus.
             # app_future = create_web_tiles.options(placement_group=pg).remote(batch, IWP_CONFIG)
-            app_future = create_web_tiles.remote(batch, IWP_CONFIG)
+            # app_future = create_web_tiles.remote(batch, IWP_CONFIG) # remove this line
+            app_future = create_web_tiles.remote(batch, IWP_CONFIG_NEW)
             app_futures.append(app_future)
 
         for i in range(0, len(app_futures)): 
@@ -582,28 +595,14 @@ def rasterize(staged_paths, config, logging_dict=None):
 
     try:
         rasterizer = pdgraster.RasterTiler(config)
-        # from pympler.classtracker import ClassTracker
-        # tracker = ClassTracker()
-        # tracker.track_object(rasterizer, resolution_level=4) # todo try resolution 2
-        # tracker.track_class(pdgraster.RasterTiler, resolution_level=4)
-        # tracker.create_snapshot()
         # todo: fix warning `python3.9/site-packages/geopandas/base.py:31: UserWarning: The indices of the two GeoSeries are different.`
         # with suppress(UserWarning): 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             rasterizer.rasterize_vectors(staged_paths, make_parents=False)
-        # tracker.create_snapshot()
-        # tracker.stats.print_summary()
     except Exception as e:
         print("⚠️ Failed to rasterize path: ", staged_paths, "\nWith error: ", e, "\nTraceback", traceback.print_exc())
     finally:
-        # MEMORY LEAK (related to loggers being created)
-        # for handler in logger.handlers:
-        #     handler.close()
-        # del rasterizer
-        # tracker.create_snapshot()
-        # tracker.stats.print_summary()
-        # print("After deleting rasterizer")
         return staged_paths
 
 @ray.remote
@@ -812,6 +811,13 @@ def start_logging():
     filepath.parent.mkdir(parents=True, exist_ok=True)
     filepath.touch(exist_ok=True)
     logging.basicConfig(level=logging.INFO, filename= IWP_CONFIG['dir_output'] + 'workflow_log.txt', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
+
+@ray.remote
+def rsync_raster_to_scatch(rsync_python_file='utilities/rsync_merge_raster_to_scratch.py'):
+    while True:
+        rsync_raster = f'python {rsync_python_file}'
+        subprocess.run(shlex.split(rsync_raster))
+        time.sleep(30)
 
 if __name__ == '__main__':
     main()

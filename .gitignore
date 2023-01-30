@@ -138,3 +138,6 @@ dmypy.json
 
 # nodes list for specific Delta runs
 nodes_array.txt
+
+# output of slurm processes
+slurm-*.out
