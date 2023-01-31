@@ -429,8 +429,6 @@ def step3_raster_lower(batch_size_geotiffs=20):
     print("3️⃣ Step 3: Create parent geotiffs for all lower z-levels (everything except highest zoom)")
 
     # update the config for the current context: pull stager that represents staged files in /scratch
-    # not sure that this next line is necessary but might as well keep the config up to date
-    # with where files currently are
     IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote']
     stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
     
@@ -443,16 +441,15 @@ def step3_raster_lower(batch_size_geotiffs=20):
     IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
 
     print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG['dir_geotiff']}")
-    #stager.tiles.add_base_dir('geotiff_path', IWP_CONFIG['dir_geotiff'], '.tif') # already added ?? remove this line
+    stager.tiles.add_base_dir('geotiff', IWP_CONFIG['dir_geotiff'], '.tif')
 
     start = time.time()
     # Can't start lower z-level until higher z-level is complete.
     for z in parent_zs:
         print(f"👉 Starting Z level {z} of {len(parent_zs)}")
-        # Loop thru Z levels 
-        # Make lower z-levels based on the path names of the files just created
-        # child_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_path', z=z + 1) # remove this line
-        child_paths = stager.tiles.get_filenames_from_dir( base_dir = 'geotiff', z=z + 1)
+        # Loop thru z levels 
+        # Make lower z-levels based on the highest z-level rasters
+        child_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff', z=z + 1)
 
         if ONLY_SMALL_TEST_RUN:
             child_paths = child_paths[:TEST_RUN_SIZE]
@@ -469,17 +466,16 @@ def step3_raster_lower(batch_size_geotiffs=20):
         print(f"📦 Rasterizing (Z-{z}) {len(child_paths)} children into {len(parent_tiles)} parents tifs (using {len(parent_tile_batches)} batches)")
         # print(f"📦 Rasterizing {parent_tile_batches} parents")
 
-        # now that geotiff_path has been created as a base dir and batched, switch the dir_geotiff to _local
-        # so that new raster lower files are written to /tmp rather than /scratch
-        IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local']
-        # no need to set rasterizer with new config after chaning this property cause 
-        # that is done within the function create_composite_geotiffs() which is called
-        # in next loop
-
         # PARALLELIZE batches WITHIN one zoom level (best we can do for now).
         try:
             app_futures = []
             for parent_tile_batch in parent_tile_batches:
+                # now that the geotiff base dir has been created and the filenames have been batched, switch the dir_geotiff to _local
+                # so that new lower z-level rasters are written to /tmp rather than /scratch
+                IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local']
+                # no need to set rasterizer with new config after chaning this property cause 
+                # that is done within the function create_composite_geotiffs()
+
                 # MANDATORY: include placement_group for better stability on 200+ cpus.
                 app_future = create_composite_geotiffs.remote(parent_tile_batch, IWP_CONFIG, logging_dict=None)
                 app_futures.append(app_future)

@@ -11,13 +11,13 @@ user = subprocess.check_output("whoami").strip().decode("ascii")
 # ensures a new subfolder every run as long as new run is not started within same day as last run
 #output_subdir = datetime.now().strftime("%b-%d-%y")
 # don't use subprocess to retrieve date for subdir because runs might span over 2 days if they go overnight
-# following path is the output subdir for test run, using just on subdir of the alaska files that is only 7.78% of the Alaska dir, 45.57 GB
-output_subdir = 'iwp_testRun_20230130'
+# following path is the output subdir for test run, using just on subdir of the alaska files that is only ~8% of the Alaska dir, 23.5 GB
+output_subdir = 'iwp_testRun_20230131'
 #output_subdir = '2023-01-20'
 
 # Use Elias' new shape files
-# following path is the INPUT for test run, using just one _iwp subdir of the alaska files that is only 7.78% of the Alaska dir, 45.57 GB
-INPUT = '/scratch/bbki/kastanday/maple_data_xsede_bridges2/glacier_water_cleaned_shp/high_ice/alaska/146_157_iwp/'
+# following path is the INPUT for test run, using just one _iwp subdir of the alaska files that is only ~8% of the Alaska dir, 23.5 GB
+INPUT = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/iwp_files/high/alaska/207_208_209_223_224_iwp/'
 # input path for all data, when it is available:
 #INPUT = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/.../high_ice/' # The output data of MAPLE. Which is the input data for STAGING.
 # following path is the OUTPUT for test run, using just on subdir of the alaska files that is only 7.78% of the Alaska dir, 45.57 GB
@@ -27,7 +27,7 @@ OUTPUT  = f'/scratch/bbki/{user}/{output_subdir}/' # Dir for results. High I/O i
 
 # following 2 paths are for test run, using just on subdir of the alaska files that is only 7.78% of the Alaska dir, 45.57 GB
 FOOTPRINTS_LOCAL = '/tmp/staged_footprints/'
-FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/old_staged_footprints/high_ice/alaska/146_157_iwp/'
+FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/footprint_files/high/alaska/207_208_209_223_224_iwp/'
 
 # footprints paths for all data, when it is available:
 #FOOTPRINTS_LOCAL = '/tmp/staged_footprints/'
