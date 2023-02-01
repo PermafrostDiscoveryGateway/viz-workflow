@@ -5,9 +5,6 @@ from datetime import datetime
 import subprocess
 from subprocess import PIPE, Popen
 import pprint
-# Juliet's edit: commented out Kastan's manual config settings to instead import config for workflow
-# in order to make this work, took Robyn's suggestion to move this file out of the utilities subdir 
-# to be same level as config
 import PRODUCTION_IWP_CONFIG
 IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
 # set config properties for current context
@@ -44,7 +41,7 @@ for hostname in hostnames:
   process = Popen(mkdir, stdin=PIPE, stdout=PIPE, stderr=PIPE)
   time.sleep(0.2)
   
-  ssh = ['ssh', f'{hostname}',] # form juliet: why does the ssh command as a subprocess always end in a comma?
+  ssh = ['ssh', f'{hostname}',] # from juliet: does this have to end in comma cause it is concatenated with rsync command below?
   # old command before we separated paths into LOCAL and REMOTE:
   # rsync = ['rsync', '-r', '--update', '/tmp/staged/', f'/scratch/bbou/{user}/IWP/output/{output_subdir}/staged/{hostname}']
   # new command now that we separated paths into LOCAL and REMOTE:

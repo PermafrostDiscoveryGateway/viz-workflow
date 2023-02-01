@@ -12,8 +12,7 @@ user = subprocess.check_output("whoami").strip().decode("ascii")
 #output_subdir = datetime.now().strftime("%b-%d-%y")
 # don't use subprocess to retrieve date for subdir because runs might span over 2 days if they go overnight
 # following path is the output subdir for test run, using just on subdir of the alaska files that is only ~8% of the Alaska dir, 23.5 GB
-output_subdir = 'IWP/output/iwp_testRun_20230131'
-#output_subdir = '2023-01-20'
+output_subdir = 'IWP/output/iwp_testRun_20230201'
 
 # Use Elias' new shape files
 # following path is the INPUT for test run, using just one _iwp subdir of the alaska files that is only ~8% of the Alaska dir, 23.5 GB
@@ -37,7 +36,7 @@ STAGING_LOCAL = '/tmp/staged/'
 STAGING_REMOTE = OUTPUT  + 'staged/'
 
 GEOTIFF_LOCAL = '/tmp/geotiff/'
-GEOTIFF_REMOTE = OUTPUT + 'geotiff' # Kastan used pathlib.Path(OUTPUT) / pathlib.Path('merged_geotiff_sep9') for this so if it errors try something similar
+GEOTIFF_REMOTE = OUTPUT + 'geotiff/' # Kastan used pathlib.Path(OUTPUT) / pathlib.Path('merged_geotiff_sep9') for this so if it errors try something similar
 
 #WEBTILE_LOCAL = '/tmp/web_tiles/' # we do not use /tmp for webtile step, it is unique in that way
 WEBTILE_REMOTE = OUTPUT + 'web_tiles/'

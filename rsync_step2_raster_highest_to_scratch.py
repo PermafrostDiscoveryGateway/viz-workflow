@@ -2,10 +2,19 @@
 import subprocess
 import time
 from subprocess import PIPE, Popen
+import PRODUCTION_IWP_CONFIG
+IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
+# set config properties for current context
+IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local']
+SOURCE = IWP_CONFIG['dir_geotiff']
+IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
+DESTINATION = IWP_CONFIG['dir_geotiff']
+
+# define user on Delta, avoid writing files to other user's dir
+user = subprocess.check_output("whoami").strip().decode("ascii")
 
 ''' get hostnames from slurm file '''
-# /u/kastanday/viz/viz-workflow/slurm/nodes_array.txt
-with open('/u/kastanday/viz/viz-workflow/slurm/nodes_array.txt', 'r') as f:
+with open(f'/u/{user}/viz-workflow/slurm/nodes_array.txt', 'r') as f:
   hostnames = f.read().splitlines()
 
 print("Syncing RasterHighest from /tmp to /scratch:\n\t", '\n\t'.join(hostnames))
@@ -16,12 +25,12 @@ for hostname in hostnames:
   # see https://manpages.ubuntu.com/manpages/focal/en/man1/rsync.1.html (USING RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL CONNECTION)
 
   # mkdir then sync
-  mkdir = ['mkdir', '-p', f'/scratch/bbki/kastanday/maple_data_xsede_bridges2/viz_pipline_outputs/v7_debug_viz_output/staged/{hostname}']
+  mkdir = ['mkdir', '-p', f'{DESTINATION}{hostname}']
   process = Popen(mkdir, stdin=PIPE, stdout=PIPE, stderr=PIPE)
   time.sleep(0.2)
 
   ssh = ['ssh', f'{hostname}',]
-  rsync = ['rsync', '-r', '--update', '/tmp/v7_debug_viz_output/staged/', f'/scratch/bbki/kastanday/maple_data_xsede_bridges2/viz_pipline_outputs/v7_debug_viz_output/staged/{hostname}']
+  rsync = ['rsync', '-r', '--update', SOURCE, f'{DESTINATION}{hostname}']
   cmd = ssh + rsync
   print(f"'{count} of {len(hostnames)}'. running command: {cmd}")
   count += 1

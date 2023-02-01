@@ -7,7 +7,7 @@
 
 #SBATCH --export=ALL,RAY_worker_register_timeout_seconds=120
 
-#SBATCH --nodes=2
+#SBATCH --nodes=3
 #SBATCH --mem=0
 #SBATCH --exclusive
 
