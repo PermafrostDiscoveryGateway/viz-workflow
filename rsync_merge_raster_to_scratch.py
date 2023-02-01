@@ -29,8 +29,7 @@ DESTINATION = IWP_CONFIG['dir_geotiff']
 
 # mkdir -p = make directories and parent directories in destination first
 # note from Juliet: do we need the mkdir command if we already have -r (recussive)
-# in the rsync command? maybe that -recursively deletes instead of creates dirs
-# because it follows --remove-source-files?
+# in the rsync command?
 mkdir = ['mkdir', '-p', DESTINATION]
 process = Popen(mkdir, stdin=PIPE, stdout=PIPE, stderr=PIPE)
 time.sleep(0.2)

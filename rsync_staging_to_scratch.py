@@ -32,7 +32,7 @@ user = subprocess.check_output("whoami").strip().decode("ascii")
 with open(f'/u/{user}/viz-workflow/slurm/nodes_array.txt', 'r') as f:
   hostnames = f.read().splitlines()
 
-print("Syncing footprints to nodes:\n\t", '\n\t'.join(hostnames))
+print("Syncing staged files to nodes:\n\t", '\n\t'.join(hostnames))
 
 count = 0
 for hostname in hostnames:  

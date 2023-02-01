@@ -84,17 +84,17 @@ def main():
     #######################
     # todo -- get files from dirs automatically, using os.lsdir().
     #BASE_DIR = '/scratch/bbou/julietcohen/IWP/output/...'
-    merged_dir_path = f"{IWP_CONFIG['dir_staged']}/cn033"  # this path SHOULD NOT be in the `staged_dir_paths_list`
+    merged_dir_path = f"{IWP_CONFIG['dir_staged']}cn034"  # this path SHOULD NOT be in the `staged_dir_paths_list`
     staged_dir_paths_list = [
-        f"{IWP_CONFIG['dir_staged']}/cn034",
-        f"{IWP_CONFIG['dir_staged']}/cn035",
-     #   f"{IWP_CONFIG['dir_staged']}/gpub092",
-     #   f"{IWP_CONFIG['dir_staged']}/gpub093",
-     #   f"{IWP_CONFIG['dir_staged']}/gpub094",
-     #   f"{IWP_CONFIG['dir_staged']}/gpub095",
-     #   f"{IWP_CONFIG['dir_staged']}/gpub096",
-     #   f"{IWP_CONFIG['dir_staged']}/gpub097",
-     #   f"{IWP_CONFIG['dir_staged']}/gpub098",
+        f"{IWP_CONFIG['dir_staged']}cn035", # in 01/31 test run, tried this script both with , here and without , but did not merge either way
+     #   f"{IWP_CONFIG['dir_staged']}cn035",
+     #   f"{IWP_CONFIG['dir_staged']}gpub092",
+     #   f"{IWP_CONFIG['dir_staged']}gpub093",
+     #   f"{IWP_CONFIG['dir_staged']}gpub094",
+     #   f"{IWP_CONFIG['dir_staged']}gpub095",
+     #   f"{IWP_CONFIG['dir_staged']}gpub096",
+     #   f"{IWP_CONFIG['dir_staged']}gpub097",
+     #   f"{IWP_CONFIG['dir_staged']}gpub098",
     ]
     ##############################
     #### END OF Change me 😁  ####
@@ -110,7 +110,7 @@ def main():
     print("Final  dir: ", merged_dir_path)
     
     stager = pdgstaging.TileStager(config=IWP_CONFIG, check_footprints=False)
-    ext = '.gpkg'
+    ext = '.shp'
     
     print("Starting merge...")
     start_distributed_logging()
@@ -178,7 +178,7 @@ class StagingMerger():
                 path_batches = make_batch(paths, batch_size=800)
                 total_batches = len(path_batches)
                 for j, incoming_tile_in_path_batch in enumerate(path_batches):
-                    print(f'starting batch {j+1} of {total_batches}')
+                    print(f'starting batch {j+1} of {total_batches}')  
                     
                     # collect all the out paths
                     incoming_tile_out_path_batch = []
@@ -252,15 +252,15 @@ class StagingMerger():
             path_manager.add_base_dir(base_dir_name_string, base_dir_path, ext)
         else:
             start = time.monotonic()
-            print(f"Collecting paths. Base dir named: {base_dir_name_string}  \n\tpath: {base_dir_path}")
-            path_manager.add_base_dir(base_dir_name_string, base_dir_path, ext)
+            print(f"Collecting paths. Base dir named: {base_dir_name_string}  \n\tpath: {base_dir_path}") # script got this far before not finding paths to merge, test run 01/31
+            path_manager.add_base_dir(base_dir_name_string, base_dir_path, ext) 
             paths_list = path_manager.get_filenames_from_dir(base_dir_name_string)
             paths_set = set(paths_list) # speed optimization
             self.final_merged_paths_set = paths_set
             
             assert len(paths_list) == len(paths_set), f"❌ Warning: There are duplicate paths in this base dir: {base_dir_path}"
             
-            print(f"⏰ Elapsed time: {(time.monotonic() - start)/60:.2f} minutes.")
+            print(f"⏰ Elapsed time: {(time.monotonic() - start)/60:.2f} minutes.") # test run 01/31 script ptrinted this so issue is in lines 255-259
             
             # write path list to disk
             pathlib_paths_list_local_filename.parent.mkdir(parents=True, exist_ok=True)
