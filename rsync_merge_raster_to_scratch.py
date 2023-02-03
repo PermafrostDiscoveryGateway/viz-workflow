@@ -28,7 +28,7 @@ IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
 DESTINATION = IWP_CONFIG['dir_geotiff']
 
 # mkdir -p = make directories and parent directories in destination first
-# note from Juliet: do we need the mkdir command if we already have -r (recussive)
+# note from Juliet: do we need the mkdir command if we already have -r (recursive)
 # in the rsync command?
 mkdir = ['mkdir', '-p', DESTINATION]
 process = Popen(mkdir, stdin=PIPE, stdout=PIPE, stderr=PIPE)

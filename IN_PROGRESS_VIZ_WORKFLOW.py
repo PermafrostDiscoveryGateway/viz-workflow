@@ -61,11 +61,11 @@ def main():
         
         # (optionally) Comment out steps you don't need 😁
         # todo: sync footprints to nodes.
-        step0_staging()        
+        # step0_staging()        
         # todo: rsync staging to /scratch
         # todo: merge staged files in /scratch    # ./merge_staged_vector_tiles.py
         # DO NOT RUN 3d-tiling UNTIL WORKFLOW CAN ACCOMODATE FILE HIERARCHY:step1_3d_tiles() # default parameter batch_size = 300 
-        # step2_raster_highest(batch_size=100) # rasterize highest Z level only
+        step2_raster_highest(batch_size=100) # rasterize highest Z level only
         # todo: immediately after initiating above step, start rsync script to continuously sync geotiff files,
         # or immediately after the above step is done, rsync all files at once if there is time left in job  
         # step3_raster_lower(batch_size_geotiffs=100) # rasterize all LOWER Z levels
@@ -103,7 +103,7 @@ def step0_staging():
     IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_local']
     # make directories in /scratch so geotiffs can populate there
     # is the following line necessary? I don't think so
-    # os.makedirs(IWP_CONFIG['dir_staged'], exist_ok = True)
+    os.makedirs(IWP_CONFIG['dir_staged'], exist_ok = True)
     
     # OLD METHOD "glob" all files. 
     stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
@@ -313,16 +313,19 @@ def step2_raster_highest(batch_size=100):
     # from random import randrange
     # from pympler import muppy, summary, tracker
 
-    # update the config for the current context: write geotiff files to local /tmp dir
-    IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local']
-    # make directories in /scratch so geotiffs can populate there
-    # is the following line necessary? I don't think so
-    #os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok = True)
-
     print("2️⃣  Step 2 Rasterize only highest Z")
 
+    # update the config for the current context: write geotiff files to local /tmp dir
+    IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local']
+    # make directories in /tmp so geotiffs can populate there
+    # is the following line necessary? I don't think so
+    os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok = True)
+
+    # update config for the current context:
+    IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local']
+    
     # update the config for the current context: pull merged staged files from /scratch
-    IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote']
+    IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote_merged']
     stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
     # first define the dir that contains the staged files into a base dir to pull all filepaths correctly
     stager.tiles.add_base_dir('output_of_staging', IWP_CONFIG['dir_staged'], '.gpkg')
@@ -507,9 +510,9 @@ def step4_webtiles(batch_size_web_tiles=300):
     # instantiate classes for their helper functions
     # not sure that the next line is necessary but might as well keep the config up to date
     # with where files currently are
-    IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote']
+    IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote_merged']
     # pull all z-levels of rasters from /scratch for web tiling
-    IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
+    IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote'] # if necessary, change this to dir_geotiff_remote_merged (need to check rasterization merging step before deciding)
     # define rasterizer here just to updates_ranges()
     rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
     # stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False) remove this line, no point in defining the stager right before we update the config, do it after!

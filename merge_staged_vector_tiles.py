@@ -36,7 +36,6 @@ from pdgstaging.TileStager import TileStager
 import subprocess
 import pprint
 
-
 ###################################
 #### ⛔️ don't change these ⛔️  ####
 ###################################
@@ -68,7 +67,7 @@ import PRODUCTION_IWP_CONFIG
 IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
 # update the config for the current context
 IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote']
-IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_remote']
+IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local']
 
 def main():
     '''
@@ -82,10 +81,10 @@ def main():
     #######################
     # todo -- get files from dirs automatically, using os.lsdir().
     #BASE_DIR = '/scratch/bbou/julietcohen/IWP/output/...'
-    merged_dir_path = f"{IWP_CONFIG['dir_staged']}cn0__"  # this path SHOULD NOT be in the `staged_dir_paths_list`
+    merged_dir_path = f"{IWP_CONFIG['dir_staged']}cn009"  # this path SHOULD NOT be in the `staged_dir_paths_list`
     staged_dir_paths_list = [
-        f"{IWP_CONFIG['dir_staged']}cn0__",
-        f"{IWP_CONFIG['dir_staged']}cn0__",
+        f"{IWP_CONFIG['dir_staged']}cn010",
+        f"{IWP_CONFIG['dir_staged']}cn011",
      #   f"{IWP_CONFIG['dir_staged']}gpub092",
      #   f"{IWP_CONFIG['dir_staged']}gpub093",
      #   f"{IWP_CONFIG['dir_staged']}gpub094",
@@ -107,8 +106,9 @@ def main():
     print("Input dirs: ", "\n".join(staged_dir_paths_list))
     print("Final  dir: ", merged_dir_path)
     
-    stager = pdgstaging.TileStager(config=IWP_CONFIG, check_footprints=False)
-    ext = '.shp'
+    #stager = pdgstaging.TileStager(config=IWP_CONFIG, check_footprints=False)
+    stager = TileStager(config=IWP_CONFIG, check_footprints=False) # changed this from above line when troubleshooting merging 02/01
+    ext = '.gpkg'
     
     print("Starting merge...")
     start_distributed_logging()
@@ -250,7 +250,7 @@ class StagingMerger():
             path_manager.add_base_dir(base_dir_name_string, base_dir_path, ext)
         else:
             start = time.monotonic()
-            print(f"Collecting paths. Base dir named: {base_dir_name_string}  \n\tpath: {base_dir_path}") # script got this far before not finding paths to merge, test run 01/31
+            print(f"Collecting paths. Base dir named: {base_dir_name_string}  \n\tpath: {base_dir_path}") # script got this far before not finding paths to merge, test runs 01/31 and 02/01
             path_manager.add_base_dir(base_dir_name_string, base_dir_path, ext) 
             paths_list = path_manager.get_filenames_from_dir(base_dir_name_string)
             paths_set = set(paths_list) # speed optimization

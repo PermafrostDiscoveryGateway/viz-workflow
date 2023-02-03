@@ -7,14 +7,18 @@ import subprocess
 
 # define user on Delta, avoid writing files to other user's dir
 user = subprocess.check_output("whoami").strip().decode("ascii")
+head_node = 'cn009/'
 # define desired location for output files within user dir
 # ensures a new subfolder every run as long as new run is not started within same day as last run
-#output_subdir = datetime.now().strftime("%b-%d-%y")
-# don't use subprocess to retrieve date for subdir because runs might span over 2 days if they go overnight
 # following path is the output subdir for test run, using just on subdir of the alaska files that is only ~8% of the Alaska dir, 23.5 GB
 output_subdir = 'IWP/output/iwp_testRun_20230201'
+#output_subdir = datetime.now().strftime("%b-%d-%y")
+# don't use subprocess to retrieve date for subdir because runs might span over 2 days if they go overnight
 
-# Use Elias' new shape files
+##############################
+#### END OF Change me 😁  ####
+##############################
+
 # following path is the INPUT for test run, using just one _iwp subdir of the alaska files that is only ~8% of the Alaska dir, 23.5 GB
 INPUT = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/iwp_files/high/alaska/207_208_209_223_224_iwp/'
 # input path for all data, when it is available:
@@ -28,15 +32,17 @@ OUTPUT  = f'/scratch/bbou/{user}/{output_subdir}/' # Dir for results. High I/O i
 FOOTPRINTS_LOCAL = '/tmp/staged_footprints/'
 FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/footprint_files/high/alaska/207_208_209_223_224_iwp/'
 
-# footprints paths for all data, when it is available:
+# footprints paths for all data:
 #FOOTPRINTS_LOCAL = '/tmp/staged_footprints/'
 #FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/staged_footprints/'
 
 STAGING_LOCAL = '/tmp/staged/'
 STAGING_REMOTE = OUTPUT  + 'staged/'
+STAGING_REMOTE_MERGED = STAGING_REMOTE + head_node
 
 GEOTIFF_LOCAL = '/tmp/geotiff/'
 GEOTIFF_REMOTE = OUTPUT + 'geotiff/' # Kastan used pathlib.Path(OUTPUT) / pathlib.Path('merged_geotiff_sep9') for this so if it errors try something similar
+# check if need a variable GEOTIFF_REMOTE_MERGED after we finish the raster step successfully
 
 #WEBTILE_LOCAL = '/tmp/web_tiles/' # we do not use /tmp for webtile step, it is unique in that way
 WEBTILE_REMOTE = OUTPUT + 'web_tiles/'
@@ -46,9 +52,6 @@ WEBTILE_REMOTE = OUTPUT + 'web_tiles/'
 # Convenience for little test runs. Change me 😁  
 ONLY_SMALL_TEST_RUN = True                            # For testing, this ensures only a small handful of files are processed.
 TEST_RUN_SIZE       = 10_000                              # Number of files to pre processed during testing (only effects testing)
-##############################
-#### END OF Change me 😁  ####
-##############################
 
 """ FINAL config is exported here, and imported in the IPW Workflow python file. """
 IWP_CONFIG = {
@@ -56,12 +59,14 @@ IWP_CONFIG = {
   "dir_output": OUTPUT,
   "dir_input": INPUT, # used to define base dir of all .shp files to be staged
   "ext_input": ".shp",
+  "ext_footprints": ".shp",
   "dir_footprints_remote": FOOTPRINTS_REMOTE, # the footprints start on /scratch
   "dir_footprints_local": FOOTPRINTS_LOCAL, # we rsync footprints from /scratch to /tmp before we use them for deduplication
   "dir_geotiff_remote": GEOTIFF_REMOTE, # we pull geotiffs from /scratch to webtile
   "dir_geotiff_local": GEOTIFF_LOCAL, # we pull geotiffs from /tmp to merge & rsync to /scratch
   "dir_web_tiles": WEBTILE_REMOTE, # we do not use /tmp for webtile step, it writes directly to /scratch
   "dir_staged_remote": STAGING_REMOTE, # we pull staged files from /scratch to rasterize and 3dtile
+  "dir_staged_remote_merged": STAGING_REMOTE_MERGED, # input for raster highest after staged files have been merged
   "dir_staged_local": STAGING_LOCAL,
   "filename_staging_summary": STAGING_REMOTE + "staging_summary.csv",
   "filename_rasterization_events": GEOTIFF_REMOTE + "raster_events.csv",
@@ -95,8 +100,7 @@ IWP_CONFIG = {
     },
   ],
   "deduplicate_at": [
-    "raster",
-    "3dtiles"
+    "raster"
   ],
   "deduplicate_keep_rules": [
     [
