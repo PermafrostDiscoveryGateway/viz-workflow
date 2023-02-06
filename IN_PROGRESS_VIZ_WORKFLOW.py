@@ -61,11 +61,11 @@ def main():
         
         # (optionally) Comment out steps you don't need 😁
         # todo: sync footprints to nodes.
-        # step0_staging()        
+        step0_staging()        
         # todo: rsync staging to /scratch
         # todo: merge staged files in /scratch    # ./merge_staged_vector_tiles.py
         # DO NOT RUN 3d-tiling UNTIL WORKFLOW CAN ACCOMODATE FILE HIERARCHY:step1_3d_tiles() # default parameter batch_size = 300 
-        step2_raster_highest(batch_size=100) # rasterize highest Z level only
+        # step2_raster_highest(batch_size=75) # rasterize highest Z level only, changed to 75 just for test run of data subset
         # todo: immediately after initiating above step, start rsync script to continuously sync geotiff files,
         # or immediately after the above step is done, rsync all files at once if there is time left in job  
         # step3_raster_lower(batch_size_geotiffs=100) # rasterize all LOWER Z levels
@@ -432,7 +432,8 @@ def step3_raster_lower(batch_size_geotiffs=20):
     print("3️⃣ Step 3: Create parent geotiffs for all lower z-levels (everything except highest zoom)")
 
     # update the config for the current context: pull stager that represents staged files in /scratch
-    IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote']
+    # next line is likely not necessary but can't hurt
+    IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote_merged']
     stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
     
     # find all Z levels
