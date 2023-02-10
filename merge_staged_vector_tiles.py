@@ -81,10 +81,10 @@ def main():
     #######################
     # todo -- get files from dirs automatically, using os.lsdir().
     #BASE_DIR = '/scratch/bbou/julietcohen/IWP/output/...'
-    merged_dir_path = f"{IWP_CONFIG['dir_staged']}cn009"  # this path SHOULD NOT be in the `staged_dir_paths_list`
+    merged_dir_path = f"{IWP_CONFIG['dir_staged']}cn003"  # this path SHOULD NOT be in the `staged_dir_paths_list`
     staged_dir_paths_list = [
-        f"{IWP_CONFIG['dir_staged']}cn010",
-        f"{IWP_CONFIG['dir_staged']}cn011",
+        f"{IWP_CONFIG['dir_staged']}cn005",
+        f"{IWP_CONFIG['dir_staged']}cn006",
      #   f"{IWP_CONFIG['dir_staged']}gpub092",
      #   f"{IWP_CONFIG['dir_staged']}gpub093",
      #   f"{IWP_CONFIG['dir_staged']}gpub094",

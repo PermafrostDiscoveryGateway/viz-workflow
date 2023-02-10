@@ -36,7 +36,7 @@ time.sleep(0.2)
 
 count = 0
 for hostname in hostnames:  
-    # ssh into the node, and rsync!
+  # ssh into the node, and rsync!
   ssh = ['ssh', f'{hostname}',]
   rsync = ['rsync', '-r', '--update', SOURCE, DESTINATION]
   cmd = ssh + rsync
