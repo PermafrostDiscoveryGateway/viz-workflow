@@ -11,6 +11,12 @@
 #SBATCH --mem=0
 #SBATCH --exclusive
 
+## output slurm info to a separeate file than errors
+#SBATCH -e stderr.txt
+#SBATCH -o stdout.txt
+## append output in info & error files rather than replacing last output
+#SBATCH --open-mode=append
+
 set -x
 ## UPDATES ##
 ## 1. tasks-per-node used to be 1, but then I was only seeing 1 node of usage at a time.
@@ -66,7 +72,7 @@ echo "IP Head: $ip_head"
 # conda init
 #conda activate v3_full_viz_pipeline
 # venv init
-source `/scratch/bbou/julietcohen/venv/iwp_2/bin/activate`
+source /scratch/bbou/julietcohen/venv/iwp_2/bin/activate
 
 # increase request limit
 export RAY_max_pending_lease_requests_per_scheduling_category=2000
