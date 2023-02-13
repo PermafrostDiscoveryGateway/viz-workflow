@@ -33,13 +33,10 @@ user = subprocess.check_output("whoami").strip().decode("ascii")
 # help flag provides flag help
 # store_true actions stores argument as True
 
-##################################
-#### ⛔️ don't change these ⛔️ ####
-##################################
 import PRODUCTION_IWP_CONFIG
 IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
-print("Using config: ")
-pprint.pprint(IWP_CONFIG)
+#print("Using config: ")
+#pprint.pprint(IWP_CONFIG)
 
 def main():
     result = subprocess.run(["hostname", "-i"], capture_output=True, text=True)
@@ -101,6 +98,7 @@ def step0_staging():
 
     # update the config for the current context: write staged files to local /tmp dir
     IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_local']
+    IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local']
     # make directories in /scratch so geotiffs can populate there
     # is the following line necessary? I don't think so
     os.makedirs(IWP_CONFIG['dir_staged'], exist_ok = True)
@@ -313,16 +311,18 @@ def step2_raster_highest(batch_size=100):
     # from random import randrange
     # from pympler import muppy, summary, tracker
 
-    os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok=True) # added in 20230208
+    os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok=True) 
 
-    print("2️⃣  Step 2 Rasterize only highest Z")
     # update the config for the current context: write geotiff files to local /tmp dir
-    #IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local']
-    # IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote'] # this line was used to successsfully write geotiffs straight to scratch, and commented out line above
-    IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local']
+    IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local']
+
+    print(f"2️⃣  Step 2 Rasterize only highest Z, saving to {IWP_CONFIG['dir_geotiff']}")
+
     IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote_merged']
     stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
     stager.tiles.add_base_dir('output_of_staging', IWP_CONFIG['dir_staged'], '.gpkg')
+    # i dont think this next line is necessary cause dedup occurs based on the flag that is inserted during staging:
+    
     #rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
     # make directories in /tmp so geotiffs can populate there
     # is the following line necessary? I don't think so
@@ -342,10 +342,6 @@ def step2_raster_highest(batch_size=100):
     staged_paths = stager.tiles.get_filenames_from_dir(base_dir = 'output_of_staging')
     
     # stager.kas_check_footprints(staged_paths)
-    
-    # Add footprints path! 
-    # todo: not sure this is the right extension.
-    # stager.tiles.add_base_dir('input', FOOTPRINTS_PATH, '.shp')
 
     if ONLY_SMALL_TEST_RUN:
         staged_paths = staged_paths[:TEST_RUN_SIZE]
@@ -391,8 +387,7 @@ def step2_raster_highest(batch_size=100):
             #IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local']
             #stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False) # maybe remove this, added when troubleshooting
             #rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
-            #os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok = True)
-
+            os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok=True) 
             app_future = rasterize.remote(batch, IWP_CONFIG)
             app_futures.append(app_future)
                 
@@ -446,7 +441,8 @@ def step3_raster_lower(batch_size_geotiffs=20):
     print("3️⃣ Step 3: Create parent geotiffs for all lower z-levels (everything except highest zoom)")
 
     IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
-    IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local'] # we deduplicate at rasterization
+    # next line is likely not necessary but can't hurt
+    IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local']
     # update the config for the current context: pull stager that represents staged files in /scratch
     # next line is likely not necessary but can't hurt
     IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote_merged']
@@ -457,14 +453,12 @@ def step3_raster_lower(batch_size_geotiffs=20):
     max_z = stager.config.get_max_z()
     parent_zs = range(max_z - 1, min_z - 1, -1)
 
-    # update the config for the current context: pull highest rasters from /scratch
-    # already ran this line a few lines earlier, but what if it needs to be the last adjustment 
-    # to the config before the rasterizer is defined?
+    # next line is likely not necessary but can't hurt (we already defined this a few lines above)
     IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
     rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
 
     print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG['dir_geotiff']}")
-    stager.tiles.add_base_dir('geotiff', IWP_CONFIG['dir_geotiff'], '.tif')
+    stager.tiles.add_base_dir('geotiff_remote', IWP_CONFIG['dir_geotiff'], '.tif') # had to change this from geotiff to geotiff_remote bc got error that the geotiff base dir already existed
 
     start = time.time()
     # Can't start lower z-level until higher z-level is complete.
@@ -472,7 +466,7 @@ def step3_raster_lower(batch_size_geotiffs=20):
         print(f"👉 Starting Z level {z} of {len(parent_zs)}")
         # Loop thru z levels 
         # Make lower z-levels based on the highest z-level rasters
-        child_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff', z=z + 1)
+        child_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_remote', z=z + 1)
 
         if ONLY_SMALL_TEST_RUN:
             child_paths = child_paths[:TEST_RUN_SIZE]
@@ -493,10 +487,11 @@ def step3_raster_lower(batch_size_geotiffs=20):
         try:
             app_futures = []
             for parent_tile_batch in parent_tile_batches:
-                # now that the geotiff base dir has been created and the filenames have been batched, switch the dir_geotiff to _local
-                # so that new lower z-level rasters are written to /tmp rather than /scratch
+                # even though the geotiff base dir has been created and the filenames have been batched, 
+                # still cannot switch the dir_geotiff to _local !!! because the lower z-level rasters need to be
+                # written to scratch rather than /tmp so all lower z-levels can access all files in higher z-levels
                 IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local'] # we deduplicate at rasterization
-                IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local'] # run immeditely before defining rasterizer
+                #IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local'] # run immeditely before defining rasterizer
                 # I dont think theres a need to set rasterizer with new config after chaning this property cause 
                 # that is done within the function create_composite_geotiffs() but troubleshooting 
                 # so lets do it anyway
@@ -535,7 +530,7 @@ def step4_webtiles(batch_size_web_tiles=300):
     # with where files currently are
     IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote_merged']
     # pull all z-levels of rasters from /scratch for web tiling
-    IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote'] # this maybe can be set to dir_geotiff_local, which would be preferred cause reading from local is faster, but only if all z-level raster files in local dir are all merged correctly
+    IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
     # define rasterizer here just to updates_ranges()
     rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
     # stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False) remove this line, no point in defining the stager right before we update the config, do it after!
@@ -560,7 +555,7 @@ def step4_webtiles(batch_size_web_tiles=300):
 
     #stager.tiles.add_base_dir('geotiff_path', IWP_CONFIG_NEW['dir_geotiff'], '.tif') # don't think we need this line because we are using the same geotiff base dir set in the raster lower step (remote geotiff dir with geotiffs of all z-levels)
     #geotiff_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_path')
-    geotiff_paths = rasterizer.tiles.get_filenames_from_dir(base_dir = 'geotiff')
+    geotiff_paths = rasterizer.tiles.get_filenames_from_dir(base_dir = 'geotiff_remote')
 
     if ONLY_SMALL_TEST_RUN:
         geotiff_paths = geotiff_paths[:TEST_RUN_SIZE]
@@ -620,7 +615,7 @@ def rasterize(staged_paths, config, logging_dict=None):
     try:
         #IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
         #os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok = True)
-        IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local']
+        #IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local']
         #IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote_merged']
         rasterizer = pdgraster.RasterTiler(config)
         # todo: fix warning `python3.9/site-packages/geopandas/base.py:31: UserWarning: The indices of the two GeoSeries are different.`
@@ -643,7 +638,6 @@ def create_composite_geotiffs(tiles, config, logging_dict=None):
         logging.config.dictConfig(logging_dict)
     try:
         IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local']
-        IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local']
         rasterizer = pdgraster.RasterTiler(config)
         rasterizer.parent_geotiffs_from_children(tiles, recursive=False)
     except Exception as e:
