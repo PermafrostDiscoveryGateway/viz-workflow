@@ -3,7 +3,7 @@
 #SBATCH --job-name=pdg_viz
 #SBATCH --partition=cpu
 #SBATCH --account=
-#SBATCH --time=01:00:00
+#SBATCH --time=02:00:00
 
 #SBATCH --export=ALL,RAY_worker_register_timeout_seconds=120
 
@@ -96,13 +96,30 @@ sleep 1
 # number of nodes other than the head node
 worker_num=$((SLURM_JOB_NUM_NODES - 1))
 
+# for ((i = 1; i <= worker_num; i++)); do
+#     node_i=${nodes_array[$i]}
+#     srun --nodes=1 --ntasks=1 -w "$node_i" \
+#     ray stop
+#     echo "Starting WORKER $i at $node_i"
+#     srun --nodes=1 --ntasks=1 -w "$node_i" \
+#       ulimit -n unlimited
+#     srun --nodes=1 --ntasks=1 -w "$node_i" \
+#       export RAY_worker_register_timeout_seconds=120
+#     srun --nodes=1 --ntasks=1 -w "$node_i" \
+#         ray start --address "$ip_head" --log-color true --block &
+#     # sleep 1
+#     # TODO -- change num-gpus back to 0. 
+#     echo "WORKER $i has SLURM_CPUS_PER_TASK: ${SLURM_CPUS_PER_TASK}"
+# done
+# __doc_worker_ray_end__
+
+# change Kastan's loop to remove changing the ulimit - received error that this is not allowed
 for ((i = 1; i <= worker_num; i++)); do
     node_i=${nodes_array[$i]}
     srun --nodes=1 --ntasks=1 -w "$node_i" \
     ray stop
     echo "Starting WORKER $i at $node_i"
-    srun --nodes=1 --ntasks=1 -w "$node_i" \
-      ulimit -n unlimited
+    srun --nodes=1 --ntasks=1 -w "$node_i"
     srun --nodes=1 --ntasks=1 -w "$node_i" \
       export RAY_worker_register_timeout_seconds=120
     srun --nodes=1 --ntasks=1 -w "$node_i" \
@@ -111,7 +128,6 @@ for ((i = 1; i <= worker_num; i++)); do
     # TODO -- change num-gpus back to 0. 
     echo "WORKER $i has SLURM_CPUS_PER_TASK: ${SLURM_CPUS_PER_TASK}"
 done
-# __doc_worker_ray_end__
 
 
 sleep infinity # wait forever to presist the ray runtime

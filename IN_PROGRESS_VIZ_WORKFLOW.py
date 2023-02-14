@@ -458,6 +458,7 @@ def step3_raster_lower(batch_size_geotiffs=20):
     rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
 
     print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG['dir_geotiff']}")
+    # removing this next line bc robyn removed it from kastan's script:
     stager.tiles.add_base_dir('geotiff_remote', IWP_CONFIG['dir_geotiff'], '.tif') # had to change this from geotiff to geotiff_remote bc got error that the geotiff base dir already existed
 
     start = time.time()
@@ -466,6 +467,8 @@ def step3_raster_lower(batch_size_geotiffs=20):
         print(f"👉 Starting Z level {z} of {len(parent_zs)}")
         # Loop thru z levels 
         # Make lower z-levels based on the highest z-level rasters
+        # removing the next line cause robyn removed it from kastan's script:
+        #child_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_remote', z=z + 1)
         child_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_remote', z=z + 1)
 
         if ONLY_SMALL_TEST_RUN:
@@ -537,15 +540,13 @@ def step4_webtiles(batch_size_web_tiles=300):
     
     start = time.time()
     # Update color ranges
-    #print(f"Updating ranges...") # reintroduce this step when determine how to properly integrate end_tracking again
-    #rasterizer.update_ranges() # reintroduce this step when determine how to properly integrate end_tracking again
-    #print("Redefined rasterizer based on new ranges.") # reintroduce this step when determine how to properly integrate end_tracking again
-    #IWP_CONFIG_NEW = rasterizer.config.config # if this doesn't work, need to add to config where to write the new config to? # reintroduce this step when determine how to properly integrate end_tracking again
-    #print("Defined new config based on new rasterizer.") # reintroduce this step when determine how to properly integrate end_tracking again
-    # note: pull in updated config? check if new congif is written
-    # new config should have been written, so update the stager
-    # so we can create a base dir out of the geotiff dir in a few lines
-    #stager = pdgstaging.TileStager(IWP_CONFIG_NEW, check_footprints=False)
+    print(f"Updating ranges...")
+    rasterizer.update_ranges()
+    IWP_CONFIG_NEW = rasterizer.config.config # if this doesn't work, need to add to config where to write the new config to?
+    print(f"Defined new config: {IWP_CONFIG_NEW}")
+
+    # define the stager so we can pull filepaths from the geotiff base dir in a few lines
+    # stager = pdgstaging.TileStager(IWP_CONFIG_NEW, check_footprints=False)
 
     # Note: we also define rasterizer later in each of the 3 functions:
     # raster highest, raster lower, and webtile functions
@@ -554,10 +555,19 @@ def step4_webtiles(batch_size_web_tiles=300):
     #print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG_NEW['dir_geotiff']}...")
 
     #stager.tiles.add_base_dir('geotiff_path', IWP_CONFIG_NEW['dir_geotiff'], '.tif') # don't think we need this line because we are using the same geotiff base dir set in the raster lower step (remote geotiff dir with geotiffs of all z-levels)
-    stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
-    stager.tiles.add_base_dir('geotiff_remote', IWP_CONFIG['dir_geotiff'], '.tif')
+    #stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
+    #stager.tiles.add_base_dir('geotiff_remote', IWP_CONFIG['dir_geotiff'], '.tif')
     #geotiff_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_path')
+
+    # set add base dir with rasterizer instead of stager
+    #rasterizer.tiles.add_base_dir('geotiff_remote', IWP_CONFIG['dir_geotiff'], '.tif')
+    #geotiff_paths = rasterizer.tiles.get_filenames_from_dir(base_dir = 'geotiff_remote')
+    # added next 2 lines 20230214:
+    rasterizer.tiles.add_base_dir('geotiff_remote', IWP_CONFIG_NEW['dir_geotiff'], '.tif')
     geotiff_paths = rasterizer.tiles.get_filenames_from_dir(base_dir = 'geotiff_remote')
+    # check if the rasterizer can add_base_dir?? robyn added that so must be correct
+    # change made 2023-02-14: change rasterizer to stager to pull filenames from stager base dir created in raster lower step
+    #geotiff_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_remote')
 
     if ONLY_SMALL_TEST_RUN:
         geotiff_paths = geotiff_paths[:TEST_RUN_SIZE]
