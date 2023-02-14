@@ -58,7 +58,7 @@ def main():
         
         # (optionally) Comment out steps you don't need 😁
         # todo: sync footprints to nodes.
-        step0_staging()        
+        # step0_staging()        
         # todo: rsync staging to /scratch
         # todo: merge staged files in /scratch    # ./merge_staged_vector_tiles.py
         # DO NOT RUN 3d-tiling UNTIL WORKFLOW CAN ACCOMODATE FILE HIERARCHY:step1_3d_tiles() # default parameter batch_size = 300 
@@ -68,7 +68,7 @@ def main():
         # step3_raster_lower(batch_size_geotiffs=100) # rasterize all LOWER Z levels
         # todo: immediately after initiating above step, start rsync script to continuously sync geotiff files,
         # or immediately after the above step is done, rsync all files at once if there is time left in job
-        # step4_webtiles(batch_size_web_tiles=250) # convert to web tiles.
+        step4_webtiles(batch_size_web_tiles=250) # convert to web tiles.
         
         # mem_testing = False        
         # if mem_testing:
@@ -311,7 +311,7 @@ def step2_raster_highest(batch_size=100):
     # from random import randrange
     # from pympler import muppy, summary, tracker
 
-    os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok=True) 
+    #os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok=True) 
 
     # update the config for the current context: write geotiff files to local /tmp dir
     IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local']
@@ -537,11 +537,11 @@ def step4_webtiles(batch_size_web_tiles=300):
     
     start = time.time()
     # Update color ranges
-    print(f"Updating ranges...")
-    rasterizer.update_ranges()
-    print("Redefined rasterizer based on new ranges.")
-    IWP_CONFIG_NEW = rasterizer.config.config # if this doesn't work, need to add 
-    print("Defined new config based on new rasterizer.")
+    #print(f"Updating ranges...") # reintroduce this step when determine how to properly integrate end_tracking again
+    #rasterizer.update_ranges() # reintroduce this step when determine how to properly integrate end_tracking again
+    #print("Redefined rasterizer based on new ranges.") # reintroduce this step when determine how to properly integrate end_tracking again
+    #IWP_CONFIG_NEW = rasterizer.config.config # if this doesn't work, need to add to config where to write the new config to? # reintroduce this step when determine how to properly integrate end_tracking again
+    #print("Defined new config based on new rasterizer.") # reintroduce this step when determine how to properly integrate end_tracking again
     # note: pull in updated config? check if new congif is written
     # new config should have been written, so update the stager
     # so we can create a base dir out of the geotiff dir in a few lines
@@ -554,6 +554,8 @@ def step4_webtiles(batch_size_web_tiles=300):
     #print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG_NEW['dir_geotiff']}...")
 
     #stager.tiles.add_base_dir('geotiff_path', IWP_CONFIG_NEW['dir_geotiff'], '.tif') # don't think we need this line because we are using the same geotiff base dir set in the raster lower step (remote geotiff dir with geotiffs of all z-levels)
+    stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
+    stager.tiles.add_base_dir('geotiff_remote', IWP_CONFIG['dir_geotiff'], '.tif')
     #geotiff_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_path')
     geotiff_paths = rasterizer.tiles.get_filenames_from_dir(base_dir = 'geotiff_remote')
 
@@ -578,7 +580,8 @@ def step4_webtiles(batch_size_web_tiles=300):
             # MANDATORY: include placement_group for better stability on 200+ cpus.
             # app_future = create_web_tiles.options(placement_group=pg).remote(batch, IWP_CONFIG)
             # app_future = create_web_tiles.remote(batch, IWP_CONFIG) # remove this line
-            app_future = create_web_tiles.remote(batch, IWP_CONFIG_NEW)
+            #app_future = create_web_tiles.remote(batch, IWP_CONFIG_NEW) # reintroduce this step when determine how to properly integrate end_tracking again
+            app_future = create_web_tiles.remote(batch, IWP_CONFIG) # remove this line when line "reintroduce" lines are reintroduced
             app_futures.append(app_future)
 
         for i in range(0, len(app_futures)): 

@@ -5,7 +5,7 @@ from subprocess import PIPE, Popen
 import PRODUCTION_IWP_CONFIG
 IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
 # set config properties for current context
-#IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local'] # switched IWP_CONFIG['dir_geotiff'] to be the LOCAL path in the config, no longer necesary to have IWP_CONFIG['dir_geotiff_local']
+IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local'] 
 SOURCE = IWP_CONFIG['dir_geotiff']
 IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
 DESTINATION = IWP_CONFIG['dir_geotiff']
