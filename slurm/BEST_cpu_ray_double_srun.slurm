@@ -119,7 +119,6 @@ for ((i = 1; i <= worker_num; i++)); do
     srun --nodes=1 --ntasks=1 -w "$node_i" \
     ray stop
     echo "Starting WORKER $i at $node_i"
-    srun --nodes=1 --ntasks=1 -w "$node_i"
     srun --nodes=1 --ntasks=1 -w "$node_i" \
       export RAY_worker_register_timeout_seconds=120
     srun --nodes=1 --ntasks=1 -w "$node_i" \
