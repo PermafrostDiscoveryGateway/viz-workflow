@@ -9,9 +9,9 @@
 
 #SBATCH --nodes=3
 #SBATCH --mem=0
-#SBATCH --exclusive
+#SBATCH --mem=200g
 
-## output slurm info to a separeate file than errors
+## output slurm info to a separate file than errors
 #SBATCH -e stderr.txt
 #SBATCH -o stdout.txt
 ## append output in info & error files rather than replacing last output
