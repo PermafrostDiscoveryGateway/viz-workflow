@@ -3,12 +3,13 @@
 #SBATCH --job-name=pdg_viz
 #SBATCH --partition=cpu
 #SBATCH --account=
-#SBATCH --time=02:00:00
+#SBATCH --time=04:00:00
 
 #SBATCH --export=ALL,RAY_worker_register_timeout_seconds=120
 
 #SBATCH --nodes=3
-#SBATCH --mem=200g
+#SBATCH --mem=0
+#SBATCH --exclusive
 
 ## output slurm info to a separate file than errors
 #SBATCH -e stderr.txt
@@ -112,14 +113,16 @@ worker_num=$((SLURM_JOB_NUM_NODES - 1))
 # done
 # __doc_worker_ray_end__
 
-# change Kastan's loop to remove changing the ulimit - received error that this is not allowed
+# change Kastan's loop to remove changing the ulimit - received error that this is not allowed,
+# also removed exporting the RAY_worker_register_timeout_seconds=120 because got error
+# there is no such file or directory
 for ((i = 1; i <= worker_num; i++)); do
     node_i=${nodes_array[$i]}
     srun --nodes=1 --ntasks=1 -w "$node_i" \
     ray stop
     echo "Starting WORKER $i at $node_i"
     srun --nodes=1 --ntasks=1 -w "$node_i" \
-      export RAY_worker_register_timeout_seconds=120
+       export RAY_worker_register_timeout_seconds=120
     srun --nodes=1 --ntasks=1 -w "$node_i" \
         ray start --address "$ip_head" --log-color true --block &
     # sleep 1
