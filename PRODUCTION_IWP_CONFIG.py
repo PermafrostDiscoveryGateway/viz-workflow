@@ -11,7 +11,7 @@ head_node = 'cn096/'
 # define desired location for output files within user dir
 # ensures a new subfolder every run as long as new run is not started within same day as last run
 # following path is the output subdir for test run, using just on subdir of the alaska files that is only ~8% of the Alaska dir, 23.5 GB
-output_subdir = 'IWP/output/iwp_testRun_20230217'
+output_subdir = 'IWP/output/iwp_testRun_20230217_run2'
 #output_subdir = datetime.now().strftime("%b-%d-%y")
 # don't use subprocess to retrieve date for subdir because runs might span over 2 days if they go overnight
 

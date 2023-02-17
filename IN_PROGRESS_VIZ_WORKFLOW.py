@@ -62,7 +62,7 @@ def main():
         # todo: rsync staging to /scratch
         # todo: merge staged files in /scratch    # ./merge_staged_vector_tiles.py
         # DO NOT RUN 3d-tiling UNTIL WORKFLOW CAN ACCOMODATE FILE HIERARCHY:step1_3d_tiles() # default parameter batch_size = 300 
-        # step2_raster_highest(batch_size=100) # rasterize highest Z level only, changed to 75 just for test run of data subset
+        # step2_raster_highest(batch_size=100) # rasterize highest Z level only
         # todo: immediately after initiating above step, start rsync script to continuously sync geotiff files,
         # or immediately after the above step is done, rsync all files at once if there is time left in job  
         # step3_raster_lower(batch_size_geotiffs=100) # rasterize all LOWER Z levels
@@ -540,10 +540,10 @@ def step4_webtiles(batch_size_web_tiles=300):
     
     start = time.time()
     # Update color ranges
-    # print(f"Updating ranges...") # reintroduce when fix id error in raster highest and can access rasters_summary.csv
-    # rasterizer.update_ranges() # reintroduce when fix id error in raster highest and can access rasters_summary.csv
-    # IWP_CONFIG_NEW = rasterizer.config.config # if this doesn't work, need to add to config where to write the new config to? # reintroduce when fix id error in raster highest and can access rasters_summary.csv
-    # print(f"Defined new config: {IWP_CONFIG_NEW}") # reintroduce when fix id error in raster highest and can access rasters_summary.csv
+    print(f"Updating ranges...") # reintroduce when fix id error in raster highest and can access rasters_summary.csv
+    rasterizer.update_ranges() # reintroduce when fix id error in raster highest and can access rasters_summary.csv
+    IWP_CONFIG_NEW = rasterizer.config.config # if this doesn't work, need to add to config where to write the new config to? # reintroduce when fix id error in raster highest and can access rasters_summary.csv
+    print(f"Defined new config: {IWP_CONFIG_NEW}") # reintroduce when fix id error in raster highest and can access rasters_summary.csv
 
     # define the stager so we can pull filepaths from the geotiff base dir in a few lines
     # stager = pdgstaging.TileStager(IWP_CONFIG_NEW, check_footprints=False)
@@ -563,10 +563,10 @@ def step4_webtiles(batch_size_web_tiles=300):
     #rasterizer.tiles.add_base_dir('geotiff_remote', IWP_CONFIG['dir_geotiff'], '.tif')
     #geotiff_paths = rasterizer.tiles.get_filenames_from_dir(base_dir = 'geotiff_remote')
     # added next 2 lines 20230214:
-    # rasterizer.tiles.add_base_dir('geotiff_remote_all_zs', IWP_CONFIG_NEW['dir_geotiff'], '.tif') # call it something different than geotiff_remote because we already made that base dir earlier and it might not overwrite and might error cause already exists 
+    rasterizer.tiles.add_base_dir('geotiff_remote_all_zs', IWP_CONFIG_NEW['dir_geotiff'], '.tif') # call it something different than geotiff_remote because we already made that base dir earlier and it might not overwrite and might error cause already exists 
     # reintroduce above line when fix id error in raster highest and can access rasters_summary.csv
     # and also remove line just below bc it was that line's replacement for time being:
-    rasterizer.tiles.add_base_dir('geotiff_remote_all_zs', IWP_CONFIG['dir_geotiff'], '.tif')
+    # rasterizer.tiles.add_base_dir('geotiff_remote_all_zs', IWP_CONFIG['dir_geotiff'], '.tif')
     geotiff_paths = rasterizer.tiles.get_filenames_from_dir(base_dir = 'geotiff_remote_all_zs')
     # check if the rasterizer can add_base_dir?? robyn added that so must be correct
     # change made 2023-02-14: change rasterizer to stager to pull filenames from stager base dir created in raster lower step
@@ -593,8 +593,8 @@ def step4_webtiles(batch_size_web_tiles=300):
             # MANDATORY: include placement_group for better stability on 200+ cpus.
             # app_future = create_web_tiles.options(placement_group=pg).remote(batch, IWP_CONFIG)
             # app_future = create_web_tiles.remote(batch, IWP_CONFIG) # remove this line
-            #app_future = create_web_tiles.remote(batch, IWP_CONFIG_NEW) # reintroduce this step when determine how to properly integrate end_tracking again
-            app_future = create_web_tiles.remote(batch, IWP_CONFIG) # remove this line when line "reintroduce" lines are reintroduced
+            app_future = create_web_tiles.remote(batch, IWP_CONFIG_NEW) # reintroduce this step when determine how to properly integrate end_tracking again
+            #app_future = create_web_tiles.remote(batch, IWP_CONFIG) # remove this line when line "reintroduce" lines are reintroduced
             app_futures.append(app_future)
 
         for i in range(0, len(app_futures)): 
