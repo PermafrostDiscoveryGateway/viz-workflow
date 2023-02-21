@@ -7,11 +7,11 @@ import subprocess
 
 # define user on Delta, avoid writing files to other user's dir
 user = subprocess.check_output("whoami").strip().decode("ascii")
-head_node = 'cn096/'
+head_node = 'cn___/'
 # define desired location for output files within user dir
 # ensures a new subfolder every run as long as new run is not started within same day as last run
 # following path is the output subdir for test run, using just on subdir of the alaska files that is only ~8% of the Alaska dir, 23.5 GB
-output_subdir = 'IWP/output/iwp_testRun_20230217_run2'
+output_subdir = 'IWP/output/iwp_high_20230221'
 #output_subdir = datetime.now().strftime("%b-%d-%y")
 # don't use subprocess to retrieve date for subdir because runs might span over 2 days if they go overnight
 
@@ -19,22 +19,17 @@ output_subdir = 'IWP/output/iwp_testRun_20230217_run2'
 #### END OF Change me 😁  ####
 ##############################
 
-# following path is the INPUT for test run, using just one _iwp subdir of the alaska files that is only ~8% of the Alaska dir, 23.5 GB
-INPUT = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/iwp_files/high/alaska/207_208_209_223_224_iwp/'
 # input path for all data:
-#INPUT = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/iwp_files/high_ice/' # The output data of MAPLE. Which is the input data for STAGING.
+INPUT = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/iwp_files/high/' # The output data of MAPLE. Which is the input data for STAGING.
 
 # following path is the OUTPUT for test run, using just on subdir of the alaska files that is only 7.78% of the Alaska dir, 45.57 GB
 OUTPUT  = f'/scratch/bbou/{user}/{output_subdir}/' # Dir for results. High I/O is good.
 # output path for all data, when it is available:
 #OUTPUT  = f'/scratch/bbou/{user}/IWP/output/{output_subdir}/' # Dir for results. High I/O is good.
 
-# following 2 paths are for test run, using just on subdir of the alaska files that is only 7.78% of the Alaska dir, 45.57 GB
-FOOTPRINTS_LOCAL = '/tmp/staged_footprints/'
-FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/IWP/footprint_files_with_date_20230119/high/alaska/207_208_209_223_224_iwp/'
 # footprints paths for all data:
-#FOOTPRINTS_LOCAL = '/tmp/staged_footprints/'
-#FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/IWP/footprint_files_with_date_20230119/'
+FOOTPRINTS_LOCAL = '/tmp/staged_footprints/'
+FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/IWP/footprint_files_with_date_20230119/high/'
 
 STAGING_LOCAL = '/tmp/staged/'
 STAGING_REMOTE = OUTPUT  + 'staged/'
@@ -62,10 +57,10 @@ IWP_CONFIG = {
   "ext_footprints": ".shp",
   "dir_footprints_remote": FOOTPRINTS_REMOTE, # the footprints start on /scratch before we transfer them to /tmp
   "dir_footprints_local": FOOTPRINTS_LOCAL, # we rsync footprints from /scratch to /tmp before we use them for deduplication
-  "dir_geotiff_remote": GEOTIFF_REMOTE, # we store highest z-level geotiffs in /scratch just after they are created so they are safe after the job concludes
-  "dir_geotiff_local": GEOTIFF_LOCAL, # we write highest level geotiffs to /tmp then pull from there to merge & rsync them to /scratch
+  "dir_geotiff_remote": GEOTIFF_REMOTE, # we store geotiffs in /scratch after they are created so they are safe after the job concludes, and web-tiling can access all geotiffs in the same directory
+  "dir_geotiff_local": GEOTIFF_LOCAL, # we write highest level geotiffs to /tmp then transfer to /scratch 
   "dir_web_tiles": WEBTILE_REMOTE, # we do not use /tmp for webtile step, it writes directly to /scratch
-  "dir_staged_remote": STAGING_REMOTE, # we pull the merged staged files from /scratch to rasterize and 3dtile
+  "dir_staged_remote": STAGING_REMOTE, # we rsync the staged files to /scratch to merge, then rasterize and 3dtile with that merged dir
   "dir_staged_remote_merged": STAGING_REMOTE_MERGED, # input for raster highest after staged files have been merged
   "dir_staged_local": STAGING_LOCAL, # initially write staged files to /tmp so they write faster
   "filename_staging_summary": STAGING_REMOTE + "staging_summary.csv",
