@@ -7,11 +7,12 @@ import subprocess
 
 # define user on Delta, avoid writing files to other user's dir
 user = subprocess.check_output("whoami").strip().decode("ascii")
-head_node = 'cn___/'
+#head_node = 'cn___/'
+head_node = 'gpub051'
 # define desired location for output files within user dir
 # ensures a new subfolder every run as long as new run is not started within same day as last run
 # following path is the output subdir for test run, using just on subdir of the alaska files that is only ~8% of the Alaska dir, 23.5 GB
-output_subdir = 'IWP/output/iwp_high_20230221'
+output_subdir = 'IWP/output/iwp_testRun_20230227'
 #output_subdir = datetime.now().strftime("%b-%d-%y")
 # don't use subprocess to retrieve date for subdir because runs might span over 2 days if they go overnight
 
@@ -20,7 +21,8 @@ output_subdir = 'IWP/output/iwp_high_20230221'
 ##############################
 
 # input path for all data:
-INPUT = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/iwp_files/high/' # The output data of MAPLE. Which is the input data for STAGING.
+#INPUT = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/iwp_files/high/' # The output data of MAPLE. Which is the input data for STAGING.
+INPUT = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/iwp_files/high/alaska/146_157_iwp/'
 
 # following path is the OUTPUT for test run, using just on subdir of the alaska files that is only 7.78% of the Alaska dir, 45.57 GB
 OUTPUT  = f'/scratch/bbou/{user}/{output_subdir}/' # Dir for results. High I/O is good.
@@ -29,7 +31,8 @@ OUTPUT  = f'/scratch/bbou/{user}/{output_subdir}/' # Dir for results. High I/O i
 
 # footprints paths for all data:
 FOOTPRINTS_LOCAL = '/tmp/staged_footprints/'
-FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/IWP/footprint_files_with_date_20230119/high/'
+#FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/IWP/footprint_files_with_date_20230119/high/'
+FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/IWP/footprint_files_with_date_20230119/high/alaska/146_157_iwp/'
 
 STAGING_LOCAL = '/tmp/staged/'
 STAGING_REMOTE = OUTPUT  + 'staged/'
@@ -105,5 +108,5 @@ IWP_CONFIG = {
     ]
   ],
   "deduplicate_method": "footprints",
-  "deduplicate_clip_to_footprint": True
+  #"deduplicate_clip_to_footprint": True
 }

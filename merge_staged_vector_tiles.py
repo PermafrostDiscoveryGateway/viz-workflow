@@ -13,6 +13,9 @@ It has methods that do the following:
     5. Write the GeoPandas object to a file in a given archive directory, still
        maintaining the tile path structure (e.g.
        {TileMatrix}/{TileRow}/{TileCol})
+
+    Juliet's note: I think the above documentation is wrong. I don't see where in this script we exeute #3 & #4.
+    If you read in a tile from the head node after merging, it still has the property "staging_centroid_within_tile"
 """
 
 import filecmp
@@ -81,12 +84,18 @@ def main():
     #######################
     # todo -- get files from dirs automatically, using os.lsdir().
     #BASE_DIR = '/scratch/bbou/julietcohen/IWP/output/...'
-    merged_dir_path = f"{IWP_CONFIG['dir_staged']}cn___"  # this path SHOULD NOT be in the `staged_dir_paths_list`
+    merged_dir_path = f"{IWP_CONFIG['dir_staged']}gpub051"  # this path SHOULD NOT be in the `staged_dir_paths_list`
     staged_dir_paths_list = [
-        f"{IWP_CONFIG['dir_staged']}cn___",
-        f"{IWP_CONFIG['dir_staged']}cn___",
-        f"{IWP_CONFIG['dir_staged']}cn___",
-        f"{IWP_CONFIG['dir_staged']}cn___",
+        f"{IWP_CONFIG['dir_staged']}gpub052",
+        f"{IWP_CONFIG['dir_staged']}gpub053",
+     #   f"{IWP_CONFIG['dir_staged']}cn071",
+     #   f"{IWP_CONFIG['dir_staged']}cn072",
+     #   f"{IWP_CONFIG['dir_staged']}cn073",
+     #   f"{IWP_CONFIG['dir_staged']}cn074",
+     #   f"{IWP_CONFIG['dir_staged']}cn075",
+     #   f"{IWP_CONFIG['dir_staged']}cn076",
+     #   f"{IWP_CONFIG['dir_staged']}cn077",
+     #   f"{IWP_CONFIG['dir_staged']}cn078",
      #   f"{IWP_CONFIG['dir_staged']}gpub094",
      #   f"{IWP_CONFIG['dir_staged']}gpub095",
      #   f"{IWP_CONFIG['dir_staged']}gpub096",
@@ -250,7 +259,7 @@ class StagingMerger():
             path_manager.add_base_dir(base_dir_name_string, base_dir_path, ext)
         else:
             start = time.monotonic()
-            print(f"Collecting paths. Base dir named: {base_dir_name_string}  \n\tpath: {base_dir_path}") # script got this far before not finding paths to merge, test runs 01/31 and 02/01
+            print(f"Collecting paths. Base dir named: {base_dir_name_string}  \n\tpath: {base_dir_path}") 
             path_manager.add_base_dir(base_dir_name_string, base_dir_path, ext) 
             paths_list = path_manager.get_filenames_from_dir(base_dir_name_string)
             paths_set = set(paths_list) # speed optimization
@@ -258,7 +267,7 @@ class StagingMerger():
             
             assert len(paths_list) == len(paths_set), f"❌ Warning: There are duplicate paths in this base dir: {base_dir_path}"
             
-            print(f"⏰ Elapsed time: {(time.monotonic() - start)/60:.2f} minutes.") # test run 01/31 script ptrinted this so issue is in lines 255-259
+            print(f"⏰ Elapsed time: {(time.monotonic() - start)/60:.2f} minutes.") 
             
             # write path list to disk
             pathlib_paths_list_local_filename.parent.mkdir(parents=True, exist_ok=True)
@@ -300,6 +309,7 @@ def merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive, sta
         stager = TileStager(stager, check_footprints=False)
     # todo check that this comparison is lining up...
     action_taken_string = ''
+    ## if the head node path + subdirs to that specific staged file does not exist:
     if not os.path.exists(incoming_tile_out_path):
         # time.sleep(5)
         # (1) add to final_merged_paths_set
@@ -307,12 +317,15 @@ def merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive, sta
         
         # NO NEED: final_merged_paths_set.add(incoming_tile_out_path)
         
+        ## then define the head node path as a path 
+        ## and if the head node dir that holds the file is not a dir in, make dir
         # check the destination folder structure exists
         filepath = pathlib.Path(incoming_tile_out_path)
         if not filepath.parent.is_dir():
             filepath.parent.mkdir(parents=True, exist_ok=True)
         
-        if isDestructive:
+        ## default for isDestructive is False, so we copy the file with pyfastcopy rather than move it
+        if isDestructive: 
             shutil.move(incoming_tile_in_path, incoming_tile_out_path)
             # print("File moved.")
             # print("File not in dest. Moving to dest: ", incoming_tile_out_path)
@@ -323,10 +336,14 @@ def merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive, sta
             # print("File not in dest. Copying to dest: ", incoming_tile_out_path)
             # print("File coppied.")
             action_taken_string += 'fast copy'
+    ## if the head node path + subdirs to that specific staged file does exist,
+    ## compare the two files and skip if they are the same,
+    ## and if the files are not the same, then append the polygons to the exisitng tile
     else:
         # if identical, skip. Else, merge/append-to the GDF.
         if filecmp.cmp(incoming_tile_in_path, incoming_tile_out_path):
             # identical, skip merge
+            ## default for isDestructive is False
             if isDestructive:
                 os.remove(incoming_tile_in_path)
                 action_taken_string += 'identical. Deleted old.'
@@ -347,10 +364,20 @@ def merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive, sta
                 
                 # actually "merge" two tiles (via append operation)
                 try:
+                    # read in the file that is not in the head node
                     incoming_gdf = gpd.read_file(incoming_tile_in_path)
+                    # why would we use combine_and_deduplicate() to just append 2 geodatframes?
+                    # in the ray workflow, we do not deduplicate at staging, we do it at raster & 3dtiles
+                    # so seems like we are adding complexity to this appending step
                     dedup_method = stager.config.get_deduplication_method()
                     if dedup_method is not None:
                         mode = 'w'
+                        ## concatenate the geodataframes:
+                        ## for IWP data, we do not set the config to dedup at staging
+                        ## so combine_and_deduplicate() does NOT deduplicate here,
+                        ## we are just ensuring that the tiles within the head node
+                        ## contains all the polygons for that tile, regardless of which node
+                        ## processed each polygon
                         incoming_gdf = stager.combine_and_deduplicate(
                             incoming_gdf, incoming_tile_out_path)
                     else:
