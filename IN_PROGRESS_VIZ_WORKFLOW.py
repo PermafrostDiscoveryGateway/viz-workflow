@@ -101,7 +101,7 @@ def step0_staging():
     os.makedirs(iwp_config['dir_staged'], exist_ok = True)
     
     # OLD METHOD "glob" all files. 
-    stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
+    stager = pdgstaging.TileStager(iwp_config, check_footprints=False)
     missing_footprints = stager.check_footprints()
     print(f"⚠️ Num missing footprints: {len(missing_footprints)}")
     
@@ -110,7 +110,7 @@ def step0_staging():
     
     # write list staging_input_files_list to file to local /tmp staged dir
     # before we transfer all staged files and other staging summary files to /scratch 
-    with open(os.path.join(IWP_CONFIG['dir_output'], "staging_input_files_list.json") , "w") as f:
+    with open(os.path.join(iwp_config['dir_output'], "staging_input_files_list.json") , "w") as f:
         json.dump(staging_input_files_list, f)
     
     """
