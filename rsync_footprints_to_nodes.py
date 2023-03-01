@@ -9,11 +9,9 @@ IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
 user = subprocess.check_output("whoami").strip().decode("ascii")
 
 # define where footprints are pulled from, using the correct property in config
-IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_remote']
-SOURCE = IWP_CONFIG['dir_footprints']
+SOURCE = IWP_CONFIG['dir_footprints_remote']
 # define where footprints should be transferred to, using the correct property in config
-IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local']
-DESTINATION = IWP_CONFIG['dir_footprints']
+DESTINATION = IWP_CONFIG['dir_footprints_local']
 
 ''' get hostnames from slurm file '''
 with open(f'/u/{user}/viz-workflow/slurm/nodes_array.txt', 'r') as f:

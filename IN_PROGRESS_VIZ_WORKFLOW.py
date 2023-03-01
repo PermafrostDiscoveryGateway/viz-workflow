@@ -93,20 +93,20 @@ def step0_staging():
     start = time.time()
 
     # update the config for the current context: write staged files to local /tmp dir
-    IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_local']
-    IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local']
+    iwp_config = deepcopy(IWP_CONFIG)
+    iwp_config['dir_staged'] = iwp_config['dir_staged_local']
+    iwp_config['dir_footprints'] = iwp_config['dir_footprints_local']
     # make directories in /scratch so geotiffs can populate there
     # is the following line necessary? I don't think so
-    os.makedirs(IWP_CONFIG['dir_staged'], exist_ok = True)
+    os.makedirs(iwp_config['dir_staged'], exist_ok = True)
     
     # OLD METHOD "glob" all files. 
     stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
     missing_footprints = stager.check_footprints()
     print(f"⚠️ Num missing footprints: {len(missing_footprints)}")
     
-    # define the input dir as the base dir for the satging step
-    stager.tiles.add_base_dir('base_input', IWP_CONFIG['dir_input'], '.shp')
-    staging_input_files_list = stager.tiles.get_filenames_from_dir(base_dir = 'base_input')
+    # Get
+    staging_input_files_list = stager.tiles.get_filenames_from_dir('input')
     
     # write list staging_input_files_list to file to local /tmp staged dir
     # before we transfer all staged files and other staging summary files to /scratch 
@@ -136,7 +136,7 @@ def step0_staging():
         for itr, filepath in enumerate(staging_input_files_list):    
             # if itr <= 6075:
             # create list of remote function ids (i.e. futures)
-            app_futures.append(stage_remote.remote(filepath))
+            app_futures.append(stage_remote.remote(filepath, iwp_config))
 
         # COLLECT all jobs as they finish.
         # BLOCKING - WAIT FOR *ALL* REMOTE FUNCTIONS TO FINISH
@@ -678,7 +678,7 @@ def make_batch(items, batch_size):
     return [items[i:i + batch_size] for i in range(0, len(items), batch_size)]
 
 @ray.remote
-def stage_remote(filepath):
+def stage_remote(filepath, config):
     """
     Step 1. 
     Parallelism at the per-shape-file level.
@@ -688,7 +688,7 @@ def stage_remote(filepath):
     
     try: 
         # consider redefining local path here? 
-        stager = pdgstaging.TileStager(config=IWP_CONFIG, check_footprints=False)
+        stager = pdgstaging.TileStager(config=config, check_footprints=False)
         ret = stager.stage(filepath)
         if 'Skipping' in str(ret):
             print(f"⚠️ Skipping {filepath}")
