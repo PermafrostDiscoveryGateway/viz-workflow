@@ -23,10 +23,6 @@ import pdgstaging  # For staging
 import ray
 import viz_3dtiles  # import Cesium3DTile, Cesium3DTileset
 
-# Convenience for little test runs. Change me 😁  
-ONLY_SMALL_TEST_RUN = False                            # For testing, this ensures only a small handful of files are processed.
-TEST_RUN_SIZE       = 10_000                              # Number of files to pre processed during testing (only effects testing)
-
 # define user on Delta, avoid writing files to other user's dir
 user = subprocess.check_output("whoami").strip().decode("ascii")
 
@@ -58,7 +54,7 @@ def main():
         
         # (optionally) Comment out steps you don't need 😁
         # todo: sync footprints to nodes.
-        # step0_staging()        
+        step0_staging()        
         # todo: rsync staging to /scratch
         # todo: merge staged files in /scratch    # ./merge_staged_vector_tiles.py
         # DO NOT RUN 3d-tiling UNTIL WORKFLOW CAN ACCOMODATE FILE HIERARCHY:step1_3d_tiles() # default parameter batch_size = 300 
@@ -68,7 +64,7 @@ def main():
         # step3_raster_lower(batch_size_geotiffs=100) # rasterize all LOWER Z levels
         # todo: immediately after initiating above step, start rsync script to continuously sync geotiff files,
         # or immediately after the above step is done, rsync all files at once if there is time left in job
-        step4_webtiles(batch_size_web_tiles=250) # convert to web tiles.
+        # step4_webtiles(batch_size_web_tiles=250) # convert to web tiles.
         
         # mem_testing = False        
         # if mem_testing:
@@ -124,9 +120,6 @@ def step0_staging():
         staging_input_files_list_raw = json.load(open('./iwp-file-list.json'))
     except FileNotFoundError as e:
         print("Hey you, please specify a json file containing a list of input file paths (relative to `BASE_DIR_OF_INPUT`).", e)
-    
-    if ONLY_SMALL_TEST_RUN: # for testing only
-        staging_input_files_list_raw = staging_input_files_list_raw[:TEST_RUN_SIZE]
     
     # make paths absolute 
     staging_input_files_list = prepend(staging_input_files_list_raw, BASE_DIR_OF_INPUT)
@@ -199,8 +192,8 @@ def prep_only_high_ice_input_list():
     except FileNotFoundError as e:
         print("❌❌❌ Hey you, please specify a 👉 json file containing a list of input file paths 👈 (relative to `BASE_DIR_OF_INPUT`).", e)
 
-    if ONLY_SMALL_TEST_RUN: # for testing only
-        staging_input_files_list_raw = staging_input_files_list_raw[:TEST_RUN_SIZE]
+    #if ONLY_SMALL_TEST_RUN: # for testing only
+    #    staging_input_files_list_raw = staging_input_files_list_raw[:TEST_RUN_SIZE]
 
     # make paths absolute (not relative) 
     staging_input_files_list = prepend(staging_input_files_list_raw, IWP_CONFIG['dir_input'])
@@ -343,8 +336,8 @@ def step2_raster_highest(batch_size=100):
     
     # stager.kas_check_footprints(staged_paths)
 
-    if ONLY_SMALL_TEST_RUN:
-        staged_paths = staged_paths[:TEST_RUN_SIZE]
+    #if ONLY_SMALL_TEST_RUN:
+    #    staged_paths = staged_paths[:TEST_RUN_SIZE]
     
     # save a copy of the files we're rasterizing.
     staged_path_json_filepath = os.path.join(IWP_CONFIG['dir_output'], "staged_paths_to_rasterize_highest.json")
@@ -471,8 +464,8 @@ def step3_raster_lower(batch_size_geotiffs=20):
         #child_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_remote', z=z + 1)
         child_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_remote', z=z + 1)
 
-        if ONLY_SMALL_TEST_RUN:
-            child_paths = child_paths[:TEST_RUN_SIZE]
+        #if ONLY_SMALL_TEST_RUN:
+        #    child_paths = child_paths[:TEST_RUN_SIZE]
 
         parent_tiles = set()
         for child_path in child_paths:
@@ -572,8 +565,8 @@ def step4_webtiles(batch_size_web_tiles=300):
     # change made 2023-02-14: change rasterizer to stager to pull filenames from stager base dir created in raster lower step
     #geotiff_paths = stager.tiles.get_filenames_from_dir(base_dir = 'geotiff_remote')
 
-    if ONLY_SMALL_TEST_RUN:
-        geotiff_paths = geotiff_paths[:TEST_RUN_SIZE]
+    #if ONLY_SMALL_TEST_RUN:
+    #    geotiff_paths = geotiff_paths[:TEST_RUN_SIZE]
     
     geotiff_batches = make_batch(geotiff_paths, batch_size_web_tiles)
     print(f"📦 Creating web tiles from geotiffs. Num parallel batches = {len(geotiff_batches)}")
@@ -694,6 +687,7 @@ def stage_remote(filepath):
     # config_path = deepcopy(IWP_CONFIG)
     
     try: 
+        # consider redefining local path here? 
         stager = pdgstaging.TileStager(config=IWP_CONFIG, check_footprints=False)
         ret = stager.stage(filepath)
         if 'Skipping' in str(ret):

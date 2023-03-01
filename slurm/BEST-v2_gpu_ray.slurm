@@ -44,7 +44,7 @@ echo "This is BEST-v2_gpu_ray.slurm"
 
 # global settings
 # juliet's IWP workflow env:
-source /scratch/bbou/julietcohen/venv/iwp_2/bin/activate
+source /scratch/bbou/julietcohen/venv/iwp_3/bin/activate
 export RAY_worker_register_timeout_seconds=120  # for sure necessary. Might be needed in user shell before `sbatch` is executed. 
 export RAY_max_pending_lease_requests_per_scheduling_category=2000 # probably not necessary
 
@@ -95,8 +95,8 @@ for ((i = 1; i <= worker_num; i++)); do
     srun --nodes=1 --ntasks=1 -w "$node_i" \
     ray stop
     echo "Starting WORKER $i at $node_i"
-    srun --nodes=1 --ntasks=1 -w "$node_i" \
-      ulimit -n unlimited
+    #srun --nodes=1 --ntasks=1 -w "$node_i" \
+    #  ulimit -n unlimited
     srun --nodes=1 --ntasks=1 -w "$node_i" \
       export RAY_worker_register_timeout_seconds=120
     srun --nodes=1 --ntasks=1 -w "$node_i" \
