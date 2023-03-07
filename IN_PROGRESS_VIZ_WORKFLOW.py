@@ -9,7 +9,7 @@ import sys
 import time
 import traceback
 import warnings
-from asyncio.log import logger
+#from asyncio.log import logger
 from collections import Counter
 from contextlib import suppress
 from copy import deepcopy
@@ -34,6 +34,23 @@ IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
 #print("Using config: ")
 #pprint.pprint(IWP_CONFIG)
 
+# setup logging
+def setup_logging(log_json_file):
+    """
+    Setup logging configuration
+    """
+    with open(log_json_file, 'r') as f:
+        logging_dict = json.load(f)
+    logging.config.dictConfig(logging_dict)
+    return logging_dict
+
+# define logger:
+logging_config = '/u/julietcohen/viz-workflow/logging.json'
+logging_dict = setup_logging(logging_config)
+# retrieve name of logger to add updates
+logger = logging.getLogger(__name__)
+
+
 def main():
     result = subprocess.run(["hostname", "-i"], capture_output=True, text=True)
     head_ip = result.stdout.strip()
@@ -43,8 +60,8 @@ def main():
     assert ray.is_initialized() == True
     print("🎯 Ray initialized.")
     
-    #print(f"Write all results to output dir: {IWP_CONFIG['dir_output']}")
     print_cluster_stats()
+    # create file workflow_log.txt in output dir
     start_logging()
     start = time.time()
     
@@ -54,7 +71,7 @@ def main():
         
         # (optionally) Comment out steps you don't need 😁
         # todo: sync footprints to nodes.
-        step0_staging()        
+        # step0_staging()        
         # todo: rsync staging to /scratch
         # todo: merge staged files in /scratch    # ./merge_staged_vector_tiles.py
         # DO NOT RUN 3d-tiling UNTIL WORKFLOW CAN ACCOMODATE FILE HIERARCHY:step1_3d_tiles() # default parameter batch_size = 300 
@@ -64,7 +81,7 @@ def main():
         # step3_raster_lower(batch_size_geotiffs=100) # rasterize all LOWER Z levels
         # todo: immediately after initiating above step, start rsync script to continuously sync geotiff files,
         # or immediately after the above step is done, rsync all files at once if there is time left in job
-        # step4_webtiles(batch_size_web_tiles=250) # convert to web tiles.
+        step4_webtiles(batch_size_web_tiles=250) # convert to web tiles.
         
         # mem_testing = False        
         # if mem_testing:
@@ -96,8 +113,9 @@ def step0_staging():
     iwp_config = deepcopy(IWP_CONFIG)
     iwp_config['dir_staged'] = iwp_config['dir_staged_local']
     iwp_config['dir_footprints'] = iwp_config['dir_footprints_local']
-    # make directories in /scratch so geotiffs can populate there
-    # is the following line necessary? I don't think so
+    # make directory /tmp/staged on each node
+    # not really necessary cause Robyn's functions are set up to do this
+    # and /tmp allows dirs to be created to write files
     os.makedirs(iwp_config['dir_staged'], exist_ok = True)
     
     # OLD METHOD "glob" all files. 
@@ -107,9 +125,11 @@ def step0_staging():
     
     # Get
     staging_input_files_list = stager.tiles.get_filenames_from_dir('input')
-    
-    # write list staging_input_files_list to file to local /tmp staged dir
-    # before we transfer all staged files and other staging summary files to /scratch 
+
+    # record number of filepaths before they are converted into app_futures to detemrine if that's where the bug is
+    with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
+        file.write(f"Number of filepaths in staging_input_files_list: {len(staging_input_files_list)}\n\n")   
+     
     with open(os.path.join(iwp_config['dir_output'], "staging_input_files_list.json") , "w") as f:
         json.dump(staging_input_files_list, f)
     
@@ -137,6 +157,10 @@ def step0_staging():
             # if itr <= 6075:
             # create list of remote function ids (i.e. futures)
             app_futures.append(stage_remote.remote(filepath, iwp_config))
+        
+        # record how many app_futures were created to determine if it is the full number of input paths
+        with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
+            file.write(f"Number of future staged files: {len(app_futures)}. This is {len(staging_input_files_list)-len(app_futures)} fewer than the original number of files input.\n\n")       
 
         # COLLECT all jobs as they finish.
         # BLOCKING - WAIT FOR *ALL* REMOTE FUNCTIONS TO FINISH
@@ -148,11 +172,19 @@ def step0_staging():
             if any(err in ray.get(ready)[0][0] for err in ["FAILED", "Failed", "❌"]):
                 FAILURES.append([ray.get(ready)[0][0], ray.get(ready)[0][1]])
                 print(f"❌ Failed {ray.get(ready)[0][0]}")
+
+                with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
+                    file.write(f"Number of FAILURES in preparing future staged files: {len(FAILURES)}\n\n")
+
                 IP_ADDRESSES_OF_WORK.append(ray.get(ready)[0][1])
             else:
                 # success case
                 print(f"✅ Finished {ray.get(ready)[0][0]}")
                 print(f"📌 Completed {i+1} of {len(staging_input_files_list)}, {(i+1)/len(staging_input_files_list)*100:.2f}%, ⏰ Elapsed time: {(time.time() - start)/60:.2f} min.\n🔮 Estimated total runtime: { ((time.time() - start)/60) / ((i+1)/len(staging_input_files_list)) :.2f} minutes.\n")
+
+                with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
+                    file.write(f"Success! Finished staging for: {ray.get(ready)[0][0]}\n\n")
+
                 IP_ADDRESSES_OF_WORK.append(ray.get(ready)[0][1])
 
             app_futures = not_ready
@@ -160,14 +192,23 @@ def step0_staging():
                 break
     except Exception as e:
         print(f"Cauth error in Staging (step_0): {str(e)}")
+
+        with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
+            file.write(f"ERROR IN STAGING STEP for: {ray.get(ready)[0][0]} with {str(e)}\n\n")
+        
     finally:
         # print FINAL stats about Staging 
-        print(f"Runtime: {(time.time() - start)/60:.2f} minutes\n")        
+        print(f"Runtime: {(time.time() - start)/60:.2f} minutes\n")
+
         for failure in FAILURES: print(failure) # for pretty-print newlines
         print(f"Number of failures = {len(FAILURES)}")
         print("Which nodes were used?")
         for ip_address, num_tasks in Counter(IP_ADDRESSES_OF_WORK).items():
             print('    {} tasks on {}'.format(num_tasks, ip_address))
+
+        with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
+            file.write(f"Completed Staging.\n\n")
+
         return "😁 step 1 success"
 
 # todo: refactor for a uniform function to check for failures
@@ -216,8 +257,8 @@ def prepend(mylist, mystr):
 # def step1_3d_tiles(batch_size=300):
     
 #     # instantiate classes for their helper functions
-#     # rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
-#     stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
+#     # rasterizer = pdgraster.RasterTiler(iwp_config)
+#     stager = pdgstaging.TileStager(iwp_config, check_footprints=False)
     
 #     IP_ADDRESSES_OF_WORK_3D_TILES = []
 #     FAILURES_3D_TILES = []
@@ -227,7 +268,7 @@ def prepend(mylist, mystr):
 #     try:
 #         # collect staged files from STAGING_REMOTE dir
 #         # first define the dir that contains the staged files into a base dir to pull all filepaths correctly
-#         stager.tiles.add_base_dir('staging', IWP_CONFIG['dir_staged_remote'], '.gpkg')
+#         stager.tiles.add_base_dir('staging', iwp_config['dir_staged_remote'], '.gpkg')
 #         staged_files_list = stager.tiles.get_filenames_from_dir(base_dir = 'staging')
 #         staged_files_list.reverse()
         
@@ -256,7 +297,7 @@ def prepend(mylist, mystr):
 #             #         app_futures.append(three_d_tile.remote(filepath, filename, save_to_dir))
             
 #             # batched version        
-#             app_futures.append(three_d_tile_batches.remote(filepath_batch, IWP_CONFIG['dir_output']))
+#             app_futures.append(three_d_tile_batches.remote(filepath_batch, iwp_config['dir_output']))
 
 #         # get 3D tiles, send to Tileset
 #         for i in range(0,len(staged_files_list)): 
@@ -304,33 +345,35 @@ def step2_raster_highest(batch_size=100):
     # from random import randrange
     # from pympler import muppy, summary, tracker
 
-    #os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok=True) 
+    #os.makedirs(iwp_config['dir_geotiff'], exist_ok=True) 
+
+    iwp_config = deepcopy(IWP_CONFIG)
 
     # update the config for the current context: write geotiff files to local /tmp dir
-    IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local']
+    iwp_config['dir_geotiff'] = iwp_config['dir_geotiff_local']
 
-    print(f"2️⃣  Step 2 Rasterize only highest Z, saving to {IWP_CONFIG['dir_geotiff']}")
+    print(f"2️⃣  Step 2 Rasterize only highest Z, saving to {iwp_config['dir_geotiff']}")
 
-    IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote_merged']
-    stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
-    stager.tiles.add_base_dir('output_of_staging', IWP_CONFIG['dir_staged'], '.gpkg')
+    iwp_config['dir_staged'] = iwp_config['dir_staged_remote_merged']
+    stager = pdgstaging.TileStager(iwp_config, check_footprints=False)
+    stager.tiles.add_base_dir('output_of_staging', iwp_config['dir_staged'], '.gpkg')
     # i dont think this next line is necessary cause dedup occurs based on the flag that is inserted during staging:
     
-    #rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
+    #rasterizer = pdgraster.RasterTiler(iwp_config)
     # make directories in /tmp so geotiffs can populate there
     # is the following line necessary? I don't think so
-    #os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok = True)
+    #os.makedirs(iwp_config['dir_geotiff'], exist_ok = True)
 
     # update config for the current context:
-    #IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local']
+    #iwp_config['dir_footprints'] = iwp_config['dir_footprints_local']
     
     # update the config for the current context: pull merged staged files from /scratch
-    #IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote_merged']
-    #stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
+    #iwp_config['dir_staged'] = iwp_config['dir_staged_remote_merged']
+    #stager = pdgstaging.TileStager(iwp_config, check_footprints=False)
     # first define the dir that contains the staged files into a base dir to pull all filepaths correctly
-    #stager.tiles.add_base_dir('output_of_staging', IWP_CONFIG['dir_staged'], '.gpkg')
+    #stager.tiles.add_base_dir('output_of_staging', iwp_config['dir_staged'], '.gpkg')
     
-    print(f"Collecting all STAGED files from `{IWP_CONFIG['dir_staged']}`...")
+    print(f"Collecting all STAGED files from `{iwp_config['dir_staged']}`...")
     # Get paths to all the newly staged tiles
     staged_paths = stager.tiles.get_filenames_from_dir(base_dir = 'output_of_staging')
     
@@ -340,7 +383,7 @@ def step2_raster_highest(batch_size=100):
     #    staged_paths = staged_paths[:TEST_RUN_SIZE]
     
     # save a copy of the files we're rasterizing.
-    staged_path_json_filepath = os.path.join(IWP_CONFIG['dir_output'], "staged_paths_to_rasterize_highest.json")
+    staged_path_json_filepath = os.path.join(iwp_config['dir_output'], "staged_paths_to_rasterize_highest.json")
     print(f"Writing a copy of the files we're rasterizing to {staged_path_json_filepath}...")
     with open(staged_path_json_filepath, "w") as f:
         json.dump(staged_paths, f, indent=2)
@@ -348,7 +391,7 @@ def step2_raster_highest(batch_size=100):
     print(f"Step 2️⃣ -- Making batches of staged files... batch_size: {batch_size}")
     staged_batches = make_batch(staged_paths, batch_size)
 
-    print(f"The input to this step, Rasterization, is the output of Staging.\n Using Staging path: {IWP_CONFIG['dir_staged']}")
+    print(f"The input to this step, Rasterization, is the output of Staging.\n Using Staging path: {iwp_config['dir_staged']}")
 
     print(f"🌄 Rasterize total files {len(staged_paths)} gpkgs, using batch size: {batch_size}")
     print(f"🏎  Parallel batches of jobs: {len(staged_batches)}...\n")
@@ -376,18 +419,22 @@ def step2_raster_highest(batch_size=100):
         for i, batch in enumerate(staged_batches):
 
             # inserted to try to get geotiffs to stop trying to write to scratch:
-            #IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local']
-            #IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local']
-            #stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False) # maybe remove this, added when troubleshooting
-            #rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
-            os.makedirs(IWP_CONFIG['dir_geotiff'], exist_ok=True) 
-            app_future = rasterize.remote(batch, IWP_CONFIG)
+            #iwp_config['dir_footprints'] = iwp_config['dir_footprints_local']
+            #iwp_config['dir_geotiff'] = iwp_config['dir_geotiff_local']
+            #stager = pdgstaging.TileStager(iwp_config, check_footprints=False) # maybe remove this, added when troubleshooting
+            #rasterizer = pdgraster.RasterTiler(iwp_config)
+            os.makedirs(iwp_config['dir_geotiff'], exist_ok=True) 
+            app_future = rasterize.remote(batch, iwp_config)
             app_futures.append(app_future)
                 
         for i in range(0, len(app_futures)): 
             ready, not_ready = ray.wait(app_futures)
             # print(f"✅ Finished {ray.get(ready)}")
             print(f"📌 Completed {i+1} of {len(staged_batches)}")
+
+            with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
+                file.write(f"Raster highest batch success: Completed {i+1} of {len(staged_batches)}\n\n")
+
             print(f"⏰ Running total of elapsed time: {(time.time() - start)/60:.2f} minutes\n🔮 Estimated total runtime: { ((time.time() - start)/60) / ((i+1)/len(staged_batches)) :.2f} minutes.\n")
 
             # todo: memory debugging
@@ -433,13 +480,15 @@ def step3_raster_lower(batch_size_geotiffs=20):
     '''
     print("3️⃣ Step 3: Create parent geotiffs for all lower z-levels (everything except highest zoom)")
 
-    IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
+    iwp_config = deepcopy(IWP_CONFIG)
+
+    iwp_config['dir_geotiff'] = iwp_config['dir_geotiff_remote']
     # next line is likely not necessary but can't hurt
-    IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local']
+    iwp_config['dir_footprints'] = iwp_config['dir_footprints_local']
     # update the config for the current context: pull stager that represents staged files in /scratch
     # next line is likely not necessary but can't hurt
-    IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote_merged']
-    stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False)
+    iwp_config['dir_staged'] = iwp_config['dir_staged_remote_merged']
+    stager = pdgstaging.TileStager(iwp_config, check_footprints=False)
     
     # find all Z levels
     min_z = stager.config.get_min_z()
@@ -447,12 +496,12 @@ def step3_raster_lower(batch_size_geotiffs=20):
     parent_zs = range(max_z - 1, min_z - 1, -1)
 
     # next line is likely not necessary but can't hurt (we already defined this a few lines above)
-    IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
-    rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
+    iwp_config['dir_geotiff'] = iwp_config['dir_geotiff_remote']
+    rasterizer = pdgraster.RasterTiler(iwp_config)
 
-    print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG['dir_geotiff']}")
+    print(f"Collecting all Geotiffs (.tif) in: {iwp_config['dir_geotiff']}")
     # removing this next line bc robyn removed it from kastan's script:
-    stager.tiles.add_base_dir('geotiff_remote', IWP_CONFIG['dir_geotiff'], '.tif') # had to change this from geotiff to geotiff_remote bc got error that the geotiff base dir already existed
+    stager.tiles.add_base_dir('geotiff_remote', iwp_config['dir_geotiff'], '.tif') # had to change this from geotiff to geotiff_remote bc got error that the geotiff base dir already existed
 
     start = time.time()
     # Can't start lower z-level until higher z-level is complete.
@@ -486,15 +535,15 @@ def step3_raster_lower(batch_size_geotiffs=20):
                 # even though the geotiff base dir has been created and the filenames have been batched, 
                 # still cannot switch the dir_geotiff to _local !!! because the lower z-level rasters need to be
                 # written to scratch rather than /tmp so all lower z-levels can access all files in higher z-levels
-                IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local'] # we deduplicate at rasterization
-                #IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local'] # run immeditely before defining rasterizer
+                iwp_config['dir_footprints'] = iwp_config['dir_footprints_local'] # we deduplicate at rasterization
+                #iwp_config['dir_geotiff'] = iwp_config['dir_geotiff_local'] # run immeditely before defining rasterizer
                 # I dont think theres a need to set rasterizer with new config after chaning this property cause 
                 # that is done within the function create_composite_geotiffs() but troubleshooting 
                 # so lets do it anyway
-                rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
+                rasterizer = pdgraster.RasterTiler(iwp_config)
 
                 # MANDATORY: include placement_group for better stability on 200+ cpus.
-                app_future = create_composite_geotiffs.remote(parent_tile_batch, IWP_CONFIG, logging_dict=None)
+                app_future = create_composite_geotiffs.remote(parent_tile_batch, iwp_config, logging_dict=None)
                 app_futures.append(app_future)
 
             # Don't start the next z-level (or move to step 4) until the
@@ -503,6 +552,10 @@ def step3_raster_lower(batch_size_geotiffs=20):
                 ready, not_ready = ray.wait(app_futures)
                 print(f"✅ Finished {ray.get(ready)}")
                 print(f"📌 Completed {i+1} of {len(parent_tile_batches)}, {(i+1)/len(parent_tile_batches)*100:.2f}%")
+
+                with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
+                    file.write(f"Raster lower batch success: Completed {i+1} of {len(parent_tile_batches)}\n\n")
+
                 print(f"⏰ Running total of elapsed time: {(time.time() - start)/60:.2f} minutes. 🔮 Estimated time to completion: { ((time.time() - start)/60) / ((i+1)/len(parent_tile_batches)) :.2f} minutes.\n")
                 app_futures = not_ready
                 if not app_futures:
@@ -521,30 +574,32 @@ def step4_webtiles(batch_size_web_tiles=300):
     '''
     print("4️⃣ -- Creating web tiles from geotiffs...")
     
+    iwp_config = deepcopy(IWP_CONFIG)
+
     # instantiate classes for their helper functions
     # not sure that the next line is necessary but might as well keep the config up to date
     # with where files currently are
-    IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote_merged']
+    iwp_config['dir_staged'] = iwp_config['dir_staged_remote_merged']
     # pull all z-levels of rasters from /scratch for web tiling
-    IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_remote']
+    iwp_config['dir_geotiff'] = iwp_config['dir_geotiff_remote']
     # define rasterizer here just to updates_ranges()
-    rasterizer = pdgraster.RasterTiler(IWP_CONFIG)
-    # stager = pdgstaging.TileStager(IWP_CONFIG, check_footprints=False) remove this line, no point in defining the stager right before we update the config, do it after!
+    rasterizer = pdgraster.RasterTiler(iwp_config)
+    # stager = pdgstaging.TileStager(iwp_config, check_footprints=False) remove this line, no point in defining the stager right before we update the config, do it after!
     
     start = time.time()
     # Update color ranges
     print(f"Updating ranges...") # reintroduce when fix id error in raster highest and can access rasters_summary.csv
     rasterizer.update_ranges() # reintroduce when fix id error in raster highest and can access rasters_summary.csv
-    IWP_CONFIG_NEW = rasterizer.config.config # if this doesn't work, need to add to config where to write the new config to? # reintroduce when fix id error in raster highest and can access rasters_summary.csv
-    print(f"Defined new config: {IWP_CONFIG_NEW}") # reintroduce when fix id error in raster highest and can access rasters_summary.csv
+    iwp_config_new = rasterizer.config.config # if this doesn't work, need to add to config where to write the new config to? # reintroduce when fix id error in raster highest and can access rasters_summary.csv
+    print(f"Defined new config: {iwp_config_new}") # reintroduce when fix id error in raster highest and can access rasters_summary.csv
 
     # define the stager so we can pull filepaths from the geotiff base dir in a few lines
-    # stager = pdgstaging.TileStager(IWP_CONFIG_NEW, check_footprints=False)
+    # stager = pdgstaging.TileStager(iwp_config_new, check_footprints=False)
 
     # Note: we also define rasterizer later in each of the 3 functions:
     # raster highest, raster lower, and webtile functions
 
-    print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG['dir_geotiff']}...") # the original config here is correct, it is just printing the filepath we are using for source of geotiff files
+    print(f"Collecting all Geotiffs (.tif) in: {iwp_config['dir_geotiff']}...") # the original config here is correct, it is just printing the filepath we are using for source of geotiff files
     #print(f"Collecting all Geotiffs (.tif) in: {IWP_CONFIG_NEW['dir_geotiff']}...")
 
     #stager.tiles.add_base_dir('geotiff_path', IWP_CONFIG_NEW['dir_geotiff'], '.tif') # don't think we need this line because we are using the same geotiff base dir set in the raster lower step (remote geotiff dir with geotiffs of all z-levels)
@@ -556,7 +611,7 @@ def step4_webtiles(batch_size_web_tiles=300):
     #rasterizer.tiles.add_base_dir('geotiff_remote', IWP_CONFIG['dir_geotiff'], '.tif')
     #geotiff_paths = rasterizer.tiles.get_filenames_from_dir(base_dir = 'geotiff_remote')
     # added next 2 lines 20230214:
-    rasterizer.tiles.add_base_dir('geotiff_remote_all_zs', IWP_CONFIG_NEW['dir_geotiff'], '.tif') # call it something different than geotiff_remote because we already made that base dir earlier and it might not overwrite and might error cause already exists 
+    rasterizer.tiles.add_base_dir('geotiff_remote_all_zs', iwp_config_new['dir_geotiff'], '.tif') # call it something different than geotiff_remote because we already made that base dir earlier and it might not overwrite and might error cause already exists 
     # reintroduce above line when fix id error in raster highest and can access rasters_summary.csv
     # and also remove line just below bc it was that line's replacement for time being:
     # rasterizer.tiles.add_base_dir('geotiff_remote_all_zs', IWP_CONFIG['dir_geotiff'], '.tif')
@@ -586,7 +641,7 @@ def step4_webtiles(batch_size_web_tiles=300):
             # MANDATORY: include placement_group for better stability on 200+ cpus.
             # app_future = create_web_tiles.options(placement_group=pg).remote(batch, IWP_CONFIG)
             # app_future = create_web_tiles.remote(batch, IWP_CONFIG) # remove this line
-            app_future = create_web_tiles.remote(batch, IWP_CONFIG_NEW) # reintroduce this step when determine how to properly integrate end_tracking again
+            app_future = create_web_tiles.remote(batch, iwp_config_new) # reintroduce this step when determine how to properly integrate end_tracking again
             #app_future = create_web_tiles.remote(batch, IWP_CONFIG) # remove this line when line "reintroduce" lines are reintroduced
             app_futures.append(app_future)
 
@@ -646,11 +701,11 @@ def create_composite_geotiffs(tiles, config, logging_dict=None):
         import logging.config
         logging.config.dictConfig(logging_dict)
     try:
-        IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local']
+        #iwp_config['dir_footprints'] = iwp_config['dir_footprints_local']
         rasterizer = pdgraster.RasterTiler(config)
         rasterizer.parent_geotiffs_from_children(tiles, recursive=False)
     except Exception as e:
-        print("⚠️ Failed to create rasterizer. With error ", e)
+        print("⚠️ Failed to rasterize parent geotiffs with error ", e)
     return 0
 
 @ray.remote
@@ -678,21 +733,44 @@ def make_batch(items, batch_size):
     return [items[i:i + batch_size] for i in range(0, len(items), batch_size)]
 
 @ray.remote
-def stage_remote(filepath, config):
+def stage_remote(filepath, config, logging_dict = logging_dict):
     """
     Step 1. 
     Parallelism at the per-shape-file level.
     """
     # deepcopy makes a realy copy, not using references. Helpful for parallelism.
     # config_path = deepcopy(IWP_CONFIG)
-    
+
+    iwp_config = deepcopy(IWP_CONFIG)
+
     try: 
-        # consider redefining local path here? 
         stager = pdgstaging.TileStager(config=config, check_footprints=False)
         ret = stager.stage(filepath)
+
+        with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
+                file.write(f"Successfully staged file:\n")
+                file.write(f"{filepath}\n\n")
+
+        #logging.info(f"Juliet's logging: Successfully staged tile: {filepath}.")
+
         if 'Skipping' in str(ret):
             print(f"⚠️ Skipping {filepath}")
+
+            with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
+                file.write(f"SKIPPING FILE:\n")
+                file.write(f"{filepath}\n\n")
+
+            #logging.info(f"Juliet's logging: Skipping staging tile: {filepath}.")
+
     except Exception as e:
+
+        #logging.info(f"Juliet's logging :Failed to stage tile: {filepath}.")
+
+        with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
+            file.write(f"FAILURE TO STAGE FILE:\n")
+            file.write(f"{filepath}\n")
+            file.write(f"Error: {e}\n\n")
+
         return [filepath,
                 socket.gethostbyname(socket.gethostname()),
                 "‼️ ‼️ ❌ ❌ ❌ ❌ -- THIS TASK FAILED ❌ ❌ ❌ ❌ ‼️ ‼️"]
@@ -840,7 +918,7 @@ def three_d_tile_batches(file_batch, output_dir):
 
 def start_logging():
     '''
-    In output directory. 
+    Writes file workflow_log.txt in output directory. 
     '''
     filepath = pathlib.Path(IWP_CONFIG['dir_output'] + 'workflow_log.txt')
     filepath.parent.mkdir(parents=True, exist_ok=True)

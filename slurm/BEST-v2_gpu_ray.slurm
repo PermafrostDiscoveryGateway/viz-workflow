@@ -3,18 +3,18 @@
 #SBATCH --job-name=pdg_viz
 #SBATCH --partition=gpuA40x4
 #SBATCH --account=
-#SBATCH --time=04:00:00
+#SBATCH --time=03:00:00
 
 #SBATCH --export=ALL,RAY_worker_register_timeout_seconds=120
-#SBATCH --gpus-per-node=1
+
 #SBATCH --nodes=3
 #SBATCH --mem=0
-
+#SBATCH --gpus-per-node=1
 #SBATCH --exclusive
 
-## output slurm info to a separate file than errors
-#SBATCH -e stderr.txt
-#SBATCH -o stdout.txt
+## output slurm info to a separate file than errors, %j = include job id in file names
+#SBATCH -e stderr_%j.txt
+#SBATCH -o stdout_%j.txt
 ## append output in info & error files rather than replacing last output
 #SBATCH --open-mode=append
 
@@ -45,7 +45,12 @@ echo "This is BEST-v2_gpu_ray.slurm"
 # global settings
 # juliet's IWP workflow env:
 source /scratch/bbou/julietcohen/venv/iwp_3/bin/activate
-export RAY_worker_register_timeout_seconds=120  # for sure necessary. Might be needed in user shell before `sbatch` is executed. 
+# set file soft limit to maximum value (not unlimited because that's not permitted)
+# before any srun's are executed
+ulimit -n 32768
+# extend time period allowed for workers to register (this has been removed from worker loop below)
+# but Greg suggested in his code snippet to run it right before worker loop, so moved it there
+#export RAY_worker_register_timeout_seconds=120  # for sure necessary. Might be needed in user shell before `sbatch` is executed. 
 export RAY_max_pending_lease_requests_per_scheduling_category=2000 # probably not necessary
 
 # Getting the node names
@@ -89,16 +94,31 @@ sleep 1
 # START RAY WORKERS
 
 # number of nodes other than the head node
+# commenting out this loop beacse Greg suggested modified loop below it
+# worker_num=$((SLURM_JOB_NUM_NODES - 1))
+# for ((i = 1; i <= worker_num; i++)); do
+#     node_i=${nodes_array[$i]}
+#     srun --nodes=1 --ntasks=1 -w "$node_i" \
+#     ray stop
+#     echo "Starting WORKER $i at $node_i"
+# #    srun --nodes=1 --ntasks=1 -w "$node_i" \
+# #      export RAY_worker_register_timeout_seconds=120
+#     srun --nodes=1 --ntasks=1 -w "$node_i" \
+#         ray start --address "$ip_head" --log-color true --block &
+#     sleep 0.25
+#     echo "WORKER $i has SLURM_CPUS_PER_TASK: ${SLURM_CPUS_PER_TASK}"
+# done
+
+# from Greg:
+# "srun will "export" any environment variables that are set in the calling shell to the shell it starts up and then exits."
+export RAY_worker_register_timeout_seconds=120 
+# number of nodes other than the head node
 worker_num=$((SLURM_JOB_NUM_NODES - 1))
 for ((i = 1; i <= worker_num; i++)); do
     node_i=${nodes_array[$i]}
     srun --nodes=1 --ntasks=1 -w "$node_i" \
     ray stop
     echo "Starting WORKER $i at $node_i"
-    #srun --nodes=1 --ntasks=1 -w "$node_i" \
-    #  ulimit -n unlimited
-    srun --nodes=1 --ntasks=1 -w "$node_i" \
-      export RAY_worker_register_timeout_seconds=120
     srun --nodes=1 --ntasks=1 -w "$node_i" \
         ray start --address "$ip_head" --log-color true --block &
     sleep 0.25
