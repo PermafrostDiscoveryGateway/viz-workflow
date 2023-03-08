@@ -191,8 +191,9 @@ class RasterTiler():
             bounds = self.tiles.get_bounding_box(tile)
 
             # Track and log the event
-            id = self.__start_tracking('geotiffs_from_vectors')
-            logger.info(f'Rasterizing {path} for tile {tile} to {out_path}.')
+            #id = self.__start_tracking('geotiffs_from_vectors')
+            #print(f'Using ID: {id}')
+            print(f'OUT_PATH PRINTED HERE: Rasterizing {path} for tile {tile} to {out_path}.')
 
             gdf = gpd.read_file(path)
 
@@ -317,8 +318,8 @@ class RasterTiler():
                 return None
 
             message = f'Creating tile {tile} from child geotiffs.'
-            id = self.__start_tracking(
-                'parent_geotiffs_from_children', message=message)
+            #id = self.__start_tracking(
+            #    'parent_geotiffs_from_children', message=message)
 
             # Get paths to children geotiffs that we will use to make the
             # composite, parent geotiff.
@@ -435,8 +436,8 @@ class RasterTiler():
             tile = self.tiles.tile_from_path(geotiff_path)
 
             message = f'Creating web tile {tile} from geotiff {geotiff_path}.'
-            id = self.__start_tracking(
-                'webtiles_from_geotiffs', message=message)
+            #id = self.__start_tracking(
+            #    'webtiles_from_geotiffs', message=message)
 
             for i in range(len(stats)):
                 stat = stats[i]
@@ -578,7 +579,7 @@ class RasterTiler():
 
     def __end_tracking(
             self,
-            id=None,
+            id="id_replacement",
             raster=None,
             tile=None,
             image=None,
@@ -614,11 +615,16 @@ class RasterTiler():
         end_time = time.time()
         if not hasattr(self, 'running_processes'):
             self.running_processes = {}
-        if id in self.running_processes:
-            start_time, event_type = self.running_processes.pop(id)
-            total_time = end_time - start_time
-        else:
-            raise Exception(f'No event with id {id} found.')
+        # if id in self.running_processes:
+        #     start_time, event_type = self.running_processes.pop(id)
+        #     total_time = end_time - start_time
+        # else:
+        #     raise Exception(f'No event with id {id} found.')
+
+        # replacement code for chunk above
+        # do not pull in variable id bc cannot get it working with ray
+        event_type = "event_type_replacement"
+        start_time = "start_time_replacement"
 
         event = {
             'id': id,
