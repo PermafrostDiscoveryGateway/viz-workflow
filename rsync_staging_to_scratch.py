@@ -5,8 +5,12 @@ from datetime import datetime
 import subprocess
 from subprocess import PIPE, Popen
 import pprint
-import PRODUCTION_IWP_CONFIG
-IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
+#import PRODUCTION_IWP_CONFIG
+#IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
+
+import lake_change_config
+IWP_CONFIG = lake_change_config.IWP_CONFIG
+
 # set config properties for current context
 IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_local']
 SOURCE = IWP_CONFIG['dir_staged']

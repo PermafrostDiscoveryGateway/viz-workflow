@@ -29,31 +29,38 @@ user = subprocess.check_output("whoami").strip().decode("ascii")
 # help flag provides flag help
 # store_true actions stores argument as True
 
-import PRODUCTION_IWP_CONFIG
-IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
+#import PRODUCTION_IWP_CONFIG # reintroduce when processing IWP
+#IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG # reintroduce when processing IWP
+
+import lake_change_config
+IWP_CONFIG = lake_change_config.IWP_CONFIG
+
+
 #print("Using config: ")
 #pprint.pprint(IWP_CONFIG)
 
-# setup logging
-def setup_logging(log_json_file):
-    """
-    Setup logging configuration
-    """
-    with open(log_json_file, 'r') as f:
-        logging_dict = json.load(f)
-    logging.config.dictConfig(logging_dict)
-    return logging_dict
+# # setup logging
+# def setup_logging(log_json_file):
+#     """
+#     Setup logging configuration
+#     """
+#     with open(log_json_file, 'r') as f:
+#         logging_dict = json.load(f)
+#     logging.config.dictConfig(logging_dict)
+#     return logging_dict
 
-# define logger:
-logging_config = '/u/julietcohen/viz-workflow/logging.json'
-logging_dict = setup_logging(logging_config)
-# retrieve name of logger to add updates
-logger = logging.getLogger(__name__)
+# # define logger:
+# logging_config = '/u/julietcohen/viz-workflow/logging.json'
+# logging_dict = setup_logging(logging_config)
+# # retrieve name of logger to add updates
+# logger = logging.getLogger(__name__)
 
 
 def main():
     result = subprocess.run(["hostname", "-i"], capture_output=True, text=True)
     head_ip = result.stdout.strip()
+    #print("connecting to ray.")
+    #ray.init(address='auto', dashboard_port=8265)
     print(f"Connecting to Ray... at address ray://{head_ip}:10001")
     ray.init(address=f'ray://{head_ip}:10001', dashboard_port=8265)   # most reliable way to start Ray
     # use port-forwarding to see dashboard: `ssh -L 8265:localhost:8265 kastanday@kingfisher.ncsa.illinois.edu`
@@ -112,7 +119,7 @@ def step0_staging():
     # update the config for the current context: write staged files to local /tmp dir
     iwp_config = deepcopy(IWP_CONFIG)
     iwp_config['dir_staged'] = iwp_config['dir_staged_local']
-    iwp_config['dir_footprints'] = iwp_config['dir_footprints_local']
+    #iwp_config['dir_footprints'] = iwp_config['dir_footprints_local'] # reintroduce when processing IWP
     # make directory /tmp/staged on each node
     # not really necessary cause Robyn's functions are set up to do this
     # and /tmp allows dirs to be created to write files
@@ -120,8 +127,8 @@ def step0_staging():
     
     # OLD METHOD "glob" all files. 
     stager = pdgstaging.TileStager(iwp_config, check_footprints=False)
-    missing_footprints = stager.check_footprints()
-    print(f"⚠️ Num missing footprints: {len(missing_footprints)}")
+    #missing_footprints = stager.check_footprints() # reintroduce when processing IWP
+    #print(f"⚠️ Num missing footprints: {len(missing_footprints)}") # reintroduce when processing IWP
     
     # Get
     staging_input_files_list = stager.tiles.get_filenames_from_dir('input')
@@ -484,7 +491,7 @@ def step3_raster_lower(batch_size_geotiffs=20):
 
     iwp_config['dir_geotiff'] = iwp_config['dir_geotiff_remote']
     # next line is likely not necessary but can't hurt
-    iwp_config['dir_footprints'] = iwp_config['dir_footprints_local']
+    # iwp_config['dir_footprints'] = iwp_config['dir_footprints_local'] # reintroduce when processing IWP data
     # update the config for the current context: pull stager that represents staged files in /scratch
     # next line is likely not necessary but can't hurt
     iwp_config['dir_staged'] = iwp_config['dir_staged_remote_merged']
@@ -535,7 +542,7 @@ def step3_raster_lower(batch_size_geotiffs=20):
                 # even though the geotiff base dir has been created and the filenames have been batched, 
                 # still cannot switch the dir_geotiff to _local !!! because the lower z-level rasters need to be
                 # written to scratch rather than /tmp so all lower z-levels can access all files in higher z-levels
-                iwp_config['dir_footprints'] = iwp_config['dir_footprints_local'] # we deduplicate at rasterization
+                # iwp_config['dir_footprints'] = iwp_config['dir_footprints_local'] # we deduplicate at rasterization, reintroduce when processing IWP data 
                 #iwp_config['dir_geotiff'] = iwp_config['dir_geotiff_local'] # run immeditely before defining rasterizer
                 # I dont think theres a need to set rasterizer with new config after chaning this property cause 
                 # that is done within the function create_composite_geotiffs() but troubleshooting 
@@ -733,7 +740,7 @@ def make_batch(items, batch_size):
     return [items[i:i + batch_size] for i in range(0, len(items), batch_size)]
 
 @ray.remote
-def stage_remote(filepath, config, logging_dict = logging_dict):
+def stage_remote(filepath, config, logging_dict = None):
     """
     Step 1. 
     Parallelism at the per-shape-file level.
