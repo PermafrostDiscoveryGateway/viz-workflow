@@ -8,11 +8,11 @@ import subprocess
 # define user on Delta, avoid writing files to other user's dir
 user = subprocess.check_output("whoami").strip().decode("ascii")
 #head_node = 'cn___/'
-head_node = 'gpub073'
+head_node = 'gpub086'
 # define desired location for output files within user dir
 # ensures a new subfolder every run as long as new run is not started within same day as last run
 # following path is the output subdir for test run, using just on subdir of the alaska files that is only ~8% of the Alaska dir, 23.5 GB
-output_subdir = 'lake_change/output/utm_32640_20230407'
+output_subdir = 'lake_change/output/utm_32640_20230411'
 #output_subdir = datetime.now().strftime("%b-%d-%y")
 # don't use subprocess to retrieve date for subdir because runs might span over 2 days if they go overnight
 
@@ -54,7 +54,6 @@ IWP_CONFIG = {
   "filename_staging_summary": STAGING_REMOTE + "staging_summary.csv",
   "filename_rasterization_events": GEOTIFF_REMOTE + "raster_events.csv",
   "filename_rasters_summary": GEOTIFF_REMOTE + "raster_summary.csv",
-  #"filename_config": OUTPUT + "config",
   "version": datetime.now().strftime("%B%d,%Y"),
   "simplify_tolerance": 0.1,
   "tms_id": "WGS1984Quad",
@@ -66,19 +65,22 @@ IWP_CONFIG = {
   "z_coord": 0,
   "statistics": [
     {
-      "name": "coverage",
+      "name": "change_rate", # changed from "coverage"
       "weight_by": "area",
-      "property": "area_per_pixel_area",
-      "aggregation_method": "sum",
-      "resampling_method": "average",
+      "property": "ChangeRateGrowth_myr-1", # changed from "area_per_pixel_area", can also be property that is available in input data 
+      "aggregation_method": "sum",  
+      "resampling_method": "sum", # changed from "average"
       "val_range": [
         0,
         1
       ],
-      "palette": [
-        "#ff0000", # red
-        "#0000ff" # blue
-      ],
+      "palette": ["#ff0000", # red
+                  "#FF8C00", # DarkOrange
+                  "#FFA07A", # LightSalmon
+                  "#FFFF00", # yellow
+                  "#66CDAA", # MediumAquaMarine
+                  "#AFEEEE", # PaleTurquoise,
+                  "#0000ff"], # blue
       "nodata_val": 0,
       "nodata_color": "#ffffff00"
     },
