@@ -3,13 +3,13 @@
 #SBATCH --job-name=pdg_viz
 #SBATCH --partition=gpuA40x4
 #SBATCH --account=
-#SBATCH --time=03:00:00
+#SBATCH --time=24:00:00
 
 #SBATCH --export=ALL,RAY_worker_register_timeout_seconds=120
 
-#SBATCH --nodes=3
-#SBATCH --mem=0
+#SBATCH --nodes=11
 #SBATCH --gpus-per-node=1
+#SBATCH --mem=0
 #SBATCH --exclusive
 
 ## output slurm info to a separate file than errors, %j = include job id in file names
@@ -92,22 +92,6 @@ srun --nodes=1 --ntasks=1 -w "$head_node" \
 sleep 1
 
 # START RAY WORKERS
-
-# number of nodes other than the head node
-# commenting out this loop beacse Greg suggested modified loop below it
-# worker_num=$((SLURM_JOB_NUM_NODES - 1))
-# for ((i = 1; i <= worker_num; i++)); do
-#     node_i=${nodes_array[$i]}
-#     srun --nodes=1 --ntasks=1 -w "$node_i" \
-#     ray stop
-#     echo "Starting WORKER $i at $node_i"
-# #    srun --nodes=1 --ntasks=1 -w "$node_i" \
-# #      export RAY_worker_register_timeout_seconds=120
-#     srun --nodes=1 --ntasks=1 -w "$node_i" \
-#         ray start --address "$ip_head" --log-color true --block &
-#     sleep 0.25
-#     echo "WORKER $i has SLURM_CPUS_PER_TASK: ${SLURM_CPUS_PER_TASK}"
-# done
 
 # from Greg:
 # "srun will "export" any environment variables that are set in the calling shell to the shell it starts up and then exits."
