@@ -1,7 +1,10 @@
 
 import json
+
 import logging
-import logging.config
+#import logging.config # removed this because trying to get logger to work with special config to log.log rather than Kastan's file
+import logging.handlers
+
 import os
 import pathlib
 import socket  # for seeing where jobs run when distributed
@@ -29,11 +32,21 @@ user = subprocess.check_output("whoami").strip().decode("ascii")
 # help flag provides flag help
 # store_true actions stores argument as True
 
-#import PRODUCTION_IWP_CONFIG # reintroduce when processing IWP
-#IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG # reintroduce when processing IWP
+#import lake_change_config
+#IWP_CONFIG = lake_change_config.IWP_CONFIG
 
-import lake_change_config
-IWP_CONFIG = lake_change_config.IWP_CONFIG
+import PRODUCTION_IWP_CONFIG # reintroduce when processing IWP
+IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG # reintroduce when processing IWP
+
+# set up logging
+#log_filepath = IWP_CONFIG["dir_output"] + "log.log"
+handler = logging.handlers.WatchedFileHandler(
+    os.environ.get("LOGFILE", '/tmp/log.log'))
+formatter = logging.Formatter(logging.BASIC_FORMAT)
+handler.setFormatter(formatter)
+root = logging.getLogger()
+root.setLevel(os.environ.get("LOGLEVEL", "INFO"))
+root.addHandler(handler)
 
 
 #print("Using config: ")
@@ -69,7 +82,7 @@ def main():
     
     print_cluster_stats()
     # create file workflow_log.txt in output dir
-    start_logging()
+    # start_logging() # removed this because trying to get logger to work with special config to log.log rather than Kastan's file
     start = time.time()
     
     try:
@@ -78,7 +91,7 @@ def main():
         
         # (optionally) Comment out steps you don't need 😁
         # todo: sync footprints to nodes.
-        # step0_staging()        
+        step0_staging()
         # todo: rsync staging to /scratch
         # todo: merge staged files in /scratch    # ./merge_staged_vector_tiles.py
         # DO NOT RUN 3d-tiling UNTIL WORKFLOW CAN ACCOMODATE FILE HIERARCHY:step1_3d_tiles() # default parameter batch_size = 300 
@@ -88,7 +101,7 @@ def main():
         # step3_raster_lower(batch_size_geotiffs=100) # rasterize all LOWER Z levels
         # todo: immediately after initiating above step, start rsync script to continuously sync geotiff files,
         # or immediately after the above step is done, rsync all files at once if there is time left in job
-        step4_webtiles(batch_size_web_tiles=250) # convert to web tiles.
+        # step4_webtiles(batch_size_web_tiles=250) # convert to web tiles.
         
         # mem_testing = False        
         # if mem_testing:
@@ -118,8 +131,8 @@ def step0_staging():
 
     # update the config for the current context: write staged files to local /tmp dir
     iwp_config = deepcopy(IWP_CONFIG)
-    iwp_config['dir_staged'] = iwp_config['dir_staged_local']
-    #iwp_config['dir_footprints'] = iwp_config['dir_footprints_local'] # reintroduce when processing IWP
+    iwp_config['dir_staged'] = iwp_config['dir_staged_local']  
+    iwp_config['dir_footprints'] = iwp_config['dir_footprints_local'] # reintroduce when processing IWP 
     # make directory /tmp/staged on each node
     # not really necessary cause Robyn's functions are set up to do this
     # and /tmp allows dirs to be created to write files
@@ -127,15 +140,15 @@ def step0_staging():
     
     # OLD METHOD "glob" all files. 
     stager = pdgstaging.TileStager(iwp_config, check_footprints=False)
-    #missing_footprints = stager.check_footprints() # reintroduce when processing IWP
-    #print(f"⚠️ Num missing footprints: {len(missing_footprints)}") # reintroduce when processing IWP
+    missing_footprints = stager.check_footprints() # reintroduce when processing IWP
+    print(f"⚠️ Num missing footprints: {len(missing_footprints)}") # reintroduce when processing IWP
     
     # Get
     staging_input_files_list = stager.tiles.get_filenames_from_dir('input')
 
     # record number of filepaths before they are converted into app_futures to detemrine if that's where the bug is
-    with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
-        file.write(f"Number of filepaths in staging_input_files_list: {len(staging_input_files_list)}\n\n")   
+    # with open(os.path.join(iwp_config['dir_output'], "workflow_log.txt"), "a+") as file:
+    #     file.write(f"Number of filepaths in staging_input_files_list: {len(staging_input_files_list)}\n\n")   # removed this because trying to get logger to work with special config to log.log rather than Kastan's file
      
     with open(os.path.join(iwp_config['dir_output'], "staging_input_files_list.json") , "w") as f:
         json.dump(staging_input_files_list, f)
@@ -166,8 +179,8 @@ def step0_staging():
             app_futures.append(stage_remote.remote(filepath, iwp_config))
         
         # record how many app_futures were created to determine if it is the full number of input paths
-        with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
-            file.write(f"Number of future staged files: {len(app_futures)}. This is {len(staging_input_files_list)-len(app_futures)} fewer than the original number of files input.\n\n")       
+        # with open(os.path.join(iwp_config['dir_output'], "workflow_log.txt"), "a+") as file:
+        #     file.write(f"Number of future staged files: {len(app_futures)}. This is {len(staging_input_files_list)-len(app_futures)} fewer than the original number of files input.\n\n")       # removed this because trying to get logger to work with special config to log.log rather than Kastan's file
 
         # COLLECT all jobs as they finish.
         # BLOCKING - WAIT FOR *ALL* REMOTE FUNCTIONS TO FINISH
@@ -180,8 +193,8 @@ def step0_staging():
                 FAILURES.append([ray.get(ready)[0][0], ray.get(ready)[0][1]])
                 print(f"❌ Failed {ray.get(ready)[0][0]}")
 
-                with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
-                    file.write(f"Number of FAILURES in preparing future staged files: {len(FAILURES)}\n\n")
+                # with open(os.path.join(iwp_config['dir_output'], "workflow_log.txt"), "a+") as file:
+                #     file.write(f"Number of FAILURES in preparing future staged files: {len(FAILURES)}\n\n") # removed this because trying to get logger to work with special config to log.log rather than Kastan's file
 
                 IP_ADDRESSES_OF_WORK.append(ray.get(ready)[0][1])
             else:
@@ -189,8 +202,8 @@ def step0_staging():
                 print(f"✅ Finished {ray.get(ready)[0][0]}")
                 print(f"📌 Completed {i+1} of {len(staging_input_files_list)}, {(i+1)/len(staging_input_files_list)*100:.2f}%, ⏰ Elapsed time: {(time.time() - start)/60:.2f} min.\n🔮 Estimated total runtime: { ((time.time() - start)/60) / ((i+1)/len(staging_input_files_list)) :.2f} minutes.\n")
 
-                with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
-                    file.write(f"Success! Finished staging for: {ray.get(ready)[0][0]}\n\n")
+                # with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
+                #     file.write(f"Success! Finished staging for: {ray.get(ready)[0][0]}\n\n") # removed this because trying to get logger to work with special config to log.log rather than Kastan's file
 
                 IP_ADDRESSES_OF_WORK.append(ray.get(ready)[0][1])
 
@@ -200,8 +213,8 @@ def step0_staging():
     except Exception as e:
         print(f"Cauth error in Staging (step_0): {str(e)}")
 
-        with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
-            file.write(f"ERROR IN STAGING STEP for: {ray.get(ready)[0][0]} with {str(e)}\n\n")
+        # with open(os.path.join(iwp_config['dir_output'], "workflow_log.txt"), "a+") as file:
+        #     file.write(f"ERROR IN STAGING STEP for: {ray.get(ready)[0][0]} with {str(e)}\n\n") # removed this because trying to get logger to work with special config to log.log rather than Kastan's file
         
     finally:
         # print FINAL stats about Staging 
@@ -213,8 +226,8 @@ def step0_staging():
         for ip_address, num_tasks in Counter(IP_ADDRESSES_OF_WORK).items():
             print('    {} tasks on {}'.format(num_tasks, ip_address))
 
-        with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
-            file.write(f"Completed Staging.\n\n")
+        # with open(os.path.join(iwp_config['dir_output'], "workflow_log.txt"), "a+") as file:
+        #     file.write(f"Completed Staging.\n\n") # removed this because trying to get logger to work with special config to log.log rather than Kastan's file
 
         return "😁 step 1 success"
 
@@ -439,8 +452,8 @@ def step2_raster_highest(batch_size=100):
             # print(f"✅ Finished {ray.get(ready)}")
             print(f"📌 Completed {i+1} of {len(staged_batches)}")
 
-            with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
-                file.write(f"Raster highest batch success: Completed {i+1} of {len(staged_batches)}\n\n")
+            # with open(os.path.join(iwp_config['dir_output'], "workflow_log.txt"), "a+") as file:
+            #     file.write(f"Raster highest batch success: Completed {i+1} of {len(staged_batches)}\n\n") # removed this because trying to get logger to work with special config to log.log rather than Kastan's file
 
             print(f"⏰ Running total of elapsed time: {(time.time() - start)/60:.2f} minutes\n🔮 Estimated total runtime: { ((time.time() - start)/60) / ((i+1)/len(staged_batches)) :.2f} minutes.\n")
 
@@ -491,7 +504,7 @@ def step3_raster_lower(batch_size_geotiffs=20):
 
     iwp_config['dir_geotiff'] = iwp_config['dir_geotiff_remote']
     # next line is likely not necessary but can't hurt
-    # iwp_config['dir_footprints'] = iwp_config['dir_footprints_local'] # reintroduce when processing IWP data
+    iwp_config['dir_footprints'] = iwp_config['dir_footprints_local'] # reintroduce when processing IWP data
     # update the config for the current context: pull stager that represents staged files in /scratch
     # next line is likely not necessary but can't hurt
     iwp_config['dir_staged'] = iwp_config['dir_staged_remote_merged']
@@ -542,7 +555,7 @@ def step3_raster_lower(batch_size_geotiffs=20):
                 # even though the geotiff base dir has been created and the filenames have been batched, 
                 # still cannot switch the dir_geotiff to _local !!! because the lower z-level rasters need to be
                 # written to scratch rather than /tmp so all lower z-levels can access all files in higher z-levels
-                # iwp_config['dir_footprints'] = iwp_config['dir_footprints_local'] # we deduplicate at rasterization, reintroduce when processing IWP data 
+                iwp_config['dir_footprints'] = iwp_config['dir_footprints_local'] # we deduplicate at rasterization, reintroduce when processing IWP data 
                 #iwp_config['dir_geotiff'] = iwp_config['dir_geotiff_local'] # run immeditely before defining rasterizer
                 # I dont think theres a need to set rasterizer with new config after chaning this property cause 
                 # that is done within the function create_composite_geotiffs() but troubleshooting 
@@ -560,8 +573,8 @@ def step3_raster_lower(batch_size_geotiffs=20):
                 print(f"✅ Finished {ray.get(ready)}")
                 print(f"📌 Completed {i+1} of {len(parent_tile_batches)}, {(i+1)/len(parent_tile_batches)*100:.2f}%")
 
-                with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
-                    file.write(f"Raster lower batch success: Completed {i+1} of {len(parent_tile_batches)}\n\n")
+                # with open(os.path.join(iwp_config['dir_output'], "workflow_log.txt"), "a+") as file:
+                #     file.write(f"Raster lower batch success: Completed {i+1} of {len(parent_tile_batches)}\n\n") # removed this because trying to get logger to work with special config to log.log rather than Kastan's file
 
                 print(f"⏰ Running total of elapsed time: {(time.time() - start)/60:.2f} minutes. 🔮 Estimated time to completion: { ((time.time() - start)/60) / ((i+1)/len(parent_tile_batches)) :.2f} minutes.\n")
                 app_futures = not_ready
@@ -595,10 +608,10 @@ def step4_webtiles(batch_size_web_tiles=300):
     
     start = time.time()
     # Update color ranges
-    print(f"Updating ranges...") # reintroduce when fix id error in raster highest and can access rasters_summary.csv
-    rasterizer.update_ranges() # reintroduce when fix id error in raster highest and can access rasters_summary.csv
-    iwp_config_new = rasterizer.config.config # if this doesn't work, need to add to config where to write the new config to? # reintroduce when fix id error in raster highest and can access rasters_summary.csv
-    print(f"Defined new config: {iwp_config_new}") # reintroduce when fix id error in raster highest and can access rasters_summary.csv
+    print(f"Updating ranges...") 
+    rasterizer.update_ranges() 
+    iwp_config_new = rasterizer.config.config 
+    print(f"Defined new config: {iwp_config_new}") 
 
     # define the stager so we can pull filepaths from the geotiff base dir in a few lines
     # stager = pdgstaging.TileStager(iwp_config_new, check_footprints=False)
@@ -619,7 +632,6 @@ def step4_webtiles(batch_size_web_tiles=300):
     #geotiff_paths = rasterizer.tiles.get_filenames_from_dir(base_dir = 'geotiff_remote')
     # added next 2 lines 20230214:
     rasterizer.tiles.add_base_dir('geotiff_remote_all_zs', iwp_config_new['dir_geotiff'], '.tif') # call it something different than geotiff_remote because we already made that base dir earlier and it might not overwrite and might error cause already exists 
-    # reintroduce above line when fix id error in raster highest and can access rasters_summary.csv
     # and also remove line just below bc it was that line's replacement for time being:
     # rasterizer.tiles.add_base_dir('geotiff_remote_all_zs', IWP_CONFIG['dir_geotiff'], '.tif')
     geotiff_paths = rasterizer.tiles.get_filenames_from_dir(base_dir = 'geotiff_remote_all_zs')
@@ -648,7 +660,7 @@ def step4_webtiles(batch_size_web_tiles=300):
             # MANDATORY: include placement_group for better stability on 200+ cpus.
             # app_future = create_web_tiles.options(placement_group=pg).remote(batch, IWP_CONFIG)
             # app_future = create_web_tiles.remote(batch, IWP_CONFIG) # remove this line
-            app_future = create_web_tiles.remote(batch, iwp_config_new) # reintroduce this step when determine how to properly integrate end_tracking again
+            app_future = create_web_tiles.remote(batch, iwp_config_new) 
             #app_future = create_web_tiles.remote(batch, IWP_CONFIG) # remove this line when line "reintroduce" lines are reintroduced
             app_futures.append(app_future)
 
@@ -754,18 +766,18 @@ def stage_remote(filepath, config, logging_dict = None):
         stager = pdgstaging.TileStager(config=config, check_footprints=False)
         ret = stager.stage(filepath)
 
-        with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
-                file.write(f"Successfully staged file:\n")
-                file.write(f"{filepath}\n\n")
+        # with open(os.path.join(iwp_config['dir_output'], "workflow_log.txt"), "a+") as file:
+        #         file.write(f"Successfully staged file:\n")
+        #         file.write(f"{filepath}\n\n") # removed this because trying to get logger to work with special config to log.log rather than Kastan's file
 
         #logging.info(f"Juliet's logging: Successfully staged tile: {filepath}.")
 
         if 'Skipping' in str(ret):
             print(f"⚠️ Skipping {filepath}")
 
-            with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
-                file.write(f"SKIPPING FILE:\n")
-                file.write(f"{filepath}\n\n")
+            # with open(os.path.join(iwp_config['dir_output'], "workflow_log.txt"), "a+") as file:
+            #     file.write(f"SKIPPING FILE:\n")
+            #     file.write(f"{filepath}\n\n") # removed this because trying to get logger to work with special config to log.log rather than Kastan's file
 
             #logging.info(f"Juliet's logging: Skipping staging tile: {filepath}.")
 
@@ -773,10 +785,10 @@ def stage_remote(filepath, config, logging_dict = None):
 
         #logging.info(f"Juliet's logging :Failed to stage tile: {filepath}.")
 
-        with open(f"{iwp_config['dir_output']}workflow_log.txt", "a+") as file:
-            file.write(f"FAILURE TO STAGE FILE:\n")
-            file.write(f"{filepath}\n")
-            file.write(f"Error: {e}\n\n")
+        # with open(os.path.join(iwp_config['dir_output'], "workflow_log.txt"), "a+") as file:
+        #     file.write(f"FAILURE TO STAGE FILE:\n")
+        #     file.write(f"{filepath}\n")
+        #     file.write(f"Error: {e}\n\n") # removed this because trying to get logger to work with special config to log.log rather than Kastan's file
 
         return [filepath,
                 socket.gethostbyname(socket.gethostname()),
