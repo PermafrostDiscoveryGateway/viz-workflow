@@ -3,11 +3,11 @@
 #SBATCH --job-name=pdg_viz
 #SBATCH --partition=cpu
 #SBATCH --account=
-#SBATCH --time=24:00:00
+#SBATCH --time=04:00:00
 
 #SBATCH --export=ALL,RAY_worker_register_timeout_seconds=120
 
-#SBATCH --nodes=5
+#SBATCH --nodes=1
 #SBATCH --mem=0
 #SBATCH --exclusive
 
@@ -38,12 +38,21 @@ set -x
 
 echo "This is BEST_cpu_ray_double_srun.slurm"
 
-export RAY_worker_register_timeout_seconds=120
+# venv init
+source /scratch/bbou/julietcohen/venv/iwp_3/bin/activate
+# set file soft limit to maximum value (not unlimited because that's not permitted)
+# before any srun's are executed
+ulimit -n 32768
+# extend time period allowed for workers to register (this has been removed from worker loop below)
+# but Greg suggested in his code snippet to run it right before worker loop, so moved it there
+#export RAY_worker_register_timeout_seconds=120  # for sure necessary. Might be needed in user shell before `sbatch` is executed. 
+export RAY_max_pending_lease_requests_per_scheduling_category=2000 # probably not necessary
+
+#export RAY_worker_register_timeout_seconds=120
 
 # Getting the node names
 nodes=$(scontrol show hostnames "$SLURM_JOB_NODELIST")
 nodes_array=($nodes)
-
 head_node=${nodes_array[0]}
 head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
 
@@ -68,14 +77,6 @@ port=6379
 ip_head=$head_node_ip:$port
 export ip_head
 echo "IP Head: $ip_head"
-
-# conda init
-#conda activate v3_full_viz_pipeline
-# venv init
-source /scratch/bbou/julietcohen/venv/iwp_2/bin/activate
-
-# increase request limit
-export RAY_max_pending_lease_requests_per_scheduling_category=2000
 
 echo "Starting HEAD at $head_node"
 srun --nodes=1 --ntasks=1 -w "$head_node" \
@@ -113,23 +114,26 @@ worker_num=$((SLURM_JOB_NUM_NODES - 1))
 # done
 # __doc_worker_ray_end__
 
+# from Greg:
+# "srun will "export" any environment variables that are set in the calling shell to the shell it starts up and then exits."
+export RAY_worker_register_timeout_seconds=120 
+
 # change Kastan's loop to remove changing the ulimit - received error that this is not allowed,
 # also removed exporting the RAY_worker_register_timeout_seconds=120 because got error
 # there is no such file or directory
+
+
 for ((i = 1; i <= worker_num; i++)); do
     node_i=${nodes_array[$i]}
     srun --nodes=1 --ntasks=1 -w "$node_i" \
     ray stop
     echo "Starting WORKER $i at $node_i"
     srun --nodes=1 --ntasks=1 -w "$node_i" \
-       export RAY_worker_register_timeout_seconds=120
-    srun --nodes=1 --ntasks=1 -w "$node_i" \
         ray start --address "$ip_head" --log-color true --block &
-    # sleep 1
+    sleep 0.25
     # TODO -- change num-gpus back to 0. 
     echo "WORKER $i has SLURM_CPUS_PER_TASK: ${SLURM_CPUS_PER_TASK}"
 done
-
 
 sleep infinity # wait forever to presist the ray runtime
 

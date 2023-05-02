@@ -3,11 +3,11 @@
 #SBATCH --job-name=pdg_viz
 #SBATCH --partition=gpuA40x4
 #SBATCH --account=
-#SBATCH --time=24:00:00
+#SBATCH --time=04:00:00
 
 #SBATCH --export=ALL,RAY_worker_register_timeout_seconds=120
 
-#SBATCH --nodes=11
+#SBATCH --nodes=1
 #SBATCH --gpus-per-node=1
 #SBATCH --mem=0
 #SBATCH --exclusive

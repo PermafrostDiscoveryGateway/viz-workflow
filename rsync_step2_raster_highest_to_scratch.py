@@ -2,11 +2,11 @@
 import subprocess
 import time
 from subprocess import PIPE, Popen
-#import PRODUCTION_IWP_CONFIG # reintroduce when processing IWP
-#IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG # reintroduce when processing IWP
+import PRODUCTION_IWP_CONFIG # reintroduce when processing IWP
+IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG # reintroduce when processing IWP
 
-import lake_change_config
-IWP_CONFIG = lake_change_config.IWP_CONFIG
+#import lake_change_config
+#IWP_CONFIG = lake_change_config.IWP_CONFIG
 
 # set config properties for current context
 IWP_CONFIG['dir_geotiff'] = IWP_CONFIG['dir_geotiff_local'] 
