@@ -193,7 +193,6 @@ class RasterTiler():
             # Track and log the event
             #id = self.__start_tracking('geotiffs_from_vectors')
             #print(f'Using ID: {id}')
-            print(f'OUT_PATH PRINTED HERE: Rasterizing {path} for tile {tile} to {out_path}.')
 
             gdf = gpd.read_file(path)
 
