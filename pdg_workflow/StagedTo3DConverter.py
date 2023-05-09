@@ -38,12 +38,6 @@ class StagedTo3DConverter():
         self.tiles = pdgstaging.TilePathManager(
             **self.config.get_path_manager_config())
 
-        # For now, manually add directory for the 3D tiles. We should add this
-        # to the ConfigManager & TilePathManager class
-        c3dt_ext = '.json'
-        c3dt_dir = self.config.get('dir_3dtiles')
-        self.tiles.add_base_dir('3dtiles', dir_path=c3dt_dir, ext=c3dt_ext)
-
     def all_staged_to_3dtiles(
         self
     ):
@@ -59,8 +53,8 @@ class StagedTo3DConverter():
 
     def staged_to_3dtile(self, path):
         """
-            Convert a staged vector tile into a B3DM tile file and a matching JSON
-            tileset file.
+            Convert a staged vector tile into a B3DM tile file and a matching
+            JSON tileset file.
 
             Parameters
             ----------
@@ -127,6 +121,7 @@ class StagedTo3DConverter():
                 gdf,
                 dir=tile_dir,
                 filename=tile_filename,
+                z=self.config.get('z_coord'),
                 geometricError=self.config.get('geometricError'),
                 tilesetVersion=self.config.get('version'),
                 boundingVolume=tile_bv
@@ -141,13 +136,15 @@ class StagedTo3DConverter():
 
     def parent_3dtiles_from_children(self, tiles, bv_limit=None):
         """
-            Create parent Cesium 3D Tileset json files that point to 
-            of child JSON files in the tile tree hierarchy.
+            Create parent Cesium 3D Tileset json files that point to of child
+            JSON files in the tile tree hierarchy. This method will take a list
+            of parent tiles and search the 3D tile directory for any children
+            tiles to create.
 
             Parameters
             ----------
             tiles : list of morecantile.Tile
-                The list of tiles to create parent tiles for.
+                The list of parent tiles to create.
         """
 
         tile_manager = self.tiles
@@ -169,7 +166,8 @@ class StagedTo3DConverter():
             # Remove paths that do not exist
             child_paths = tile_manager.remove_nonexistent_paths(child_paths)
             # Get the parent bounding volume
-            parent_bv = self.bounding_region_for_tile(parent_tile, limit_to=bv_limit)
+            parent_bv = self.bounding_region_for_tile(
+                parent_tile, limit_to=bv_limit)
             # If the bounding region is outside t
             # Get the version
             version = config_manager.get('version')
@@ -185,7 +183,7 @@ class StagedTo3DConverter():
                 boundingVolume=parent_bv
             )
             tileset_objs.append(tileset_obj)
-        
+
         return tileset_objs
 
     def bounding_region_for_tile(self, tile, limit_to=None):
@@ -209,10 +207,12 @@ class StagedTo3DConverter():
         tms = self.tiles.tms
         bounds = tms.bounds(tile)
         bounds = gpd.GeoSeries(
-            box(bounds.left, bounds.bottom, bounds.right, bounds.top), crs=tms.crs)
+            box(bounds.left, bounds.bottom, bounds.right, bounds.top),
+            crs=tms.crs)
         if limit_to is not None:
             bounds_limitor = gpd.GeoSeries(
-                box(limit_to[0], limit_to[1], limit_to[2], limit_to[3]), crs=tms.crs)
+                box(limit_to[0], limit_to[1], limit_to[2], limit_to[3]),
+                crs=tms.crs)
             bounds = bounds.intersection(bounds_limitor)
         bounds = bounds.to_crs(BoundingVolumeRegion.CESIUM_EPSG)
         bounds = bounds.total_bounds
@@ -222,3 +222,30 @@ class StagedTo3DConverter():
             'east': bounds[2], 'north': bounds[3],
         }
         return region_bv
+
+    def make_top_level_tileset(self):
+        """
+        Create a top-level tileset.json file that sets all the min_z level
+        tiles as its children. This is needed to display the tiles in Cesium
+        when the min_z level has more than one tile.
+
+        Returns
+        -------
+        tileset : Tileset
+            The Cesium3DTileset object
+        """
+
+        tile_manager = self.tiles
+        config_manager = self.config
+        min_z = config_manager.get_min_z()
+
+        # Make a parent tileset.json - this will combine the top level tiles if
+        # there are 2, otherwise it will just refer to the top level tile.
+        top_level_tiles = tile_manager.get_filenames_from_dir(
+            '3dtiles', z=min_z)
+        top_level_dir = tile_manager.get_base_dir('3dtiles')['path']
+
+        return TreeGenerator.parent_tile_from_children_json(
+            children=top_level_tiles,
+            dir=top_level_dir
+        )
