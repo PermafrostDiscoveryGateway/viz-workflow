@@ -3,7 +3,7 @@
 #SBATCH --job-name=pdg_viz
 #SBATCH --partition=cpu
 #SBATCH --account=
-#SBATCH --time=04:00:00
+#SBATCH --time=01:00:00
 
 #SBATCH --export=ALL,RAY_worker_register_timeout_seconds=120
 

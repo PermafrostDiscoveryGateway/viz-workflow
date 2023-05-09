@@ -2,7 +2,7 @@
 import json
 
 import logging
-#import logging.config # removed this because trying to get logger to work with special config to log.log rather than Kastan's file
+#import logging.config
 import logging.handlers
 
 import os
@@ -22,15 +22,12 @@ import pprint
 import shlex
 
 import pdgraster
-import pdgstaging  # For staging
+import pdgstaging 
 import ray
 import viz_3dtiles  # import Cesium3DTile, Cesium3DTileset
 
 # define user on Delta, avoid writing files to other user's dir
 user = subprocess.check_output("whoami").strip().decode("ascii")
-
-# help flag provides flag help
-# store_true actions stores argument as True
 
 #import lake_change_config
 #IWP_CONFIG = lake_change_config.IWP_CONFIG
@@ -97,7 +94,7 @@ def main():
         
         # (optionally) Comment out steps you don't need 😁
         # todo: sync footprints to nodes.
-        # step0_staging()
+        step0_staging()
         # todo: rsync staging to /scratch
         # todo: merge staged files in /scratch    # ./merge_staged_vector_tiles.py
         # DO NOT RUN 3d-tiling UNTIL WORKFLOW CAN ACCOMODATE FILE HIERARCHY:step1_3d_tiles() # default parameter batch_size = 300 
@@ -107,7 +104,7 @@ def main():
         # step3_raster_lower(batch_size_geotiffs=100) # rasterize all LOWER Z levels
         # todo: immediately after initiating above step, start rsync script to continuously sync geotiff files,
         # or immediately after the above step is done, rsync all files at once if there is time left in job
-        step4_webtiles(batch_size_web_tiles=250) # convert to web tiles.
+        # step4_webtiles(batch_size_web_tiles=250) # convert to web tiles.
         
         # mem_testing = False        
         # if mem_testing:
@@ -674,7 +671,6 @@ def step4_webtiles(batch_size_web_tiles=300):
 
         for i in range(0, len(app_futures)): 
             ready, not_ready = ray.wait(app_futures)
-            print(f"✅ Finished {ray.get(ready)}")
             print(f"📌 Completed {i+1} of {len(geotiff_batches)}")
             print(f"⏰ Running total of elapsed time: {(time.time() - start)/60:.2f} minutes\n")
             app_futures = not_ready

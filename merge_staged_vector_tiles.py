@@ -51,21 +51,6 @@ ray.init(address=f'ray://{head_ip}:10001', dashboard_port=8265)   # most reliabl
 assert ray.is_initialized() == True
 print("🎯 Ray initialized.")
 
-# todo: see if I can delete all of these constants....
-# These don't matter much in this workflow.
-# ALWAYS include the tailing slash "/"
-# BASE_DIR_OF_INPUT = '/tmp/'  
-# FOOTPRINTS_PATH   = BASE_DIR_OF_INPUT + 'staged_footprints/'
-
-# OUTPUT            = '/tmp/' # Dir for results. High I/O is good.
-# Output dirs for each sub-step:
-# OUTPUT_OF_STAGING = OUTPUT + 'staged/' 
-# GEOTIFF_PATH      = OUTPUT + 'geotiff/'
-# WEBTILE_PATH      = OUTPUT + 'web_tiles/'
-# THREE_D_PATH      = OUTPUT + '3d_tiles/'
-# IWP_CONFIG = {"dir_input": BASE_DIR_OF_INPUT,"ext_input": ".shp", "dir_footprints": FOOTPRINTS_PATH,"dir_geotiff": GEOTIFF_PATH,"dir_web_tiles": WEBTILE_PATH,"dir_staged": OUTPUT_OF_STAGING,"filename_staging_summary": OUTPUT_OF_STAGING + "staging_summary.csv","filename_rasterization_events": GEOTIFF_PATH + "raster_events.csv","filename_rasters_summary": GEOTIFF_PATH + "raster_summary.csv","version": datetime.now().strftime("%B%d,%Y"),"simplify_tolerance": 0.1,"tms_id": "WorldCRS84Quad","z_range": [0, 16],"geometricError": 57,"z_coord": 0,"statistics": [    {        "name": "iwp_count",        "weight_by": "count",        "property": "centroids_per_pixel",        "aggregation_method": "sum",        "resampling_method": "sum",        "val_range": [0, None],        "palette": ["#66339952", "#d93fce", "#ffcc00"],        "nodata_val": 0,        "nodata_color": "#ffffff00"    },    {        "name": "iwp_coverage",        "weight_by": "area",        "property": "area_per_pixel_area",        "aggregation_method": "sum",        "resampling_method": "average",        "val_range": [0, 1],        "palette": ["#66339952", "#ffcc00"],        "nodata_val": 0,        "nodata_color": "#ffffff00"    },],"deduplicate_at": ["raster", "3dtiles"],"deduplicate_keep_rules": [["Date", "larger"]],"deduplicate_method": "footprints",}
-
-# Juliet's edit: commented out Kastan's manual config settings to instead import config for workflow
 import PRODUCTION_IWP_CONFIG
 IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
 # update the config for the current context
@@ -84,23 +69,23 @@ def main():
     #######################
     # todo -- get files from dirs automatically, using os.lsdir().
     #BASE_DIR = '/scratch/bbou/julietcohen/IWP/output/...'
-    merged_dir_path = f"{IWP_CONFIG['dir_staged']}gpub020"  # this path SHOULD NOT be in the `staged_dir_paths_list`
+    merged_dir_path = f"{IWP_CONFIG['dir_staged']}cn___"  # this path SHOULD NOT be in the `staged_dir_paths_list`
     staged_dir_paths_list = [
-        f"{IWP_CONFIG['dir_staged']}gpub030",
-        f"{IWP_CONFIG['dir_staged']}gpub031",
-     #   f"{IWP_CONFIG['dir_staged']}cn071",
-     #   f"{IWP_CONFIG['dir_staged']}cn072",
-     #   f"{IWP_CONFIG['dir_staged']}cn073",
-     #   f"{IWP_CONFIG['dir_staged']}cn074",
-     #   f"{IWP_CONFIG['dir_staged']}cn075",
-     #   f"{IWP_CONFIG['dir_staged']}cn076",
-     #   f"{IWP_CONFIG['dir_staged']}cn077",
-     #   f"{IWP_CONFIG['dir_staged']}cn078",
-     #   f"{IWP_CONFIG['dir_staged']}gpub094",
-     #   f"{IWP_CONFIG['dir_staged']}gpub095",
-     #   f"{IWP_CONFIG['dir_staged']}gpub096",
-     #   f"{IWP_CONFIG['dir_staged']}gpub097",
-     #   f"{IWP_CONFIG['dir_staged']}gpub098",
+        f"{IWP_CONFIG['dir_staged']}cn___",
+        f"{IWP_CONFIG['dir_staged']}cn___",
+        f"{IWP_CONFIG['dir_staged']}cn___",
+     #   f"{IWP_CONFIG['dir_staged']}cn___",
+     #   f"{IWP_CONFIG['dir_staged']}cn___",
+     #   f"{IWP_CONFIG['dir_staged']}cn___",
+     #   f"{IWP_CONFIG['dir_staged']}cn___",
+     #   f"{IWP_CONFIG['dir_staged']}cn___",
+     #   f"{IWP_CONFIG['dir_staged']}cn___",
+     #   f"{IWP_CONFIG['dir_staged']}cn___",
+     #   f"{IWP_CONFIG['dir_staged']}cn___",
+     #   f"{IWP_CONFIG['dir_staged']}cn___",
+     #   f"{IWP_CONFIG['dir_staged']}cn___",
+     #   f"{IWP_CONFIG['dir_staged']}cn___",
+     #   f"{IWP_CONFIG['dir_staged']}cn___",
     ]
     ##############################
     #### END OF Change me 😁  ####
