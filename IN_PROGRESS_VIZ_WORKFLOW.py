@@ -39,18 +39,34 @@ IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG # reintroduce when processing IWP
 #log_filepath = IWP_CONFIG["dir_output"] + "log.log"
 # handler = logging.FileHandler(
 #      os.environ.get("LOGFILE", '/tmp/log.log')) # changed function to one that is newer, maybe logger.handlers.WatchedFileHandler is depreciated
-handler = logging.handlers.WatchedFileHandler(
-    os.environ.get("LOGFILE", '/tmp/log.log'))
+
+# handler = logging.handlers.WatchedFileHandler(
+#     os.environ.get("LOGFILE", '/tmp/log.log'))
+# formatter = logging.Formatter(logging.BASIC_FORMAT)
+# handler.setFormatter(formatter)
+# root = logging.getLogger()
+# root.setLevel(os.environ.get("LOGLEVEL", "INFO"))
+# root.addHandler(handler)
+# # set up logging from other scripts to print to console
+# sh = logging.StreamHandler()
+# sh.setFormatter(formatter)
+# root.addHandler(sh)
+
+# configure logger
+logger = logging.getLogger("logger")
+# Remove any existing handlers from the logger
+for handler in logger.handlers[:]:
+    logger.removeHandler(handler)
+# prevent logging statements from being printed to terminal
+logger.propagate = False
+# set up new handler
+handler = logging.FileHandler("/tmp/log.log")
 formatter = logging.Formatter(logging.BASIC_FORMAT)
 handler.setFormatter(formatter)
-root = logging.getLogger()
-root.setLevel(os.environ.get("LOGLEVEL", "INFO"))
-root.addHandler(handler)
-# set up logging from other scripts to print to console
-sh = logging.StreamHandler()
-sh.setFormatter(formatter)
-root.addHandler(sh)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
+print(logger.handlers)
 
 #print("Using config: ")
 #pprint.pprint(IWP_CONFIG)
@@ -70,7 +86,6 @@ root.addHandler(sh)
 # logging_dict = setup_logging(logging_config)
 # # retrieve name of logger to add updates
 # logger = logging.getLogger(__name__)
-
 
 def main():
     result = subprocess.run(["hostname", "-i"], capture_output=True, text=True)
@@ -131,6 +146,9 @@ def step0_staging():
     IP_ADDRESSES_OF_WORK = []
     app_futures = []
     start = time.time()
+
+    # test logging configuration
+    logger.info("step0_staging() has initiated.")
 
     # update the config for the current context: write staged files to local /tmp dir
     iwp_config = deepcopy(IWP_CONFIG)
