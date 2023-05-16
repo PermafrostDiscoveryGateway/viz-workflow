@@ -20,8 +20,8 @@ requirements = [
 test_requirements = ['pytest>=3', ]
 
 setup(
-    author='Kastan Day, Juliet Cohen, Matthew B. Jones',
-    author_email='kvday2@illinois.edu, jcohen@nceas.ucsb.edu, jones@nceas.ucsb.edu',
+    author='Kastan Day, Juliet Cohen, Robyn Thiessen-Bock, Matthew B. Jones',
+    author_email='kvday2@illinois.edu, jcohen@nceas.ucsb.edu, thiessenbock@nceas.ucsb.edu, jones@nceas.ucsb.edu',
     python_requires='>=3.6',
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
