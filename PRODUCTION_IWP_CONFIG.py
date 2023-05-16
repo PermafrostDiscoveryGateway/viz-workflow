@@ -12,7 +12,7 @@ head_node = 'gpub___/'
 # define desired location for output files within user dir
 # ensures a new subfolder every run as long as new run is not started within same day as last run
 # following path is the output subdir for test run, using just on subdir of the alaska files that is only ~8% of the Alaska dir, 23.5 GB
-output_subdir = 'IWP/output/iwp_testRun_2023____'
+output_subdir = 'IWP/output/iwp_testRun'
 #output_subdir = datetime.now().strftime("%b-%d-%y")
 # don't use subprocess to retrieve date for subdir because runs might span over 2 days if they go overnight
 
@@ -20,32 +20,37 @@ output_subdir = 'IWP/output/iwp_testRun_2023____'
 #### END OF Change me 😁  ####
 ##############################
 
-# input path for all data:
+# input path
 #INPUT = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/iwp_files/high/' # The output data of MAPLE. Which is the input data for STAGING.
-INPUT = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/iwp_files/high/russia/226_227_iwp/'
+#INPUT = '/scratch/bbou/julietcohen/IWP/input/2023-01-19/iwp_files/high/russia/226_227_iwp/'
+INPUT = '/scratch/bbou/julietcohen/IWP/input/few_adjacent_russia/iwp/'
 
-# following path is the OUTPUT for test run, using just on subdir of the alaska files that is only 7.78% of the Alaska dir, 45.57 GB
+# output path 
 OUTPUT  = f'/scratch/bbou/{user}/{output_subdir}/' # Dir for results. High I/O is good.
-# output path for all data, when it is available:
-#OUTPUT  = f'/scratch/bbou/{user}/IWP/output/{output_subdir}/' # Dir for results. High I/O is good.
 
-# footprints paths for all data:
+# footprints paths:
 FOOTPRINTS_LOCAL = '/tmp/staged_footprints/'
 #FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/IWP/footprint_files_with_date_20230119/high/'
-FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/IWP/footprint_files_with_date_20230119/high/russia/226_227_iwp/'
+#FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/IWP/footprint_files_with_date_20230119/high/russia/226_227_iwp/'
+FOOTPRINTS_REMOTE = '/scratch/bbou/julietcohen/IWP/input/few_adjacent_russia/footprints/'
 
+# staging paths
 STAGING_LOCAL = '/tmp/staged/'
 STAGING_REMOTE = OUTPUT  + 'staged/'
 STAGING_REMOTE_MERGED = STAGING_REMOTE + head_node
 
+# geotiff paths
 GEOTIFF_LOCAL = '/tmp/geotiff/'
 GEOTIFF_REMOTE = OUTPUT + 'geotiff/' # Kastan used pathlib.Path(OUTPUT) / pathlib.Path('merged_geotiff_sep9') for this so if it errors try something similar
 # check if need a variable GEOTIFF_REMOTE_MERGED after we finish the raster step successfully
 
+# web tile path
 #WEBTILE_LOCAL = '/tmp/web_tiles/' # we do not use /tmp for webtile step, it is unique in that way
 WEBTILE_REMOTE = OUTPUT + 'web_tiles/'
 
-#THREE_D_PATH      = OUTPUT + '3d_tiles/' # workflow does not accomodate 3d-tiling yet
+# 3d tile path
+# Note: workflow does not accomodate 3d-tiling yet as of release 0.9.0
+#THREE_D_PATH      = OUTPUT + '3d_tiles/'
 
 """ FINAL config is exported here, and imported in the IPW Workflow python file. """
 IWP_CONFIG = {
@@ -56,7 +61,7 @@ IWP_CONFIG = {
   "ext_footprints": ".shp",
   "dir_footprints_remote": FOOTPRINTS_REMOTE, # the footprints start on /scratch before we transfer them to /tmp
   "dir_footprints_local": FOOTPRINTS_LOCAL, # we rsync footprints from /scratch to /tmp before we use them for deduplication
-  "dir_geotiff_remote": GEOTIFF_REMOTE, # we store geotiffs in /scratch after they are created so they are safe after the job concludes, and web-tiling can access all geotiffs in the same directory
+  "dir_geotiff_remote": GEOTIFF_REMOTE, # we store geotiffs in /scratch after they're created so they're safe after the job concludes, and web-tiling can access all geotiffs in the same directory
   "dir_geotiff_local": GEOTIFF_LOCAL, # we write highest level geotiffs to /tmp then transfer to /scratch 
   "dir_web_tiles": WEBTILE_REMOTE, # we do not use /tmp for webtile step, it writes directly to /scratch
   "dir_staged_remote": STAGING_REMOTE, # we rsync the staged files to /scratch to merge, then rasterize and 3dtile with that merged dir
