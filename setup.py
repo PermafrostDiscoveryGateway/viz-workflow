@@ -12,8 +12,6 @@ with open('HISTORY.rst') as history_file:
 
 requirements = [
     'Click>=7.0', 
-    'parsl>=1.2.0',
-    'kubernetes>=21.7.0',
     'viz_3dtiles @ git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git#egg=viz_3dtiles',
     'pdgstaging @ git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git@develop#egg=pdgstaging',
     'pdgraster @ git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git@develop#egg=pdgraster',
@@ -22,8 +20,8 @@ requirements = [
 test_requirements = ['pytest>=3', ]
 
 setup(
-    author="Matthew B. Jones",
-    author_email='jones@nceas.ucsb.edu',
+    author='Kastan Day, Juliet Cohen, Matthew B. Jones',
+    author_email='kvday2@illinois.edu, jcohen@nceas.ucsb.edu, jones@nceas.ucsb.edu',
     python_requires='>=3.6',
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
@@ -52,6 +50,6 @@ setup(
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/PermafrostDiscoveryGateway/viz-workflow',
-    version='0.1.0',
+    version='0.9.0',
     zip_safe=False,
 )
