@@ -35,23 +35,6 @@ user = subprocess.check_output("whoami").strip().decode("ascii")
 import PRODUCTION_IWP_CONFIG # reintroduce when processing IWP
 IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG # reintroduce when processing IWP
 
-# set up logging from ConfigManager.py
-#log_filepath = IWP_CONFIG["dir_output"] + "log.log"
-# handler = logging.FileHandler(
-#      os.environ.get("LOGFILE", '/tmp/log.log')) # changed function to one that is newer, maybe logger.handlers.WatchedFileHandler is depreciated
-
-# handler = logging.handlers.WatchedFileHandler(
-#     os.environ.get("LOGFILE", '/tmp/log.log'))
-# formatter = logging.Formatter(logging.BASIC_FORMAT)
-# handler.setFormatter(formatter)
-# root = logging.getLogger()
-# root.setLevel(os.environ.get("LOGLEVEL", "INFO"))
-# root.addHandler(handler)
-# # set up logging from other scripts to print to console
-# sh = logging.StreamHandler()
-# sh.setFormatter(formatter)
-# root.addHandler(sh)
-
 # configure logger
 logger = logging.getLogger("logger")
 # Remove any existing handlers from the logger
@@ -67,25 +50,6 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 print(logger.handlers)
-
-#print("Using config: ")
-#pprint.pprint(IWP_CONFIG)
-
-# # setup logging
-# def setup_logging(log_json_file):
-#     """
-#     Setup logging configuration
-#     """
-#     with open(log_json_file, 'r') as f:
-#         logging_dict = json.load(f)
-#     logging.config.dictConfig(logging_dict)
-#     return logging_dict
-
-# # define logger:
-# logging_config = '/u/julietcohen/viz-workflow/logging.json'
-# logging_dict = setup_logging(logging_config)
-# # retrieve name of logger to add updates
-# logger = logging.getLogger(__name__)
 
 def main():
     result = subprocess.run(["hostname", "-i"], capture_output=True, text=True)

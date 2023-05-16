@@ -1,23 +1,3 @@
-"""
-This file prepares staged, vector tiles for archiving in the DataONE network.
-It has methods that do the following:
-    1. Find all the paths of vector tiles in the staged directory.
-    2. Open each path in GeoPandas
-    3. Remove the polygons whose centroids are not contained within the
-       boundaries of the tile. (This avoids archiving the exact same polygons
-       in two different tiles, in the case that the polygon intersects a tile's
-       boundary.)
-    4. Remove the "centroids_within_tile" and "tile" columns, which are no
-       longer needed after the above step. The tile is still identified using
-       by the "centroid_tile" property.
-    5. Write the GeoPandas object to a file in a given archive directory, still
-       maintaining the tile path structure (e.g.
-       {TileMatrix}/{TileRow}/{TileCol})
-
-    Juliet's note: I think the above documentation is wrong. I don't see where in this script we exeute #3 & #4.
-    If you read in a tile from the head node after merging, it still has the property "staging_centroid_within_tile"
-"""
-
 import filecmp
 import os
 import pathlib
@@ -61,7 +41,8 @@ def main():
     '''
     Usage Instructions:
         - Set the list of paths to the vector tiles `staged_dir_paths_list`
-        - Choose one of the paths from the last step, remove it from the `staged_dir_paths_list` and set it as the `merged_dir_path` that will be used as the merged dir.
+        - Choose one of the paths from the last step, remove the head node 
+        from the `staged_dir_paths_list` and set it as the `merged_dir_path`
     '''
     
     #######################
@@ -101,7 +82,7 @@ def main():
     print("Final  dir: ", merged_dir_path)
     
     #stager = pdgstaging.TileStager(config=IWP_CONFIG, check_footprints=False)
-    stager = TileStager(config=IWP_CONFIG, check_footprints=False) # changed this from above line when troubleshooting merging 02/01
+    stager = TileStager(config=IWP_CONFIG, check_footprints=False)
     ext = '.gpkg'
     
     print("Starting merge...")
