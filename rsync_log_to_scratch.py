@@ -21,18 +21,12 @@ pprint.pprint(IWP_CONFIG)
 
 # define user on Delta, avoid writing files to other user's dir
 user = subprocess.check_output("whoami").strip().decode("ascii")
-# define desired location for output files within user dir
-# ensures a new subfolder every run as long as new run is not started within same day as last run
-#output_subdir = datetime.now().strftime("%b-%d-%y")
-# don't use subprocess to retrieve date for subdir because runs might span over 2 days if they go overnight
-#output_subdir = "iwp_testRun_20230131"
-#output_subdir = '2023-01-20'
 
 ''' get hostnames from slurm file '''
 with open(f'/u/{user}/viz-workflow/slurm/nodes_array.txt', 'r') as f:
   hostnames = f.read().splitlines()
 
-print("Syncing staged files to nodes:\n\t", '\n\t'.join(hostnames))
+print("Syncing log files to nodes within /staged dir:\n\t", '\n\t'.join(hostnames))
 
 count = 0
 for hostname in hostnames:  
