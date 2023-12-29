@@ -1,56 +1,40 @@
 from datetime import datetime
 import subprocess
-#######################
-#### Change me 😁  ####
-#######################
-# ALWAYS include the tailing slash "/"
+import numpy as np
 
+# always include the tailing slash "/"
 # define user on Delta, avoid writing files to other user's dir
 user = subprocess.check_output("whoami").strip().decode("ascii")
-#head_node = 'cn___/'
-head_node = 'gpub086'
-# define desired location for output files within user dir
-# ensures a new subfolder every run as long as new run is not started within same day as last run
-# following path is the output subdir for test run, using just on subdir of the alaska files that is only ~8% of the Alaska dir, 23.5 GB
-output_subdir = 'lake_change/output/utm_32640_20230411'
-#output_subdir = datetime.now().strftime("%b-%d-%y")
-# don't use subprocess to retrieve date for subdir because runs might span over 2 days if they go overnight
+head_node = 'cn040/'
+#head_node = 'gpub___'
 
-##############################
-#### END OF Change me 😁  ####
-##############################
-
-# input path for all data:
-INPUT = '/scratch/bbou/julietcohen/lake_change/input/sample/'
-
-# following path is the OUTPUT for test run, using just on subdir of the alaska files that is only 7.78% of the Alaska dir, 45.57 GB
-OUTPUT  = f'/scratch/bbou/{user}/{output_subdir}/' # Dir for results. High I/O is good.
+INPUT = '/scratch/bbou/julietcohen/lake_change/input/time_series/annual/yr2021/'
+output_subdir = 'lake_change/output/time_series_annual/yr2021'
+OUTPUT  = f'/scratch/bbou/{user}/{output_subdir}/'
 
 STAGING_LOCAL = '/tmp/staged/'
 STAGING_REMOTE = OUTPUT  + 'staged/'
 STAGING_REMOTE_MERGED = STAGING_REMOTE + head_node
 
 GEOTIFF_LOCAL = '/tmp/geotiff/'
-GEOTIFF_REMOTE = OUTPUT + 'geotiff/' # Kastan used pathlib.Path(OUTPUT) / pathlib.Path('merged_geotiff_sep9') for this so if it errors try something similar
-# check if need a variable GEOTIFF_REMOTE_MERGED after we finish the raster step successfully
+GEOTIFF_REMOTE = OUTPUT + 'geotiff/' 
 
-#WEBTILE_LOCAL = '/tmp/web_tiles/' # we do not use /tmp for webtile step, it is unique in that way
 WEBTILE_REMOTE = OUTPUT + 'web_tiles/'
 
-#THREE_D_PATH      = OUTPUT + '3d_tiles/' # workflow does not accomodate 3d-tiling yet
-
-""" FINAL config is exported here, and imported in the IPW Workflow python file. """
+""" final config is exported here, and imported in the workflow python file. """
 IWP_CONFIG = {
   "deduplicate_clip_to_footprint": False,
-  "dir_output": OUTPUT, # base dir of all output, needs to change every run with definition of output_subdir
-  "dir_input": INPUT, # base dir of all files to be staged
+  "deduplicate_method": None,
+  "deduplicate_at": None,
+  "dir_output": OUTPUT, 
+  "dir_input": INPUT, 
   "ext_input": ".gpkg",
-  "dir_geotiff_remote": GEOTIFF_REMOTE, # we store geotiffs in /scratch after they are created so they are safe after the job concludes, and web-tiling can access all geotiffs in the same directory
-  "dir_geotiff_local": GEOTIFF_LOCAL, # we write highest level geotiffs to /tmp then transfer to /scratch 
-  "dir_web_tiles": WEBTILE_REMOTE, # we do not use /tmp for webtile step, it writes directly to /scratch
-  "dir_staged_remote": STAGING_REMOTE, # we rsync the staged files to /scratch to merge, then rasterize and 3dtile with that merged dir
-  "dir_staged_remote_merged": STAGING_REMOTE_MERGED, # input for raster highest after staged files have been merged
-  "dir_staged_local": STAGING_LOCAL, # initially write staged files to /tmp so they write faster
+  "dir_geotiff_remote": GEOTIFF_REMOTE, 
+  "dir_geotiff_local": GEOTIFF_LOCAL,  
+  "dir_web_tiles": WEBTILE_REMOTE, 
+  "dir_staged_remote": STAGING_REMOTE, 
+  "dir_staged_remote_merged": STAGING_REMOTE_MERGED, 
+  "dir_staged_local": STAGING_LOCAL, 
   "filename_staging_summary": STAGING_REMOTE + "staging_summary.csv",
   "filename_rasterization_events": GEOTIFF_REMOTE + "raster_events.csv",
   "filename_rasters_summary": GEOTIFF_REMOTE + "raster_summary.csv",
@@ -59,42 +43,82 @@ IWP_CONFIG = {
   "tms_id": "WGS1984Quad",
   "z_range": [
     0,
-    11
+    12
   ],
   "geometricError": 57,
   "z_coord": 0,
   "statistics": [
     {
-      "name": "change_rate", # changed from "coverage"
+      "name": "permanent_water", 
       "weight_by": "area",
-      "property": "ChangeRateGrowth_myr-1", # changed from "area_per_pixel_area", can also be property that is available in input data 
-      "aggregation_method": "sum",  
-      "resampling_method": "sum", # changed from "average"
+      "property": "permanent_water", 
+      "aggregation_method": "max",
+      "resampling_method": "mode", 
       "val_range": [
         0,
-        1
+        #6088.89 # 99.99th percentile for 2017, this shows the best diversity for perm water
+        #6105.43 # 99.99th percentile for 2018
+        #6103.33 # 99.99th percentile for 2019
+        #6093.07 # 99.99th percentile for 2020
+        6071.56 # 99.99th percentile for 2021
       ],
-      "palette": ["#ff0000", # red
-                  "#FF8C00", # DarkOrange
-                  "#FFA07A", # LightSalmon
-                  "#FFFF00", # yellow
-                  "#66CDAA", # MediumAquaMarine
-                  "#AFEEEE", # PaleTurquoise,
-                  "#0000ff"], # blue
+      "palette": [
+        "#1be3ee", # blues
+        "#1b85ee",
+        "#1b22ee"
+      ],
       "nodata_val": 0,
       "nodata_color": "#ffffff00"
     },
-  ],
-  "deduplicate_at": "raster",
-  "deduplicate_keep_rules": [
-    [
-      "Date",
-      "larger"
-    ]
-  ],
-  "deduplicate_method": "neighbor",
-  "deduplicate_keep_rules": [["staging_filename", "larger"]],
-  "deduplicate_overlap_tolerance": 0.1,
-  "deduplicate_overlap_both": False,
-  "deduplicate_centroid_tolerance": None
+    {
+      "name": "seasonal_water", 
+      "weight_by": "area",
+      "property": "seasonal_water", 
+      "aggregation_method": "max",
+      "resampling_method": "mode", 
+      "val_range": [
+        0,
+        #2.66 # 95th percentile for 2017
+        #2.47 # 95th percentile for 2018
+        #2.64 # 95th percentile for 2019
+        #3.01 # 95th percentile for 2020
+        2.86 # 95th percentile for 2021
+      ],
+      "palette": [
+        "#f000d8", # purples
+        "#c200cc",
+        "#8b00cc"
+      ],
+      "nodata_val": 0,
+      "nodata_color": "#ffffff00" 
+    }
+  ]
+  # "statistics": [ # for lake change dataset:
+  #   {
+  #     "name": "change_rate", 
+  #     "weight_by": "area",
+  #     "property": "ChangeRateNet_myr-1", 
+  #     "aggregation_method": "min", 
+  #     "resampling_method": "mode",  
+  #     "val_range": [
+  #       -2,
+  #       2
+  #     ],
+  #     "palette": ["#ff0000", # red
+  #                 "#FF8C00", # DarkOrange
+  #                 "#FFA07A", # LightSalmon
+  #                 "#FFFF00", # yellow
+  #                 "#66CDAA", # MediumAquaMarine
+  #                 "#AFEEEE", # PaleTurquoise,
+  #                 "#0000ff"], # blue
+  #     "nodata_val": 0,
+  #     "nodata_color": "#ffffff00" # fully transparent white
+  #   },
+  # ],
+  #"deduplicate_at": ["staging"],
+  #"deduplicate_keep_rules": [["Perimeter_meter","larger"]], # [property, operator], using property with all positive values
+  #"deduplicate_method": "neighbor",
+  #"deduplicate_overlap_tolerance": 0.5, # default value
+  #"deduplicate_overlap_both": False, # only 1 polygon must be overlapping with the deduplicate_overlap_tolerance threshold to be considered dups
+  #"deduplicate_centroid_tolerance": None # only deduplicate_overlap_tolerance will be used to determine if polygons are dups
 }

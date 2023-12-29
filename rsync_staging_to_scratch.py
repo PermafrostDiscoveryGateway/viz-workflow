@@ -5,12 +5,25 @@ from datetime import datetime
 import subprocess
 from subprocess import PIPE, Popen
 import pprint
-import PRODUCTION_IWP_CONFIG
-IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
+
+# -----------------------------------------------------
+# CHOOSE ONE OF THE FOLLOWING IMPORT & CONFIG CHUNKS
+
+# for processing IWP:
+# import PRODUCTION_IWP_CONFIG
+# IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
+# IWP_CONFIG2 = IWP_CONFIG.copy()
+
+# for processing lake data:
+import lake_change_config
+IWP_CONFIG = lake_change_config.IWP_CONFIG
 IWP_CONFIG2 = IWP_CONFIG.copy()
 
-#import lake_change_config
-#IWP_CONFIG = lake_change_config.IWP_CONFIG
+# for testing branches with IWP data:
+# import branch_testing_iwp_config
+# IWP_CONFIG = branch_testing_iwp_config.IWP_CONFIG
+# IWP_CONFIG2 = IWP_CONFIG.copy()
+# -----------------------------------------------------
 
 # set config properties for current context
 IWP_CONFIG2['dir_staged'] = IWP_CONFIG2['dir_staged_local']
