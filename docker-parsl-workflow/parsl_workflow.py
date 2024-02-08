@@ -1,6 +1,7 @@
 # test docker image and orchestrate containers
 # with kubernetes by running a minimum version of 
 # the workflow with a kubernetes parsl config
+# processing a portion of a lake change dataset
 
 # documentation for parsl config: https://parsl.readthedocs.io/en/stable/userguide/configuring.html#kubernetes-clusters
 
@@ -9,7 +10,7 @@ from datetime import datetime
 import json
 import logging
 import logging.handlers
-from pdgstaging import logging_config # could also be imported by viz-raster
+from pdgstaging import logging_config
 import os
 
 import pdgstaging
@@ -26,16 +27,20 @@ from parsl_config import config_parsl_cluster
 
 import shutil
 
+import subprocess
+from subprocess import Popen
+user = subprocess.check_output("whoami").strip().decode("ascii")
+
 
 # call parsl config and initiate k8s cluster
 parsl.set_stream_logger()
-htex_kube = config_parsl_cluster(max_blocks=5, image='ghcr.io/PermafrostDiscoveryGateway/viz-workflow:0.1', namespace='pdgrun')
+htex_kube = config_parsl_cluster() # use default settings defined in parsl_config.py
 parsl.load(htex_kube)
 
 
 # start with a fresh directory!
 print("Removing old directories and files...")
-dir = "/home/jcohen/viz-workflow/docker-parsl-workflow/app/"
+dir = "/app/"
 old_filepaths = [dir + "staging_summary.csv",
                  dir + "raster_summary.csv",
                  dir + "raster_events.csv",
@@ -68,8 +73,7 @@ def run_pdg_workflow(
     Parameters
     ----------
     workflow_config : dict
-        Configuration for the PDG staging workflow, tailored to rasterization and 
-        web tiling steps only.
+        Configuration for the PDG staging workflow.
     batch_size: int
         How many input files, staged files, geotiffs, or web tiles should be included in a single creation
         task? (each task is run in parallel) Default: 300
@@ -279,12 +283,16 @@ def make_batch(items, batch_size):
 
 # run the workflow
 config_file = dir + 'viz_config.json'
-logging.info(f'🗂 Workflow configuration loaded from {config_file}')
 print("Loaded config. Running workflow.")
 logging.info(f'Starting PDG workflow: staging, rasterization, and web tiling')
 run_pdg_workflow(config_file)
 # Shutdown and clear the parsl executor
-htex_kube.executors[0].shutdown() # NOTE: probs don't need this line bc parsl cleans up after itself when run goes smoothly (deletes pods automatically)
-parsl.clear() # NOTE: likely dont need this line either? 
+htex_kube.executors[0].shutdown()
+parsl.clear()
+
+# transfer log from /tmp to user dir
+cmd = ['mv', '/tmp/log.log', f'/home/{user}/lake_change_time_series/parsl_workflow/']
+# initiate the process to run that command
+process = Popen(cmd)
 
 print("Script complete.")

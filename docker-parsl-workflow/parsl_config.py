@@ -2,14 +2,16 @@ from parsl.config import Config
 from parsl.executors import HighThroughputExecutor
 from parsl.providers import KubernetesProvider
 from parsl.addresses import address_by_route
+import subprocess
+user = subprocess.check_output("whoami").strip().decode("ascii")
 
 def config_parsl_cluster(
         max_blocks=2, 
         min_blocks=1, 
-        init_blocks=2, 
-        max_workers=1, # TODO: increase this?
+        init_blocks=2,
+        max_workers=7,
         cores_per_worker=1, 
-        image='ghcr.io/PermafrostDiscoveryGateway/viz-workflow:0.1',
+        image='ghcr.io/PermafrostDiscoveryGateway/viz-workflow:0.1', # TODO: automate this string to pull most recent release on github?
         namespace='pdgrun'):
 
     htex_kube = Config(
@@ -49,7 +51,7 @@ def config_parsl_cluster(
                     # persistent_volumes (list[(str, str)]) – List of tuples 
                     # describing persistent volumes to be mounted in the pod. 
                     # The tuples consist of (PVC Name, Mount Directory).
-                    # persistent_volumes=[('mypvc','/var/data')]
+                    persistent_volumes=[('pdgrun-dev-0', f'/home/{user}/viz-workflow/app-data')]
                 ),
             ),
         ]
