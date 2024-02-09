@@ -51,7 +51,7 @@ def config_parsl_cluster(
                     # persistent_volumes (list[(str, str)]) – List of tuples 
                     # describing persistent volumes to be mounted in the pod. 
                     # The tuples consist of (PVC Name, Mount Directory).
-                    persistent_volumes=[('pdgrun-dev-0', f'/home/{user}/viz-workflow/app-data')]
+                    persistent_volumes=[('pdgrun-dev-0', f'/home/{user}/viz-workflow/app')]
                 ),
             ),
         ]
