@@ -40,9 +40,9 @@ IWP_CONFIG['dir_footprints'] = IWP_CONFIG['dir_footprints_local']
 def main():
     '''
     Usage Instructions:
-        - Set the list of paths to the vector tiles `staged_dir_paths_list`
-        - Choose one of the paths from the last step, remove the head node 
-        from the `staged_dir_paths_list` and set it as the `merged_dir_path`
+        - Enter the HEAD node (lowest # node) at the end of the path for `merged_dir_path`
+        - Enter all worker nodes (all other nodes) at the end of the paths that make 
+        up `staged_dir_paths_list`
     '''
     
     #######################
@@ -50,23 +50,28 @@ def main():
     #######################
     # todo -- get files from dirs automatically, using os.lsdir().
     #BASE_DIR = '/scratch/bbou/julietcohen/IWP/output/...'
-    merged_dir_path = f"{IWP_CONFIG['dir_staged']}cn___"  # this path SHOULD NOT be in the `staged_dir_paths_list`
+    merged_dir_path = f"{IWP_CONFIG['dir_staged']}gpub020"  # this path SHOULD NOT be in the `staged_dir_paths_list`
     staged_dir_paths_list = [
-        f"{IWP_CONFIG['dir_staged']}cn___",
-        f"{IWP_CONFIG['dir_staged']}cn___",
-        f"{IWP_CONFIG['dir_staged']}cn___",
-     #   f"{IWP_CONFIG['dir_staged']}cn___",
-     #   f"{IWP_CONFIG['dir_staged']}cn___",
-     #   f"{IWP_CONFIG['dir_staged']}cn___",
-     #   f"{IWP_CONFIG['dir_staged']}cn___",
-     #   f"{IWP_CONFIG['dir_staged']}cn___",
-     #   f"{IWP_CONFIG['dir_staged']}cn___",
-     #   f"{IWP_CONFIG['dir_staged']}cn___",
-     #   f"{IWP_CONFIG['dir_staged']}cn___",
-     #   f"{IWP_CONFIG['dir_staged']}cn___",
-     #   f"{IWP_CONFIG['dir_staged']}cn___",
-     #   f"{IWP_CONFIG['dir_staged']}cn___",
-     #   f"{IWP_CONFIG['dir_staged']}cn___",
+        f"{IWP_CONFIG['dir_staged']}gpub041",
+        #f"{IWP_CONFIG['dir_staged']}gpub041",
+        #f"{IWP_CONFIG['dir_staged']}gpub041",
+        #f"{IWP_CONFIG['dir_staged']}gpub038",
+        #f"{IWP_CONFIG['dir_staged']}gpub027",
+        #f"{IWP_CONFIG['dir_staged']}gpub028",
+        #f"{IWP_CONFIG['dir_staged']}gpub029",
+        #f"{IWP_CONFIG['dir_staged']}gpub030",
+        #f"{IWP_CONFIG['dir_staged']}gpub031",
+        #f"{IWP_CONFIG['dir_staged']}gpub032",
+        #f"{IWP_CONFIG['dir_staged']}gpub033",
+        #f"{IWP_CONFIG['dir_staged']}gpub034",
+        #f"{IWP_CONFIG['dir_staged']}gpub035",
+        #f"{IWP_CONFIG['dir_staged']}gpub036",
+        #f"{IWP_CONFIG['dir_staged']}gpub037",
+        #f"{IWP_CONFIG['dir_staged']}gpub038",
+        #f"{IWP_CONFIG['dir_staged']}gpub039",
+        #f"{IWP_CONFIG['dir_staged']}gpub040",
+        #f"{IWP_CONFIG['dir_staged']}gpub041",
+        #f"{IWP_CONFIG['dir_staged']}gpub___",
     ]
     ##############################
     #### END OF Change me 😁  ####
@@ -338,11 +343,9 @@ def merge_tile(incoming_tile_in_path, incoming_tile_out_path, isDestructive, sta
                     dedup_method = stager.config.get_deduplication_method()
                     if dedup_method is not None:
                         mode = 'w'
-                        ## concatenate the geodataframes:
-                        ## for IWP data, we do not set the config to dedup at staging
-                        ## so combine_and_deduplicate() does NOT deduplicate here,
-                        ## we are just ensuring that the tiles within the head node
-                        ## contains all the polygons for that tile, regardless of which node
+                        ## concatenate the geodataframes and identify duplicates:
+                        ## ensuring that the tiles within the head node contains 
+                        ## all the polygons for that tile, regardless of which node
                         ## processed each polygon
                         incoming_gdf = stager.combine_and_deduplicate(
                             incoming_gdf, incoming_tile_out_path)

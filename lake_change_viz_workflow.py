@@ -24,16 +24,12 @@ import shlex
 import pdgraster
 import pdgstaging 
 import ray
-import viz_3dtiles  # import Cesium3DTile, Cesium3DTileset
 
 # define user on Delta, avoid writing files to other user's dir
 user = subprocess.check_output("whoami").strip().decode("ascii")
 
-#import lake_change_config
-#IWP_CONFIG = lake_change_config.IWP_CONFIG
-
-import PRODUCTION_IWP_CONFIG # reintroduce when processing IWP
-IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG # reintroduce when processing IWP
+import lake_change_config
+IWP_CONFIG = lake_change_config.IWP_CONFIG
 
 # configure logger
 logger = logging.getLogger("logger")
@@ -83,15 +79,7 @@ def main():
         # step3_raster_lower(batch_size_geotiffs=100) # rasterize all LOWER Z levels
         # todo: immediately after initiating above step, start rsync script to continuously sync geotiff files,
         # or immediately after the above step is done, rsync all files at once if there is time left in job
-        step4_webtiles(batch_size_web_tiles=250) # convert to web tiles.
-        
-        # mem_testing = False        
-        # if mem_testing:
-        #     from pympler import tracker
-        #     tr = tracker.SummaryTracker()
-        #     tr.print_diff()
-        #     step2_raster_highest(batch_size=100)                # rasterize highest Z level only 
-        #     tr.print_diff()        
+        step4_webtiles(batch_size_web_tiles=250) # convert to web tiles.       
 
     except Exception as e:
         print(f"Caught error in main(): {str(e)}", "\nTraceback", traceback.print_exc())
@@ -116,8 +104,7 @@ def step0_staging():
 
     # update the config for the current context: write staged files to local /tmp dir
     iwp_config = deepcopy(IWP_CONFIG)
-    iwp_config['dir_staged'] = iwp_config['dir_staged_local']  
-    iwp_config['dir_footprints'] = iwp_config['dir_footprints_local'] # reintroduce when processing IWP 
+    iwp_config['dir_staged'] = iwp_config['dir_staged_local']   
     # make directory /tmp/staged on each node
     # not really necessary cause Robyn's functions are set up to do this
     # and /tmp allows dirs to be created to write files
@@ -125,10 +112,7 @@ def step0_staging():
     
     # OLD METHOD "glob" all files. 
     stager = pdgstaging.TileStager(iwp_config, check_footprints=False)
-    missing_footprints = stager.check_footprints() # reintroduce when processing IWP
-    print(f"⚠️ Num missing footprints: {len(missing_footprints)}") # reintroduce when processing IWP
     
-    # Get
     staging_input_files_list = stager.tiles.get_filenames_from_dir('input')
 
     # record number of filepaths before they are converted into app_futures to detemrine if that's where the bug is
@@ -490,8 +474,6 @@ def step3_raster_lower(batch_size_geotiffs=20):
     iwp_config = deepcopy(IWP_CONFIG)
 
     iwp_config['dir_geotiff'] = iwp_config['dir_geotiff_remote']
-    # next line is likely not necessary but can't hurt
-    iwp_config['dir_footprints'] = iwp_config['dir_footprints_local'] # reintroduce when processing IWP data
     # update the config for the current context: pull stager that represents staged files in /scratch
     # next line is likely not necessary but can't hurt
     iwp_config['dir_staged'] = iwp_config['dir_staged_remote_merged']
@@ -542,7 +524,6 @@ def step3_raster_lower(batch_size_geotiffs=20):
                 # even though the geotiff base dir has been created and the filenames have been batched, 
                 # still cannot switch the dir_geotiff to _local !!! because the lower z-level rasters need to be
                 # written to scratch rather than /tmp so all lower z-levels can access all files in higher z-levels
-                iwp_config['dir_footprints'] = iwp_config['dir_footprints_local'] # we deduplicate at rasterization, reintroduce when processing IWP data 
                 #iwp_config['dir_geotiff'] = iwp_config['dir_geotiff_local'] # run immeditely before defining rasterizer
                 # I dont think theres a need to set rasterizer with new config after chaning this property cause 
                 # that is done within the function create_composite_geotiffs() but troubleshooting 
@@ -648,7 +629,7 @@ def step4_webtiles(batch_size_web_tiles=300):
             # app_future = create_web_tiles.options(placement_group=pg).remote(batch, IWP_CONFIG)
             # app_future = create_web_tiles.remote(batch, IWP_CONFIG) # remove this line
             app_future = create_web_tiles.remote(batch, iwp_config_new) 
-            #app_future = create_web_tiles.remote(batch, IWP_CONFIG) # remove this line when line "reintroduce" lines are reintroduced
+            #app_future = create_web_tiles.remote(batch, IWP_CONFIG) # remove this line when line "reintroduce" lines are reintroduced # update 8/22: dont remember why I wrote that comment
             app_futures.append(app_future)
 
         for i in range(0, len(app_futures)): 
