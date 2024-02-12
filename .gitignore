@@ -141,3 +141,10 @@ nodes_array.txt
 
 # output of slurm processes
 slurm-*.out
+
+# output of docker runs
+docker-parsl-workflow/app
+docker-parsl-workflow/data
+
+# files used for input for testing
+*.gpkg
