@@ -34,9 +34,9 @@ _How_ you specify a persistent data volume to the container differs between the 
 ### Steps 
 
 - If working on a laptop rather than a server, clone repository & open the Docker Desktop app, then navigate to repository in VScode. If working on a server, SSH into the server in VScode, clone the repository, and navigate to the repository.
-- Retrieve input data to process. **(TODO: make sample data accessible)**
+- Retrieve input data to process. **(TODO: make sample data accessible to people without access to Datateam)**
 - Edit the filepath for the WORKDIR in the Dockerfile as needed.
-  - TODO: remove this step
+  - TODO: automate this step
 - Ensure an environment is activated in the terminal that is built from the same `requirements.txt` file as the docker image. This requires you to create a fresh environment, activate it, then run `pip install -r requirements.txt` in the command line. 
 - Run `docker build -t image_name .` in the command line.
 - Run the container and specify a persistent directory for input and output data, updating the path as needed: `docker run -v /path/to/repository/viz-workflow/docker-parsl-workflow/app:/app image_name`
@@ -47,18 +47,18 @@ _How_ you specify a persistent data volume to the container differs between the 
 ### Overview
 
 - This script runs the same visualization worklow but processes in parallel with several workers. The amount of workers can be adjusted in the configuration: `parsl_config.py`
-- The GitHub repository "packages" section contains all published Docker images that can be pulled by users. These  are version controlled, so you can point to a specific image version to run. This makes a workflow more reproducibile. The repo and version is specified in the `parsl_config.py`
+- The GitHub repository "packages" section contains all published Docker images that can be pulled by users. These  are version controlled, so you can point to a specific image version to run. This makes a workflow more reproducibile. The repo and version are specified in the `parsl_config.py`
 
 ### Steps
 
-- SSH into server in VScode, clone the repository, and navigate to the repository.
 - Make sure your GitHub Personal Access Token allows for publishing packages to the repository.
     - Navigate to your token on GitHub, then scroll down to `write:packages` and check the box and save.
+- SSH into server in VScode, clone the repository, and navigate to the repository.
 - Edit the filepath for the `WORKDIR` in the Dockerfile as needed
-  - TODO: remove this step
+  - TODO: automate this step
 - Edit the line in the parsl configuration to specify the persistent volume name and mount filepath.
     - The first item in the list will need to be a persistent volume that is set up by the server admin. See [this repository](https://github.com/mbjones/k8s-parsl?tab=readme-ov-file#persistent-data-volumes) for details.
-    - The second argument is the location that you want the volume to be mounted within your container
+    - The second item is the location that you want the volume to be mounted within your container
 ```
 persistent_volumes=persistent_volumes=[('pdgrun-dev-0', f'/home/{user}/viz-workflow/docker-parsl-workflow/app')]
 ```
