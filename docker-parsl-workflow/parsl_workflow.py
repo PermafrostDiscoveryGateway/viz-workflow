@@ -1,7 +1,8 @@
 # test docker image and orchestrate containers
-# with kubernetes by running a minimum version of 
+# with kubernetes by running a version of 
 # the workflow with a kubernetes parsl config
-# processing a portion of a lake change dataset
+# processing a portion of a lake change dataset 
+# (1 UTM zone)
 
 # documentation for parsl config: https://parsl.readthedocs.io/en/stable/userguide/configuring.html#kubernetes-clusters
 
@@ -34,11 +35,12 @@ user = subprocess.check_output("whoami").strip().decode("ascii")
 
 # call parsl config and initiate k8s cluster
 parsl.set_stream_logger()
-htex_kube = config_parsl_cluster() # use default settings defined in parsl_config.py
+# use default settings defined in parsl_config.py:
+htex_kube = config_parsl_cluster()
 parsl.load(htex_kube)
 
 
-# start with a fresh directory!
+# start with a fresh directory
 print("Removing old directories and files...")
 dir = "/app/"
 old_filepaths = [dir + "staging_summary.csv",
@@ -57,6 +59,51 @@ old_dirs = [dir + "staged",
 for old_dir in old_dirs:
   if os.path.exists(old_dir) and os.path.isdir(old_dir):
       shutil.rmtree(old_dir)
+
+
+viz_config = {
+    "deduplicate_clip_to_footprint": False,
+    "deduplicate_method": None,
+    "dir_output": ".", 
+    "dir_input": ".", 
+    "ext_input": ".gpkg",
+    "dir_staged": "app/staged/", 
+    "dir_geotiff": "app/geotiff/",  
+    "dir_web_tiles": "app/web_tiles/", 
+    "filename_staging_summary": "app/staging_summary.csv",
+    "filename_rasterization_events": "app/raster_events.csv",
+    "filename_rasters_summary": "app/raster_summary.csv",
+    "simplify_tolerance": 0.1,
+    "tms_id": "WGS1984Quad",
+    "z_range": [
+    0,
+    7
+    ],
+    "geometricError": 57,
+    "z_coord": 0,
+    "statistics": [
+    {
+    "name": "change_rate", 
+    "weight_by": "area",
+    "property": "ChangeRateNet_myr-1", 
+    "aggregation_method": "min", 
+    "resampling_method": "mode",  
+    "val_range": [
+        -2,
+        2
+    ],
+    "palette": ["#ff0000", 
+                "#FF8C00", 
+                "#FFA07A", 
+                "#FFFF00", 
+                "#66CDAA", 
+                "#AFEEEE", 
+                "#0000ff"], 
+    "nodata_val": 0,
+    "nodata_color": "#ffffff00"
+    }
+  ]
+}
 
 
 def run_pdg_workflow(
@@ -282,16 +329,18 @@ def make_batch(items, batch_size):
 # ----------------------------------------------------------------
 
 # run the workflow
-config_file = dir + 'viz_config.json'
-print("Loaded config. Running workflow.")
 logging.info(f'Starting PDG workflow: staging, rasterization, and web tiling')
-run_pdg_workflow(config_file)
+run_pdg_workflow(viz_config)
 # Shutdown and clear the parsl executor
 htex_kube.executors[0].shutdown()
 parsl.clear()
 
+print("Processing complete. Moving log file.")
+
 # transfer log from /tmp to user dir
-cmd = ['mv', '/tmp/log.log', f'/home/{user}/lake_change_time_series/parsl_workflow/']
+# TODO: Automate the following destiantion path to be the mounted volume in the config
+# maybe do this by importing config script that specifies the filepath as a variable at the top
+cmd = ['mv', '/tmp/log.log', '/app/']
 # initiate the process to run that command
 process = Popen(cmd)
 

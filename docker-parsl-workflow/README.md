@@ -34,10 +34,12 @@ _How_ you specify a persistent data volume to the container differs between the 
 ### Steps 
 
 - If working on a laptop rather than a server, clone repository & open the Docker Desktop app, then navigate to repository in VScode. If working on a server, SSH into the server in VScode, clone the repository, and navigate to the repository.
-- Retrieve input data to process. **(TODO: make sample data accessible to people without access to Datateam)**
-- Edit the filepath for the WORKDIR in the Dockerfile as needed.
-  - TODO: automate this step
 - Ensure an environment is activated in the terminal that is built from the same `requirements.txt` file as the docker image. This requires you to create a fresh environment, activate it, then run `pip install -r requirements.txt` in the command line. 
+- Retrieve input data to process.
+  - **(TODO: make sample data accessible to people without access to Datateam)**
+- Edit the filepath for the WORKDIR in the Dockerfile as needed.
+  - **TODO: automate this step by adjusting `WORKDIR` in Dockerfile, and potentially defining `ENV` variables prior to defining the `WORKDIR` that are then used in the `WORKDIR`.**
+  - Recall that the default `WORKDIR` is `/` if not otherwise defined.
 - Run `docker build -t image_name .` in the command line.
 - Run the container and specify a persistent directory for input and output data, updating the path as needed: `docker run -v /path/to/repository/viz-workflow/docker-parsl-workflow/app:/app image_name`
     - Note: The `app` dir does not need ro be created manually, it will be created when the container runs.
@@ -54,8 +56,10 @@ _How_ you specify a persistent data volume to the container differs between the 
 - Make sure your GitHub Personal Access Token allows for publishing packages to the repository.
     - Navigate to your token on GitHub, then scroll down to `write:packages` and check the box and save.
 - SSH into server in VScode, clone the repository, and navigate to the repository.
+- Ensure an environment is activated in the terminal that is built from the same `requirements.txt` file as the docker image, and the same version of python.
 - Edit the filepath for the `WORKDIR` in the Dockerfile as needed
-  - TODO: automate this step
+  - **TODO: automate this step by adjusting `WORKDIR` in Dockerfile, and potentially defining `ENV` variables prior to defining the `WORKDIR` that are then used in the `WORKDIR`.**
+  - Recall that the default `WORKDIR` is `/` if not otherwise defined.
 - Edit the line in the parsl configuration to specify the persistent volume name and mount filepath.
     - The first item in the list will need to be a persistent volume that is set up by the server admin. See [this repository](https://github.com/mbjones/k8s-parsl?tab=readme-ov-file#persistent-data-volumes) for details.
     - The second item is the location that you want the volume to be mounted within your container
@@ -73,14 +77,13 @@ docker build -t ghcr.io/permafrostdiscoverygateway/viz-workflow:0.0.2 .
 Note: The string representing the organization and repo in these commands must be all lower-case letters.
 
 ```
-echo $GITHUB_PAT | docker login ghcr.io -u {username} --password-stdin
+echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER --password-stdin
 ```
 ```
 docker push ghcr.io/permafrostdiscoverygateway/viz-workflow:0.0.2
 ```
-- Run `kubectl get pods` to see if any pods are left hanging from the last run. This could be the case if a past run failed to shut down the parsl workers.
-    - If there are any hanging, delete them all at once for the specific namespace by running `kubectl delete pods --all -n {namespace}`
-- Ensure an environment is activated in the terminal that is built from the same `requirements.txt` file as the docker image, and the same version of python. 
+- Run `kubectl get pods` to see if any pods are left hanging from the last run in your namespace. This could be the case if a past run failed to shut down the parsl workers.
+    - If there are any hanging, delete them all at once for the specific namespace by running `kubectl delete pods --all -n {namespace}` 
 - Run the python script for the parsl workflow: `python parsl_workflow.py`
 
 **General Notes:**
@@ -88,3 +91,4 @@ docker push ghcr.io/permafrostdiscoverygateway/viz-workflow:0.0.2
   - You can check your processes in the command line with `ps -ef | grep {username}`
   - In the output, the column next to your username shows the 5-digit identifier for the proess. Run `kill -9 {identifier}` to kill one in particular.
 - After each run, if files were output, remove them from the persistent directory before next run. 
+- If testing code and you end up building many images, run `docker images` to list them and you can choose which to delete
