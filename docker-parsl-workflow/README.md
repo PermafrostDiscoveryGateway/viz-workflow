@@ -64,18 +64,19 @@ persistent_volumes=persistent_volumes=[('pdgrun-dev-0', f'/home/{user}/viz-workf
 ```
 - Update the string that represents the desired published repository package version of image in `parsl_config.py`. Replace the version number with the next version number you will publish it as:
 ```
-image='ghcr.io/PermafrostDiscoveryGateway/viz-workflow:0.2',
+image='ghcr.io/PermafrostDiscoveryGateway/viz-workflow:0.0.2',
 ```
 - Publish the package to the repository with new version number by running 3 commands one-by-one:
 ```
-docker build -t ghcr.io/julietcohen/docker_python_basics:0.9 .
+docker build -t ghcr.io/permafrostdiscoverygateway/viz-workflow:0.0.2 .
 ```
+Note: The string representing the organization and repo in these commands must be all lower-case letters.
 
 ```
 echo $GITHUB_PAT | docker login ghcr.io -u {username} --password-stdin
 ```
 ```
-docker push PermafrostDiscoveryGateway/viz-workflow:0.2
+docker push ghcr.io/permafrostdiscoverygateway/viz-workflow:0.0.2
 ```
 - Run `kubectl get pods` to see if any pods are left hanging from the last run. This could be the case if a past run failed to shut down the parsl workers.
     - If there are any hanging, delete them all at once for the specific namespace by running `kubectl delete pods --all -n {namespace}`

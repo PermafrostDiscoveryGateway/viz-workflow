@@ -11,7 +11,7 @@ def config_parsl_cluster(
         init_blocks=2,
         max_workers=7,
         cores_per_worker=1, 
-        image='ghcr.io/PermafrostDiscoveryGateway/viz-workflow:0.1', # TODO: automate this string to pull most recent release on github?
+        image='ghcr.io/PermafrostDiscoveryGateway/viz-workflow:0.0.1', # TODO: automate this string to pull most recent release on github? And add 0.0.+1?
         namespace='pdgrun'):
 
     htex_kube = Config(
