@@ -42,6 +42,7 @@ parsl.load(htex_kube)
 
 # start with a fresh directory
 print("Removing old directories and files...")
+# TODO: Decide filepath here, /app/ or . ?
 dir = "/app/"
 old_filepaths = [dir + "staging_summary.csv",
                  dir + "raster_summary.csv",
@@ -60,19 +61,19 @@ for old_dir in old_dirs:
   if os.path.exists(old_dir) and os.path.isdir(old_dir):
       shutil.rmtree(old_dir)
 
-
+# TODO: Decide filepath here for all dirs and cvs diles, app/ or . ?
 viz_config = {
     "deduplicate_clip_to_footprint": False,
     "deduplicate_method": None,
     "dir_output": ".", 
     "dir_input": ".", 
     "ext_input": ".gpkg",
-    "dir_staged": "app/staged/", 
-    "dir_geotiff": "app/geotiff/",  
-    "dir_web_tiles": "app/web_tiles/", 
-    "filename_staging_summary": "app/staging_summary.csv",
-    "filename_rasterization_events": "app/raster_events.csv",
-    "filename_rasters_summary": "app/raster_summary.csv",
+    "dir_staged": "staged/", 
+    "dir_geotiff": "geotiff/",  
+    "dir_web_tiles": "web_tiles/", 
+    "filename_staging_summary": "staging_summary.csv",
+    "filename_rasterization_events": "raster_events.csv",
+    "filename_rasters_summary": "raster_summary.csv",
     "simplify_tolerance": 0.1,
     "tms_id": "WGS1984Quad",
     "z_range": [
@@ -340,6 +341,7 @@ print("Processing complete. Moving log file.")
 # transfer log from /tmp to user dir
 # TODO: Automate the following destiantion path to be the mounted volume in the config
 # maybe do this by importing config script that specifies the filepath as a variable at the top
+# TODO: Decide filepath here, /app/ or . ?
 cmd = ['mv', '/tmp/log.log', '/app/']
 # initiate the process to run that command
 process = Popen(cmd)

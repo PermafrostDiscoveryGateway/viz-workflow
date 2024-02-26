@@ -2,6 +2,7 @@
 
 FROM python:3.9
 
+# metadata info:
 LABEL org.opencontainers.image.source https://github.com/permafrostdiscoverygateway/viz-workflow
 
 # note: is it necessary to start WORKDIR with aboslute path?
