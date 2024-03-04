@@ -23,7 +23,7 @@ from parsl.config import Config
 from parsl.executors import HighThroughputExecutor
 from parsl.providers import KubernetesProvider
 from parsl.addresses import address_by_route
-#from kubernetes import client, config # NOTE: might need to import this? not sure
+from kubernetes import client, config # NOTE: might need to import this? not sure
 from parsl_config import config_parsl_cluster
 
 import shutil
@@ -42,31 +42,33 @@ parsl.load(htex_kube)
 
 # start with a fresh directory
 print("Removing old directories and files...")
-# TODO: Decide filepath here, /app/ or . ?
-dir = "/app/"
-old_filepaths = [dir + "staging_summary.csv",
-                 dir + "raster_summary.csv",
-                 dir + "raster_events.csv",
-                 dir + "config__updated.json",
-                 dir + "log.log"]
+# TODO: Decide filepath here, /app/ or . ? using just dir names and filenames here 
+# because set /usr/local/share/app as WORKDIR
+# dir = "app/"
+old_filepaths = ["staging_summary.csv",
+                 "raster_summary.csv",
+                 "raster_events.csv",
+                 "config__updated.json",
+                 "log.log"]
 for old_file in old_filepaths:
   if os.path.exists(old_file):
       os.remove(old_file)
 
 # remove dirs from past run
-old_dirs = [dir + "staged",
-            dir + "geotiff",
-            dir + "web_tiles"]
+old_dirs = ["staged",
+            "geotiff",
+            "web_tiles"]
 for old_dir in old_dirs:
   if os.path.exists(old_dir) and os.path.isdir(old_dir):
       shutil.rmtree(old_dir)
 
-# TODO: Decide filepath here for all dirs and cvs diles, app/ or . ?
+# TODO: Decide filepath here for all dirs and csv files, app/ or . ?
+# using just dir names and filenames here because set /usr/local/share/app as WORKDIR
 viz_config = {
     "deduplicate_clip_to_footprint": False,
     "deduplicate_method": None,
-    "dir_output": ".", 
-    "dir_input": ".", 
+    "dir_output": ".", # output written to /usr/local/share/app
+    "dir_input": "iwp_2_files", # this dir is copied from viz-workflow/docker-parsl-workflow to /usr/local/share/app
     "ext_input": ".gpkg",
     "dir_staged": "staged/", 
     "dir_geotiff": "geotiff/",  
@@ -78,28 +80,25 @@ viz_config = {
     "tms_id": "WGS1984Quad",
     "z_range": [
     0,
-    7
+    10 # increase this later to 15
     ],
     "geometricError": 57,
     "z_coord": 0,
     "statistics": [
     {
-    "name": "change_rate", 
+    "name": "iwp_coverage", 
     "weight_by": "area",
-    "property": "ChangeRateNet_myr-1", 
-    "aggregation_method": "min", 
-    "resampling_method": "mode",  
+    "property": "area_per_pixel_area", 
+    "aggregation_method": "sum", 
+    "resampling_method": "average",  
     "val_range": [
-        -2,
-        2
+        0,
+        1
     ],
-    "palette": ["#ff0000", 
-                "#FF8C00", 
-                "#FFA07A", 
-                "#FFFF00", 
-                "#66CDAA", 
-                "#AFEEEE", 
-                "#0000ff"], 
+    "palette": [
+          "#f8ff1f1A", # 10% alpha yellow
+          "#f8ff1f" # solid yellow
+      ], 
     "nodata_val": 0,
     "nodata_color": "#ffffff00"
     }
@@ -339,10 +338,10 @@ parsl.clear()
 print("Processing complete. Moving log file.")
 
 # transfer log from /tmp to user dir
-# TODO: Automate the following destiantion path to be the mounted volume in the config
+# TODO: Automate the following destination path to be the mounted volume in the config
 # maybe do this by importing config script that specifies the filepath as a variable at the top
 # TODO: Decide filepath here, /app/ or . ?
-cmd = ['mv', '/tmp/log.log', '/app/']
+cmd = ['mv', '/tmp/log.log', '/usr/local/share/app/']
 # initiate the process to run that command
 process = Popen(cmd)
 
