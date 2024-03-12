@@ -14,7 +14,7 @@ def config_parsl_cluster(
         max_workers = 2, # set as 2 because only processing 2 small IWP files, inc later to many when inc data input size
         cores_per_worker = 1, 
         # TODO: automate this follwing string to pull most recent release on github? 
-        image='ghcr.io/PermafrostDiscoveryGateway/viz-workflow:0.0.5',
+        image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.0.6',
         namespace='pdgrun'):
 
     htex_kube = Config(
@@ -54,7 +54,7 @@ def config_parsl_cluster(
                     # persistent_volumes (list[(str, str)]) – List of tuples 
                     # describing persistent volumes to be mounted in the pod. 
                     # The tuples consist of (PVC Name, Mount Directory).
-                    persistent_volumes = [('pdgrun-dev-0', f'/usr/local/share/app')]
+                    persistent_volumes = [('pdgrun-dev-0', f'/home/jcohen/viz-workflow/docker-parsl_workflow')]
                 ),
             ),
         ]

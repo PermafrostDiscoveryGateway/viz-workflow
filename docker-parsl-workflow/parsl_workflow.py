@@ -341,7 +341,7 @@ print("Processing complete. Moving log file.")
 # TODO: Automate the following destination path to be the mounted volume in the config
 # maybe do this by importing config script that specifies the filepath as a variable at the top
 # TODO: Decide filepath here, /app/ or . ?
-cmd = ['mv', '/tmp/log.log', '/usr/local/share/app/']
+cmd = ['mv', '/tmp/log.log', '/home/jcohen/viz-workflow/docker-parsl_workflow/app/']
 # initiate the process to run that command
 process = Popen(cmd)
 

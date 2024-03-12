@@ -13,10 +13,11 @@ LABEL org.opencontainers.image.source https://github.com/permafrostdiscoverygate
 # Keep in mind WORKDIR can use environment variables previously set
 # using ENV, like ENV DIRPATH=/path followed by WORKDIR $DIRPATH/$DIRNAME
 # without specifying a WORKDIR, default is /
-# WORKDIR /home/jcohen/viz-workflow/docker-parsl_workflow/app
 
 # use a generalized WORKDIR per suggestion from dev team:
-WORKDIR /usr/local/share/app
+# PROBLEM: CANNOT CREATE app dir in /usr/local/share/ BECAUSE DO NOT HAVE PERMISSION 
+# WORKDIR /usr/local/share/app
+WORKDIR /home/jcohen/viz-workflow/docker-parsl_workflow/app 
 # check that `app` subdir is created auomatically
 # should app be included here? best practice may be to not use the app dir as WORKDIR
 # but since we might be tranferring a lot of data as input to workflow,
