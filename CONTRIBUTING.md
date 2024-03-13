@@ -19,8 +19,6 @@ bug reports, documentation, graphics, and many others.  You might consider contr
 - Fix a bug and contribute the code with a Pull Request
 - Write or edit some documentation
 - Sharing helpful tips or FAQ-type answers to users or future contributors
-- Create screenshots or tutorials of features of MetacatUI
-- Answer questions on DataONE Discussions
 - ...
 
 This is an open source project, and we welcome full
@@ -45,7 +43,7 @@ In short:
 
 ## Development Workflow
 
-Development is managed through the git repository at https://github.com/PermafrostDiscoveryGateway/viz-staging.  The repository is organized into several branches, each with a specific purpose.  
+Development is managed through the git repository at https://github.com/PermafrostDiscoveryGateway/viz-workflow.  The repository is organized into several branches, each with a specific purpose.  
 
 **main**. The `main` branch represents the stable branch that is constantly maintained with the current release.  It should generally be safe to install and use the `main` branch the same way as binary releases. The version number in all configuration files and the README on the `main` branch follows [semantic versioning](https://semver.org/) and should always be set to the current stable release, for example `2.8.5`.
 
