@@ -3,4 +3,3 @@ kubernetes==28.1.0
 glances==1.7.3
 git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git
 git+https://github.com/PermafrostDiscoveryGateway/viz-raster.git
-pydantic==1.10.9

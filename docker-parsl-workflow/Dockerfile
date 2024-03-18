@@ -15,17 +15,15 @@ LABEL org.opencontainers.image.source https://github.com/permafrostdiscoverygate
 # without specifying a WORKDIR, default is /
 
 # use a generalized WORKDIR per suggestion from dev team:
-# PROBLEM: CANNOT CREATE app dir in /usr/local/share/ BECAUSE DO NOT HAVE PERMISSION 
 # WORKDIR /usr/local/share/app
 WORKDIR /home/jcohen/viz-workflow/docker-parsl_workflow/app 
-# check that `app` subdir is created auomatically
+# check that `app` subdir is created automatically
 # should app be included here? best practice may be to not use the app dir as WORKDIR
 # but since we might be tranferring a lot of data as input to workflow,
 # maybe using a mounted volume here is best to store both input and output
 
 COPY parsl_workflow.py .
 COPY parsl_config.py .
-# COPY viz_config.json . # pasted config into parsl_workflow.py
 COPY requirements.txt .
 
 # import 2 adjacent UTM zones of lake change data to process in parallel 

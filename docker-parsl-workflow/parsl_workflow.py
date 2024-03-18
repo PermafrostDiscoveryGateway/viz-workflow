@@ -1,10 +1,10 @@
 # test docker image and orchestrate containers
 # with kubernetes by running a version of 
 # the workflow with a kubernetes parsl config
-# processing a portion of a lake change dataset 
-# (1 UTM zone)
+# processing 2 small overlapping IWP files
 
-# documentation for parsl config: https://parsl.readthedocs.io/en/stable/userguide/configuring.html#kubernetes-clusters
+# documentation for parsl config:
+# https://parsl.readthedocs.io/en/stable/userguide/configuring.html#kubernetes-clusters
 
 
 from datetime import datetime
@@ -32,6 +32,9 @@ import subprocess
 from subprocess import Popen
 user = subprocess.check_output("whoami").strip().decode("ascii")
 
+import datetime
+import time
+
 
 # call parsl config and initiate k8s cluster
 parsl.set_stream_logger()
@@ -42,8 +45,9 @@ parsl.load(htex_kube)
 
 # start with a fresh directory
 print("Removing old directories and files...")
-# TODO: Decide filepath here, /app/ or . ? using just dir names and filenames here 
-# because set /usr/local/share/app as WORKDIR
+# TODO: Decide filepath here, /app/ or . ?
+# using just dir names and filenames here because set WORKDIR as:
+# /home/jcohen/viz-workflow/docker-parsl_workflow/app
 # dir = "app/"
 old_filepaths = ["staging_summary.csv",
                  "raster_summary.csv",
@@ -62,13 +66,14 @@ for old_dir in old_dirs:
   if os.path.exists(old_dir) and os.path.isdir(old_dir):
       shutil.rmtree(old_dir)
 
-# TODO: Decide filepath here for all dirs and csv files, app/ or . ?
-# using just dir names and filenames here because set /usr/local/share/app as WORKDIR
+# TODO: Decide filepath here, app/ or . ?
+# using just dir names and filenames here because set WORKDIR as:
+# /home/jcohen/viz-workflow/docker-parsl_workflow/app
 viz_config = {
     "deduplicate_clip_to_footprint": False,
     "deduplicate_method": None,
     "dir_output": ".", # output written to /usr/local/share/app
-    "dir_input": "iwp_2_files", # this dir is copied from viz-workflow/docker-parsl-workflow to /usr/local/share/app
+    "dir_input": "iwp_2_files", # this dir is copied into container but wont be for large datasets
     "ext_input": ".gpkg",
     "dir_staged": "staged/", 
     "dir_geotiff": "geotiff/",  
@@ -328,21 +333,47 @@ def make_batch(items, batch_size):
 
 # ----------------------------------------------------------------
 
+# Matt's function to make job last longer
+@python_app
+def calc_product_long(x, y):
+    '''Useless computation to simulate one that takes a long time'''
+    import datetime
+    import time
+    current_time = datetime.datetime.now()
+    prod = x*y
+    time.sleep(15)
+    return(prod)
+
+# ----------------------------------------------------------------
+
 # run the workflow
 logging.info(f'Starting PDG workflow: staging, rasterization, and web tiling')
 run_pdg_workflow(viz_config)
+
+print("Viz processing complete.")
+# print ("Moving log file.")
+# # transfer log from /tmp to user dir
+# # TODO: Automate the following destination path to be the mounted volume in the config
+# # maybe do this by importing config script that specifies the filepath as a variable at the top
+# # TODO: Decide filepath here, /app/ or . ?
+# cmd = ['mv', '/tmp/log.log', '/home/jcohen/viz-workflow/docker-parsl_workflow/app/']
+# # initiate the process to run that command
+# process = Popen(cmd)
+
+# ----------------------------------------------------------------
+
+# make job last longer with useless computation
+size = 30
+stat_results = []
+for x in range(size):
+    for y in range(size):
+        current_time = datetime.datetime.now()
+        print(f'Schedule job at {current_time} for {x} and {y}')
+        stat_results.append(calc_product_long(x, y))
+        print(f"Sum of stat_results is: {sum(stat_results)}")
+
 # Shutdown and clear the parsl executor
 htex_kube.executors[0].shutdown()
 parsl.clear()
-
-print("Processing complete. Moving log file.")
-
-# transfer log from /tmp to user dir
-# TODO: Automate the following destination path to be the mounted volume in the config
-# maybe do this by importing config script that specifies the filepath as a variable at the top
-# TODO: Decide filepath here, /app/ or . ?
-cmd = ['mv', '/tmp/log.log', '/home/jcohen/viz-workflow/docker-parsl_workflow/app/']
-# initiate the process to run that command
-process = Popen(cmd)
 
 print("Script complete.")
