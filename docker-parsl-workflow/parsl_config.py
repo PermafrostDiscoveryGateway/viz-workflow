@@ -14,7 +14,7 @@ def config_parsl_cluster(
         max_workers = 2, # set as 2 because only processing 2 small IWP files, inc later to many when inc data input size
         cores_per_worker = 1, 
         # TODO: automate this following string to pull most recent release on github? 
-        image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.0.8',
+        image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.0.9',
         namespace='pdgrun'):
 
     htex_kube = Config(

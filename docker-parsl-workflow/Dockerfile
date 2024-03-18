@@ -16,7 +16,7 @@ LABEL org.opencontainers.image.source https://github.com/permafrostdiscoverygate
 
 # use a generalized WORKDIR per suggestion from dev team:
 # WORKDIR /usr/local/share/app
-WORKDIR /home/jcohen/viz-workflow/docker-parsl_workflow/app 
+WORKDIR /home/jcohen/viz-workflow/docker-parsl-workflow/app 
 # check that `app` subdir is created automatically
 # should app be included here? best practice may be to not use the app dir as WORKDIR
 # but since we might be tranferring a lot of data as input to workflow,
