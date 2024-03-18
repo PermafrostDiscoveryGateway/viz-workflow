@@ -68,7 +68,7 @@ for old_dir in old_dirs:
 # TODO: Decide filepath here, app/ or . ?
 # using just dir names and filenames here because set WORKDIR as:
 # /home/jcohen/viz-workflow/docker-parsl_workflow/app
-viz_config = {
+workflow_config = {
     "deduplicate_clip_to_footprint": False,
     "deduplicate_method": None,
     "dir_output": ".", # output written to /usr/local/share/app
@@ -256,7 +256,7 @@ def stage(paths, config):
     import pdgstaging
     from pdgstaging import logging_config
 
-    stager = pdgstaging.TileStager(config = config, check_footprints = False)
+    stager = pdgstaging.TileStager(config = workflow_config, check_footprints = False)
     for path in paths:
         stager.stage(path)
     return True
@@ -276,7 +276,7 @@ def create_highest_geotiffs(staged_paths, config):
     from pdgraster import logging_config
 
     # rasterize the vectors, highest z-level only
-    rasterizer = pdgraster.RasterTiler(config)
+    rasterizer = pdgraster.RasterTiler(workflow_config)
     return rasterizer.rasterize_vectors(
         staged_paths, make_parents = False)
     # no need to update ranges if manually set val_range in viz config
@@ -297,7 +297,7 @@ def create_composite_geotiffs(tiles, config):
     import pdgraster
     from pdgraster import logging_config
 
-    rasterizer = pdgraster.RasterTiler(config)
+    rasterizer = pdgraster.RasterTiler(workflow_config)
     return rasterizer.parent_geotiffs_from_children(
         tiles, recursive = False)
 
@@ -318,10 +318,10 @@ def create_web_tiles(geotiff_paths, config):
     import pdgraster
     from pdgraster import logging_config
 
-    rasterizer = pdgraster.RasterTiler(config)
+    rasterizer = pdgraster.RasterTiler(workflow_config)
     return rasterizer.webtiles_from_geotiffs(
         geotiff_paths, update_ranges = False)
-    # no need to update ranges if manually set val_range in viz config
+    # no need to update ranges if manually set val_range in workflow config
 
 
 def make_batch(items, batch_size):
@@ -347,7 +347,7 @@ def calc_product_long(x, y):
 
 # run the workflow
 logging.info(f'Starting PDG workflow: staging, rasterization, and web tiling')
-run_pdg_workflow(viz_config)
+run_pdg_workflow(workflow_config)
 
 print("Viz processing complete.")
 # print ("Moving log file.")
