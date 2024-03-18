@@ -68,7 +68,7 @@ persistent_volumes=persistent_volumes=[('pdgrun-dev-0', f'/home/{user}/viz-workf
 ```
 - Update the string that represents the desired published repository package version of image in `parsl_config.py`. Replace the version number with the next version number you will publish it as:
 ```
-image='ghcr.io/PermafrostDiscoveryGateway/viz-workflow:0.0.2',
+image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.0.2',
 ```
 - Publish the package to the repository with new version number by running 3 commands one-by-one:
 ```

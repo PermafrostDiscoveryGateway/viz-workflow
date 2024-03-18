@@ -8,6 +8,8 @@
 
 
 from datetime import datetime
+import time
+
 import json
 import logging
 import logging.handlers
@@ -31,9 +33,6 @@ import shutil
 import subprocess
 from subprocess import Popen
 user = subprocess.check_output("whoami").strip().decode("ascii")
-
-import datetime
-import time
 
 
 # call parsl config and initiate k8s cluster
@@ -337,9 +336,9 @@ def make_batch(items, batch_size):
 @python_app
 def calc_product_long(x, y):
     '''Useless computation to simulate one that takes a long time'''
-    import datetime
+    from datetime import datetime
     import time
-    current_time = datetime.datetime.now()
+    current_time = datetime.now()
     prod = x*y
     time.sleep(15)
     return(prod)
@@ -367,7 +366,7 @@ size = 30
 stat_results = []
 for x in range(size):
     for y in range(size):
-        current_time = datetime.datetime.now()
+        current_time = datetime.now()
         print(f'Schedule job at {current_time} for {x} and {y}')
         stat_results.append(calc_product_long(x, y))
         print(f"Sum of stat_results is: {sum(stat_results)}")
