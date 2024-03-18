@@ -22,9 +22,10 @@ WORKDIR /home/jcohen/viz-workflow/docker-parsl_workflow/app
 # but since we might be tranferring a lot of data as input to workflow,
 # maybe using a mounted volume here is best to store both input and output
 
+COPY requirements.txt .
+COPY workflow_config.py .
 COPY parsl_workflow.py .
 COPY parsl_config.py .
-COPY requirements.txt .
 
 # import 2 adjacent UTM zones of lake change data to process in parallel 
 COPY iwp_2_files .

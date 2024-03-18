@@ -18,6 +18,7 @@ import os
 
 import pdgstaging
 import pdgraster
+import workflow_config
 
 import parsl
 from parsl import python_app
@@ -41,8 +42,9 @@ parsl.set_stream_logger()
 htex_kube = config_parsl_cluster()
 parsl.load(htex_kube)
 
+workflow_config = workflow_config.workflow_config
 
-# start with a fresh directory
+
 print("Removing old directories and files...")
 # TODO: Decide filepath here, /app/ or . ?
 # using just dir names and filenames here because set WORKDIR as:
@@ -64,50 +66,6 @@ old_dirs = ["staged",
 for old_dir in old_dirs:
   if os.path.exists(old_dir) and os.path.isdir(old_dir):
       shutil.rmtree(old_dir)
-
-# TODO: Decide filepath here, app/ or . ?
-# using just dir names and filenames here because set WORKDIR as:
-# /home/jcohen/viz-workflow/docker-parsl_workflow/app
-workflow_config = {
-    "deduplicate_clip_to_footprint": False,
-    "deduplicate_method": None,
-    "dir_output": ".", # output written to /usr/local/share/app
-    "dir_input": "iwp_2_files", # this dir is copied into container but wont be for large datasets
-    "ext_input": ".gpkg",
-    "dir_staged": "staged/", 
-    "dir_geotiff": "geotiff/",  
-    "dir_web_tiles": "web_tiles/", 
-    "filename_staging_summary": "staging_summary.csv",
-    "filename_rasterization_events": "raster_events.csv",
-    "filename_rasters_summary": "raster_summary.csv",
-    "simplify_tolerance": 0.1,
-    "tms_id": "WGS1984Quad",
-    "z_range": [
-    0,
-    10 # increase this later to 15
-    ],
-    "geometricError": 57,
-    "z_coord": 0,
-    "statistics": [
-    {
-    "name": "iwp_coverage", 
-    "weight_by": "area",
-    "property": "area_per_pixel_area", 
-    "aggregation_method": "sum", 
-    "resampling_method": "average",  
-    "val_range": [
-        0,
-        1
-    ],
-    "palette": [
-          "#f8ff1f1A", # 10% alpha yellow
-          "#f8ff1f" # solid yellow
-      ], 
-    "nodata_val": 0,
-    "nodata_color": "#ffffff00"
-    }
-  ]
-}
 
 
 def run_pdg_workflow(
@@ -256,7 +214,7 @@ def stage(paths, config):
     import pdgstaging
     from pdgstaging import logging_config
 
-    stager = pdgstaging.TileStager(config = workflow_config, check_footprints = False)
+    stager = pdgstaging.TileStager(config, check_footprints = False)
     for path in paths:
         stager.stage(path)
     return True
@@ -276,7 +234,7 @@ def create_highest_geotiffs(staged_paths, config):
     from pdgraster import logging_config
 
     # rasterize the vectors, highest z-level only
-    rasterizer = pdgraster.RasterTiler(workflow_config)
+    rasterizer = pdgraster.RasterTiler(config)
     return rasterizer.rasterize_vectors(
         staged_paths, make_parents = False)
     # no need to update ranges if manually set val_range in viz config
@@ -297,7 +255,7 @@ def create_composite_geotiffs(tiles, config):
     import pdgraster
     from pdgraster import logging_config
 
-    rasterizer = pdgraster.RasterTiler(workflow_config)
+    rasterizer = pdgraster.RasterTiler(config)
     return rasterizer.parent_geotiffs_from_children(
         tiles, recursive = False)
 
@@ -318,7 +276,7 @@ def create_web_tiles(geotiff_paths, config):
     import pdgraster
     from pdgraster import logging_config
 
-    rasterizer = pdgraster.RasterTiler(workflow_config)
+    rasterizer = pdgraster.RasterTiler(config)
     return rasterizer.webtiles_from_geotiffs(
         geotiff_paths, update_ranges = False)
     # no need to update ranges if manually set val_range in workflow config
@@ -369,7 +327,6 @@ for x in range(size):
         current_time = datetime.now()
         print(f'Schedule job at {current_time} for {x} and {y}')
         stat_results.append(calc_product_long(x, y))
-        print(f"Sum of stat_results is: {sum(stat_results)}")
 
 # Shutdown and clear the parsl executor
 htex_kube.executors[0].shutdown()
