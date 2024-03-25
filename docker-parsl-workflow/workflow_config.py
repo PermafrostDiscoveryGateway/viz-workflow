@@ -4,12 +4,12 @@ workflow_config = {
     "dir_output": ".", # output written to /usr/local/share/app
     "dir_input": "input", # this dir is inside the dir COPY'd into container (because docker doesn't copy the top dir itself)
     "ext_input": ".gpkg",
-    "dir_staged": "staged/", 
-    "dir_geotiff": "geotiff/",  
-    "dir_web_tiles": "web_tiles/", 
-    "filename_staging_summary": "staging_summary.csv",
-    "filename_rasterization_events": "raster_events.csv",
-    "filename_rasters_summary": "raster_summary.csv",
+    "dir_staged": "/mnt/data/staged/", 
+    "dir_geotiff": "/mnt/data/geotiff/",  
+    "dir_web_tiles": "/mnt/data/web_tiles/", 
+    "filename_staging_summary": "/mnt/data/staging_summary.csv",
+    "filename_rasterization_events": "/mnt/data/raster_events.csv",
+    "filename_rasters_summary": "/mnt/data/raster_summary.csv",
     "simplify_tolerance": 0.1,
     "tms_id": "WGS1984Quad",
     "z_range": [

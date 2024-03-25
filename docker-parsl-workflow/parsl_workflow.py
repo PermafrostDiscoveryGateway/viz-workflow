@@ -305,9 +305,9 @@ def calc_product_long(x, y):
 
 # run the workflow
 logging.info(f'Starting PDG workflow: staging, rasterization, and web tiling')
-run_pdg_workflow(workflow_config)
+# run_pdg_workflow(workflow_config)
 
-print("Viz processing complete.")
+# print("Viz processing complete.")
 # print ("Moving log file.")
 # # transfer log from /tmp to user dir
 # # TODO: Automate the following destination path to be the mounted volume in the config
