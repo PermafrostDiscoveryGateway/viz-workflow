@@ -5,32 +5,22 @@ FROM python:3.9
 # metadata info:
 LABEL org.opencontainers.image.source https://github.com/permafrostdiscoverygateway/viz-workflow
 
-# note: is it necessary to start WORKDIR with aboslute path?
-# could change WORKDIR to /app and see if that is equivalent,
-# bc the Dockerfile is already in the repo
-# and would remove the need for other users to manually edit 
-# Dockerfile before running workflow.
 # Keep in mind WORKDIR can use environment variables previously set
 # using ENV, like ENV DIRPATH=/path followed by WORKDIR $DIRPATH/$DIRNAME
-# without specifying a WORKDIR, default is /
 
-# use a generalized WORKDIR per suggestion from dev team:
-# WORKDIR /usr/local/share/app
+# WORKDIR /usr/local/share/app # a generalized option
 WORKDIR /app 
 # check that `app` subdir is created automatically
-# should app be included here? best practice may be to not use the app dir as WORKDIR
-# but since we might be tranferring a lot of data as input to workflow,
-# maybe using a mounted volume here is best to store both input and output
 
 COPY requirements.txt .
+RUN pip install -r requirements.txt
 COPY workflow_config.py .
-COPY parsl_workflow.py .
-COPY parsl_config.py .
 
 # import 2 adjacent UTM zones of lake change data to process in parallel 
 COPY iwp_2_files .
 
-RUN pip install -r requirements.txt
+COPY parsl_workflow.py .
+COPY parsl_config.py .
 
 # maybe we don't want to run a command bc we need to use the terminal to
 # do it now that we are using parsl and k8s

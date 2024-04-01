@@ -332,4 +332,5 @@ for x in range(size):
 htex_kube.executors[0].shutdown()
 parsl.clear()
 
+print(f"stat_results is: {stat_results}")
 print("Script complete.")
