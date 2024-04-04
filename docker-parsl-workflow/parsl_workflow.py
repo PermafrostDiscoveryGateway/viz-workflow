@@ -337,15 +337,15 @@ def main():
     print(f"Sum of stats: {sum(stats)}")
 
 
-    @python_app
-    def calc_product_long(x, y):
-        '''Useless computation to simulate one that takes a long time'''
-        from datetime import datetime
-        import time
-        current_time = datetime.now()
-        prod = x*y
-        time.sleep(15)
-        return(prod)
+@python_app
+def calc_product_long(x, y):
+    '''Useless computation to simulate one that takes a long time'''
+    from datetime import datetime
+    import time
+    current_time = datetime.now()
+    prod = x*y
+    time.sleep(15)
+    return(prod)
 
 
 if __name__ == "__main__":
