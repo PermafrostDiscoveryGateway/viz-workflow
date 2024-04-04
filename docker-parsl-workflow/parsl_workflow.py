@@ -290,21 +290,12 @@ def make_batch(items, batch_size):
 
 # ----------------------------------------------------------------
 
-# Matt's function to make job last longer
-@python_app
-def calc_product_long(x, y):
-    '''Useless computation to simulate one that takes a long time'''
-    from datetime import datetime
-    import time
-    current_time = datetime.now()
-    prod = x*y
-    time.sleep(15)
-    return(prod)
 
-# ----------------------------------------------------------------
+# if __name__ == "__run_pdg_workflow__":
+#     run_pdg_workflow()
 
 # run the workflow
-logging.info(f'Starting PDG workflow: staging, rasterization, and web tiling')
+# logging.info(f'Starting PDG workflow: staging, rasterization, and web tiling')
 # run_pdg_workflow(workflow_config)
 
 # print("Viz processing complete.")
@@ -320,17 +311,51 @@ logging.info(f'Starting PDG workflow: staging, rasterization, and web tiling')
 # ----------------------------------------------------------------
 
 # make job last longer with useless computation
-size = 30
-stat_results = []
-for x in range(size):
-    for y in range(size):
+# size = 30
+# stat_results = []
+# for x in range(size):
+#     for y in range(size):
+#         current_time = datetime.now()
+#         print(f'Schedule job at {current_time} for {x} and {y}')
+#         stat_results.append(calc_product_long(x, y))
+
+# ------------------------------------------
+
+def main():
+
+    '''Main program.'''
+
+    size = 30
+    stat_results = []
+    for x in range(size):
+        for y in range(size):
+            current_time = datetime.now()
+            print(f'Schedule job at {current_time} for {x} and {y}')
+            stat_results.append(calc_product_long(x, y))
+            
+    stats = [r.result() for r in stat_results]
+    print(f"Sum of stats: {sum(stats)}")
+
+
+    @python_app
+    def calc_product_long(x, y):
+        '''Useless computation to simulate one that takes a long time'''
+        from datetime import datetime
+        import time
         current_time = datetime.now()
-        print(f'Schedule job at {current_time} for {x} and {y}')
-        stat_results.append(calc_product_long(x, y))
+        prod = x*y
+        time.sleep(15)
+        return(prod)
+
+
+if __name__ == "__main__":
+    main()
+
+# ------------------------------------------
+
 
 # Shutdown and clear the parsl executor
 htex_kube.executors[0].shutdown()
 parsl.clear()
 
-print(f"stat_results is: {stat_results}")
 print("Script complete.")

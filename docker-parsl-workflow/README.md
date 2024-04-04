@@ -13,8 +13,8 @@ Before executing either of these scripts, create a fresh environment with `conda
 ## Persistent data volumes
 
 These scripts can be run locally on a laptop, _or_ on a server. Either way, you will have to specify a persistent data volume because both scripts write the following output:
- - GeoPackage diles to a `staging` directory
- - geoTIFF files to a `geotiff` directory 
+ - GeoPackage files to a `staging` directory
+ - GeoTIFF files to a `geotiff` directory 
  - web tiles to a `web_tiles` directory
  - supplementary `csv` files output by the visualization workflow
  - a log file
