@@ -14,8 +14,8 @@ import pdgraster
 import shutil
 
 
-#base_dir = "/home/jcohen/docker_python_basics/app-data/"
-base_dir = "/app/"
+base_dir = "/Users/helium/ncsa/pdg/viz-workflow/"
+# base_dir = "/app/"
 # TOD0: define base dir by pulling the WORKDIR from Dockerfile
 # or pulling the second component (filepath) from the parsl config's "persistent_volumes" definition
 # instead of hard-coding
@@ -45,12 +45,12 @@ for old_dir in old_dirs:
 config = {
   "deduplicate_clip_to_footprint": False,
   "deduplicate_method": None,
-  "dir_output": base_dir, 
-  "dir_input": "/home/jcohen/docker_python_basics/data", 
+  "dir_output": base_dir,
+  "dir_input": "/Users/helium/ncsa/pdg/viz-workflow/docker-parsl-workflow/data",
   "ext_input": ".gpkg",
-  "dir_staged": base_dir+"staged/", 
-  "dir_geotiff": base_dir+"geotiff/",  
-  "dir_web_tiles": base_dir+"web_tiles/", 
+  "dir_staged": base_dir+"staged/",
+  "dir_geotiff": base_dir+"geotiff/",
+  "dir_web_tiles": base_dir+"web_tiles/",
   "filename_staging_summary": base_dir+"staging_summary.csv",
   "filename_rasterization_events": base_dir+"raster_events.csv",
   "filename_rasters_summary": base_dir+"raster_summary.csv",
@@ -65,11 +65,11 @@ config = {
   "z_coord": 0,
   "statistics": [
     {
-      "name": "change_rate", 
+      "name": "change_rate",
       "weight_by": "area",
-      "property": "ChangeRateNet_myr-1", 
-      "aggregation_method": "min", 
-      "resampling_method": "mode",  
+      "property": "ChangeRateNet_myr-1",
+      "aggregation_method": "min",
+      "resampling_method": "mode",
       "val_range": [
         -2,
         2
@@ -90,7 +90,7 @@ config = {
 print("Staging...")
 stager = pdgstaging.TileStager(config = config, check_footprints = False)
 # generate the staged files
-stager.stage("test_polygons.gpkg")
+stager.stage("data/test_polygons.gpkg")
 
 print("Staging complete. Rasterizing...")
 
