@@ -38,8 +38,8 @@ set -x
 
 echo "This is BEST_cpu_ray_double_srun.slurm"
 
-# venv init
-source /scratch/bbou/julietcohen/venv/infrastructure/bin/activate
+# venv init or conda activate
+conda activate arc_inf
 # source /scratch/bbou/julietcohen/venv/iwp_3/bin/activate
 # set file soft limit to maximum value (not unlimited because that's not permitted)
 # before any srun's are executed

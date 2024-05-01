@@ -5,11 +5,11 @@ import numpy as np
 # always include the tailing slash "/"
 # define user on Delta, avoid writing files to other user's dir
 user = subprocess.check_output("whoami").strip().decode("ascii")
-head_node = 'cn102/'
+head_node = 'cn014/'
 #head_node = 'gpub___'
 
-INPUT = '/scratch/bbou/julietcohen/infrastructure/input/'
-output_subdir = 'infrastructure/output'
+INPUT = '/scratch/bbou/julietcohen/infrastructure/input/20240423/'
+output_subdir = 'infrastructure/output/20240423'
 OUTPUT  = f'/scratch/bbou/{user}/{output_subdir}/'
 
 STAGING_LOCAL = '/tmp/staged/'
@@ -44,11 +44,33 @@ CONFIG = {
   "tms_id": "WGS1984Quad",
   "z_range": [
     0,
-    12
+    13
   ],
   "geometricError": 57,
   "z_coord": 0,
   "statistics": [
+    {
+      "name": "palette_code",
+      "weight_by": "area", 
+      "property": "palette_code",
+      "aggregation_method": "max", 
+      "resampling_method": "nearest",
+      "val_range": [
+        1,
+        7
+      ], 
+      "palette": [
+        "#e67428", # 11=linear transport infrastructure (asphalt)
+        "#9939a7", # 12=linear transport infrastructure (gravel)
+        "#4daf4a", # 13=linear transport infrastructure (undefined)
+        "#e41a1c", # 20=buildings (and other constructions such as bridges)
+        "#787878", # 30=other impacted area (includes gravel pads, mining sites)
+        "#e567e9", # 40=airstrip
+        "#1f78b4"  # 50=reservoir or other water body impacted by human activities
+      ],
+      "nodata_val": 0,
+      "nodata_color": "#ffffff00"
+    },
     {
       "name": "infrastructure_code",
       "weight_by": "area", 
@@ -60,13 +82,13 @@ CONFIG = {
         50
       ], 
       "palette": [
-        "#f48525", 
-        "#f4e625", 
-        "#47f425", 
-        "#25f4e2", 
-        "#2525f4", 
-        "#f425c3", 
-        "#f42525" 
+        "#e67428", # 11=linear transport infrastructure (asphalt)
+        "#9939a7", # 12=linear transport infrastructure (gravel)
+        "#4daf4a", # 13=linear transport infrastructure (undefined)
+        "#e41a1c", # 20=buildings (and other constructions such as bridges)
+        "#787878", # 30=other impacted area (includes gravel pads, mining sites)
+        "#e567e9", # 40=airstrip
+        "#1f78b4"  # 50=reservoir or other water body impacted by human activities
       ],
       "nodata_val": 0,
       "nodata_color": "#ffffff00"
