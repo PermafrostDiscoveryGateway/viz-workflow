@@ -5,7 +5,7 @@ import numpy as np
 # always include the tailing slash "/"
 # define user on Delta, avoid writing files to other user's dir
 user = subprocess.check_output("whoami").strip().decode("ascii")
-head_node = 'cn___/'
+head_node = 'cn014/'
 #head_node = 'gpub___'
 
 INPUT = '/scratch/bbou/julietcohen/infrastructure/input/20240423/'
