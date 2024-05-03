@@ -1,8 +1,7 @@
 workflow_config = {
-    "deduplicate_clip_to_footprint": False,
     "deduplicate_method": None,
-    "dir_output": ".", # output written to /usr/local/share/app
-    "dir_input": "input", # this dir is inside the dir COPY'd into container (because docker doesn't copy the top dir itself)
+    "deduplicate_clip_to_footprint": False,
+    "dir_input": "input", 
     "ext_input": ".gpkg",
     "dir_staged": "/mnt/data/staged/", 
     "dir_geotiff": "/mnt/data/geotiff/",  

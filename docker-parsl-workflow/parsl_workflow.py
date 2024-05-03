@@ -98,11 +98,13 @@ def run_pdg_workflow(
     config_manager = stager.config
 
     input_paths = stager.tiles.get_filenames_from_dir('input')
+    print(f"Input paths are: {input_paths}")
     input_batches = make_batch(input_paths, batch_size)
 
     # Stage all the input files (each batch in parallel)
     app_futures = []
     for i, batch in enumerate(input_batches):
+        print(f"batch is {batch}")
         app_future = stage(batch, workflow_config)
         app_futures.append(app_future)
         logging.info(f'Started job for batch {i} of {len(input_batches)}')
@@ -111,6 +113,7 @@ def run_pdg_workflow(
     [a.result() for a in app_futures]
 
     logging.info("Staging complete.")
+    print("Staging complete.")
 
     # ----------------------------------------------------------------
 
@@ -281,6 +284,7 @@ def create_web_tiles(geotiff_paths, config):
         geotiff_paths, update_ranges = False)
     # no need to update ranges if manually set val_range in workflow config
 
+# ----------------------------------------------------------------
 
 def make_batch(items, batch_size):
     """
@@ -290,17 +294,14 @@ def make_batch(items, batch_size):
 
 # ----------------------------------------------------------------
 
-
-# if __name__ == "__run_pdg_workflow__":
-#     run_pdg_workflow()
+if __name__ == "__main__":
+    run_pdg_workflow(workflow_config)
 
 # run the workflow
 # logging.info(f'Starting PDG workflow: staging, rasterization, and web tiling')
 # run_pdg_workflow(workflow_config)
 
-# print("Viz processing complete.")
-# print ("Moving log file.")
-# # transfer log from /tmp to user dir
+# # transfer visualization log from /tmp to user dir
 # # TODO: Automate the following destination path to be the mounted volume in the config
 # # maybe do this by importing config script that specifies the filepath as a variable at the top
 # # TODO: Decide filepath here, /app/ or . ?
@@ -321,41 +322,41 @@ def make_batch(items, batch_size):
 
 # ------------------------------------------
 
-def main():
+# def main():
 
-    '''Main program.'''
+#     '''Main program.'''
 
-    size = 30
-    stat_results = []
-    for x in range(size):
-        for y in range(size):
-            current_time = datetime.now()
-            print(f'Schedule job at {current_time} for {x} and {y}')
-            stat_results.append(calc_product_long(x, y))
+#     size = 30
+#     stat_results = []
+#     for x in range(size):
+#         for y in range(size):
+#             current_time = datetime.now()
+#             print(f'Schedule job at {current_time} for {x} and {y}')
+#             stat_results.append(calc_product_long(x, y))
             
-    stats = [r.result() for r in stat_results]
-    print(f"Sum of stats: {sum(stats)}")
+#     stats = [r.result() for r in stat_results]
+#     print(f"Sum of stats: {sum(stats)}")
 
 
-@python_app
-def calc_product_long(x, y):
-    '''Useless computation to simulate one that takes a long time'''
-    from datetime import datetime
-    import time
-    current_time = datetime.now()
-    prod = x*y
-    time.sleep(15)
-    return(prod)
+# @python_app
+# def calc_product_long(x, y):
+#     '''Useless computation to simulate one that takes a long time'''
+#     from datetime import datetime
+#     import time
+#     current_time = datetime.now()
+#     prod = x*y
+#     time.sleep(15)
+#     return(prod)
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
 
 # ------------------------------------------
 
 
 # Shutdown and clear the parsl executor
-htex_kube.executors[0].scale_in(len(kube_htex.executors[0].connected_blocks()))
+# htex_kube.executors[0].scale_in(htex_kube.executors[0].connected_blocks())
 htex_kube.executors[0].shutdown()
 parsl.clear()
 

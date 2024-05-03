@@ -14,9 +14,8 @@ WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install -r requirements.txt
-COPY workflow_config.py .
 
-# import 2 adjacent UTM zones of lake change data to process in parallel 
+COPY workflow_config.py .
 COPY iwp_2_files .
 
 COPY parsl_workflow.py .
