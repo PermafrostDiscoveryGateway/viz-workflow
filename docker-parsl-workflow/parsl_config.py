@@ -8,13 +8,13 @@ from parsl.addresses import address_by_route
 # user = subprocess.check_output("whoami").strip().decode("ascii")
 
 def config_parsl_cluster(
-        max_blocks = 2, 
+        max_blocks = 10, 
         min_blocks = 1, 
         init_blocks = 1, 
         max_workers = 4, 
         cores_per_worker = 1, 
         # TODO: automate this following string to pull most recent release on github? 
-        image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.1.4',
+        image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.1.7',
         namespace='pdgrun'):
 
     htex_kube = Config(
@@ -40,8 +40,8 @@ def config_parsl_cluster(
                     # Command to be run upon pod start, such as:
                     # 'module load Anaconda; source activate parsl_env'.
                     # or 'pip install parsl'
-                    worker_init='echo "Worker started..."; lf=`find . -name \'manager.log\'` tail -n+1 -f ${lf}',
-                    # worker_init = 'echo "Worker started..."',
+                    # worker_init='echo "Worker started..."; lf=`find . -name \'manager.log\'` tail -n+1 -f ${lf}',
+                    worker_init = 'pip install 2023.11.27',
     
                     # Should follow the Kubernetes naming rules
                     pod_name = 'parsl-worker',

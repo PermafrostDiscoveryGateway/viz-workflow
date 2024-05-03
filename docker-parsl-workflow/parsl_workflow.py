@@ -10,15 +10,15 @@
 from datetime import datetime
 import time
 
+import pdgstaging
+import pdgraster
+import workflow_config
+
 import json
 import logging
 import logging.handlers
 from pdgstaging import logging_config
 import os
-
-import pdgstaging
-import pdgraster
-import workflow_config
 
 import parsl
 from parsl import python_app
@@ -355,6 +355,7 @@ if __name__ == "__main__":
 
 
 # Shutdown and clear the parsl executor
+htex_kube.executors[0].scale_in(len(kube_htex.executors[0].connected_blocks()))
 htex_kube.executors[0].shutdown()
 parsl.clear()
 
