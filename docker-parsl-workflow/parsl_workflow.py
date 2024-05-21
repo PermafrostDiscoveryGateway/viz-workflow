@@ -27,6 +27,7 @@ from parsl.executors import HighThroughputExecutor
 from parsl.providers import KubernetesProvider
 from parsl.addresses import address_by_route
 from kubernetes import client, config # NOTE: might need to import this? not sure
+# from . import parsl_config # NOTE: might need to import this file if running python command from Dcokerfile?
 from parsl_config import config_parsl_cluster
 
 import shutil
@@ -45,27 +46,27 @@ parsl.load(htex_kube)
 workflow_config = workflow_config.workflow_config
 
 
-print("Removing old directories and files...")
+# print("Removing old directories and files...")
 # TODO: Decide filepath here, /app/ or . ?
 # using just dir names and filenames here because set WORKDIR as:
 # /home/jcohen/viz-workflow/docker-parsl_workflow/app
 # dir = "app/"
-old_filepaths = ["staging_summary.csv",
-                 "raster_summary.csv",
-                 "raster_events.csv",
-                 "config__updated.json",
-                 "log.log"]
-for old_file in old_filepaths:
-  if os.path.exists(old_file):
-      os.remove(old_file)
+# old_filepaths = ["staging_summary.csv",
+#                  "raster_summary.csv",
+#                  "raster_events.csv",
+#                  "config__updated.json",
+#                  "log.log"]
+# for old_file in old_filepaths:
+#   if os.path.exists(old_file):
+#       os.remove(old_file)
 
-# remove dirs from past run
-old_dirs = ["staged",
-            "geotiff",
-            "web_tiles"]
-for old_dir in old_dirs:
-  if os.path.exists(old_dir) and os.path.isdir(old_dir):
-      shutil.rmtree(old_dir)
+# # remove dirs from past run
+# old_dirs = ["staged",
+#             "geotiff",
+#             "web_tiles"]
+# for old_dir in old_dirs:
+#   if os.path.exists(old_dir) and os.path.isdir(old_dir):
+#       shutil.rmtree(old_dir)
 
 
 def run_pdg_workflow(
@@ -137,6 +138,7 @@ def run_pdg_workflow(
     [a.result() for a in app_futures]
 
     logging.info("Rasterization highest complete. Rasterizing lower z-levels.")
+    print("Rasterization highest complete. Rasterizing lower z-levels.")
 
     # ----------------------------------------------------------------
 
@@ -177,6 +179,7 @@ def run_pdg_workflow(
         [a.result() for a in app_futures]
 
     logging.info("Composite rasterization complete. Creating web tiles.")
+    print("Composite rasterization complete. Creating web tiles.")
 
     # ----------------------------------------------------------------
 
@@ -294,12 +297,9 @@ def make_batch(items, batch_size):
 
 # ----------------------------------------------------------------
 
+logging.info(f'Starting PDG workflow: staging, rasterization, and web tiling')
 if __name__ == "__main__":
     run_pdg_workflow(workflow_config)
-
-# run the workflow
-# logging.info(f'Starting PDG workflow: staging, rasterization, and web tiling')
-# run_pdg_workflow(workflow_config)
 
 # # transfer visualization log from /tmp to user dir
 # # TODO: Automate the following destination path to be the mounted volume in the config

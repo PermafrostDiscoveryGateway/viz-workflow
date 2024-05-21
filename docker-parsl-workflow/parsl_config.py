@@ -14,7 +14,7 @@ def config_parsl_cluster(
         max_workers = 4, 
         cores_per_worker = 1, 
         # TODO: automate this following string to pull most recent release on github? 
-        image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.2.1',
+        image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.2.3',
         namespace='pdgrun'):
 
     htex_kube = Config(
@@ -54,7 +54,7 @@ def config_parsl_cluster(
                     # persistent_volumes (list[(str, str)]) – List of tuples 
                     # describing persistent volumes to be mounted in the pod. 
                     # The tuples consist of (PVC Name, Mount Directory).
-                    persistent_volumes = [('pdgrun-dev-0', f'/mnt/data')] # this is a standard location for a PV, also could do /var/data/
+                    persistent_volumes = [('pdgrun-dev-0', f'/mnt/k8s-dev-pdg')]
                 ),
             ),
         ]
