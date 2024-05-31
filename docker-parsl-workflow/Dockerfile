@@ -12,6 +12,12 @@ LABEL org.opencontainers.image.source https://github.com/permafrostdiscoverygate
 WORKDIR /app 
 # check that `app` subdir is created automatically
 
+# Create new group called pdgk8sgroup and add new user to that group
+# both with same ID number as jcohen for permissions after container runs
+RUN groupadd --gid 1040 -r pdgk8sgroup && useradd --uid 1040 -r -g pdgk8sgroup pdgk8suser
+# actviate that user account
+USER pdgk8sgroup:pdgk8suser
+
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
