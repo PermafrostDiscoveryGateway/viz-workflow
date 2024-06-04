@@ -4,7 +4,6 @@
 
 # FROM ubuntu:22.04 is also an otpion but this would make the image larger and would need to install python too
 FROM python:3.9
-# specify the shell until the next SHELL command is run
 SHELL ["/bin/bash", "-c"]
 # metadata info:
 LABEL org.opencontainers.image.source https://github.com/permafrostdiscoverygateway/viz-workflow
@@ -41,9 +40,9 @@ RUN mkdir -p ${CONDA_HOME} && \
     conda --version
 
 # create new conda env
-RUN conda create -n pdg_k8s_env python=3.9 && \
-    conda init && \
-    conda activate pdg_k8s_env
+RUN conda create -n pdg_k8s_env python=3.9
+
+SHELL ["conda", "run", "-n", "pdg_k8s_env", "/bin/bash", "-c"]
 
 COPY requirements.txt .
 RUN pip install -r requirements.txt
