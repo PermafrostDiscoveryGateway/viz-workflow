@@ -23,9 +23,9 @@ RUN apt update && apt -y install wget sudo vim nano iproute2 tree
 # user's homedir?
 RUN groupadd --gid 1040 -r pdgk8sgroup && useradd --uid 1040 -r -g pdgk8sgroup pdgk8suser
 # make dir that matches WORKDIR
-RUN mkdir -p /home/pdgk8suser && chown pdgk8suser.pdgk8sgroup /home/pdgk8suser
+RUN mkdir -p /home/pdgk8suser && chown pdgk8suser:pdgk8sgroup /home/pdgk8suser
 # make dir that matches the PV to store output data
-RUN mkdir -p /mnt/k8s-dev-pdg && chown pdgk8suser.pdgk8sgroup /mnt/k8s-dev-pdg
+RUN mkdir -p /mnt/k8s-dev-pdg && chown pdgk8suser:pdgk8sgroup /mnt/k8s-dev-pdg
 
 # actviate that user account
 USER pdgk8suser:pdgk8sgroup
@@ -42,6 +42,7 @@ RUN mkdir -p ${CONDA_HOME} && \
 
 # create new conda env
 RUN conda create -n pdg_k8s_env python=3.9 && \
+    conda init && \
     conda activate pdg_k8s_env
 
 COPY requirements.txt .
