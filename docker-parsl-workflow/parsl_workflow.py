@@ -297,9 +297,9 @@ def make_batch(items, batch_size):
 
 # ----------------------------------------------------------------
 
-logging.info(f'Starting PDG workflow: staging, rasterization, and web tiling')
-if __name__ == "__main__":
-    run_pdg_workflow(workflow_config)
+# logging.info(f'Starting PDG workflow: staging, rasterization, and web tiling')
+# if __name__ == "__main__":
+#     run_pdg_workflow(workflow_config)
 
 # # transfer visualization log from /tmp to user dir
 # # TODO: Automate the following destination path to be the mounted volume in the config
@@ -311,46 +311,36 @@ if __name__ == "__main__":
 
 # ----------------------------------------------------------------
 
-# make job last longer with useless computation
-# size = 30
-# stat_results = []
-# for x in range(size):
-#     for y in range(size):
-#         current_time = datetime.now()
-#         print(f'Schedule job at {current_time} for {x} and {y}')
-#         stat_results.append(calc_product_long(x, y))
+def main():
 
-# ------------------------------------------
+    '''Main program.'''
 
-# def main():
-
-#     '''Main program.'''
-
-#     size = 30
-#     stat_results = []
-#     for x in range(size):
-#         for y in range(size):
-#             current_time = datetime.now()
-#             print(f'Schedule job at {current_time} for {x} and {y}')
-#             stat_results.append(calc_product_long(x, y))
+    # make job last a while with useless computation
+    size = 30
+    stat_results = []
+    for x in range(size):
+        for y in range(size):
+            current_time = datetime.now()
+            print(f'Schedule job at {current_time} for {x} and {y}')
+            stat_results.append(calc_product_long(x, y))
             
-#     stats = [r.result() for r in stat_results]
-#     print(f"Sum of stats: {sum(stats)}")
+    stats = [r.result() for r in stat_results]
+    print(f"Sum of stats: {sum(stats)}")
 
 
-# @python_app
-# def calc_product_long(x, y):
-#     '''Useless computation to simulate one that takes a long time'''
-#     from datetime import datetime
-#     import time
-#     current_time = datetime.now()
-#     prod = x*y
-#     time.sleep(15)
-#     return(prod)
+@python_app
+def calc_product_long(x, y):
+    '''Useless computation to simulate one that takes a long time'''
+    from datetime import datetime
+    import time
+    current_time = datetime.now()
+    prod = x*y
+    time.sleep(15)
+    return(prod)
 
 
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()
 
 # ------------------------------------------
 

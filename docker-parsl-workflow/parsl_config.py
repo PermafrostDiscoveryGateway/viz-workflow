@@ -14,7 +14,7 @@ def config_parsl_cluster(
         max_workers = 4, 
         cores_per_worker = 1, 
         # TODO: automate this following string to pull most recent release on github? 
-        image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.2.5',
+        image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.2.6',
         namespace='pdgrun'):
 
     htex_kube = Config(
@@ -41,7 +41,7 @@ def config_parsl_cluster(
                     # 'module load Anaconda; source activate parsl_env'.
                     # or 'pip install parsl'
                     # worker_init='echo "Worker started..."; lf=`find . -name \'manager.log\'` tail -n+1 -f ${lf}',
-                    worker_init = 'source /home/jcohen/.bashrc; conda activate k8s-parsl-0503-py3-9',
+                    worker_init = 'pip install parsl==2023.11.27',
     
                     # Should follow the Kubernetes naming rules
                     pod_name = 'parsl-worker',
