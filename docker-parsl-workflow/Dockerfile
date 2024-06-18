@@ -54,7 +54,7 @@ COPY parsl_config.py .
 
 # maybe we don't want to run a command bc we need to use the terminal to
 # do it now that we are using parsl and k8s
-# CMD [ "python", "./parsl_workflow.py" ]
+# CMD [ "python", "./parsl_workflow.py",  ">", "k8s_parsl.log", "2>&1"]
 
 
 # ------------------------------------------------------------

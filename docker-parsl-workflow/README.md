@@ -65,11 +65,11 @@ persistent_volumes=persistent_volumes=[('pdgrun-dev-0', f'/mnt/data')]
 ```
 - Update the string that represents the desired published repository package version of image in `parsl_config.py`. Replace the version number with the next version number you will publish it as:
 ```
-image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.1.2',
+image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.2.8',
 ```
 - Publish the package to the repository with new version number by running 3 commands one-by-one:
 ```
-docker build -t ghcr.io/permafrostdiscoverygateway/viz-workflow:0.1.2 .
+docker build -t ghcr.io/permafrostdiscoverygateway/viz-workflow:0.2.8 .
 ```
 Note: The string representing the organization and repo in these commands must be all lower-case.
 
@@ -77,12 +77,18 @@ Note: The string representing the organization and repo in these commands must b
 echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER --password-stdin
 ```
 ```
-docker push ghcr.io/permafrostdiscoverygateway/viz-workflow:0.1.2
+docker push ghcr.io/permafrostdiscoverygateway/viz-workflow:0.2.8
 ```
 - Run `kubectl get pods` to see if any pods are left hanging from the last run in your namespace. This could be the case if a past run failed to shut down the parsl workers.
     - If there are any hanging, delete them all at once for the specific namespace by running: `kubectl delete pods --all -n {namespace}`
     - or take the safer route by deleting them by listing each pod name: `kubectl delete pods {podname} {podname} {podname}`
-- Run the python script for the parsl workflow, specifying to print the log output to file: `python parsl_workflow.py > k8s_parsl.log 2>&1 `
+- Run the python script for the parsl workflow, specifying to print the log output to file:
+
+```
+python parsl_workflow.py > k8s_parsl.log 2>&1
+```
+
+If you simply run `python parsl_workflow.py`, a lot of parsl output will print to the terminal instead.
 
 **General Notes:**
 - If the run is successful, parsl processes should shut down cleanly. If not, you'll need to kill the processes manually.
