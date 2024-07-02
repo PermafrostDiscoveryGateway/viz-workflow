@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: viz-workflow-pvc
+  namespace: viz-workflow
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  volumeName: viz-workflow-pv
+  storageClassName: gcs-bucket-class

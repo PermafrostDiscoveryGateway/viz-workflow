@@ -1,0 +1,9 @@
+
+# Use a parsl version >= 2024.06.17 to support GCS persistent volumes.
+parsl==2024.06.24
+kubernetes==28.1.0
+glances==1.7.3
+# TODO: There seems to be some new dependency conflict between viz-raster and viz-staging - replace this when that's fixed.
+# git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git
+git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git@develop
+git+https://github.com/PermafrostDiscoveryGateway/viz-raster.git
