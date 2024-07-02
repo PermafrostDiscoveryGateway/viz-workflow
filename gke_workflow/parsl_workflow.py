@@ -18,7 +18,6 @@ import json
 import logging
 import logging.handlers
 from pdgstaging import logging_config
-import os
 
 import parsl
 from parsl import python_app
@@ -26,15 +25,8 @@ from parsl.config import Config
 from parsl.executors import HighThroughputExecutor
 from parsl.providers import KubernetesProvider
 from parsl.addresses import address_by_route
-# from kubernetes import client, config # NOTE: might need to import this? not sure
-# from . import parsl_config # NOTE: might need to import this file if running python command from Dockerfile?
+from kubernetes import client, config
 from parsl_config import config_parsl_cluster
-
-import shutil
-
-import subprocess
-from subprocess import Popen
-user = subprocess.check_output("whoami").strip().decode("ascii")
 
 
 # call parsl config and initiate k8s cluster
@@ -44,29 +36,6 @@ htex_kube = config_parsl_cluster()
 parsl.load(htex_kube)
 
 workflow_config = workflow_config.workflow_config
-
-
-# print("Removing old directories and files...")
-# TODO: Decide filepath here, /app/ or . ?
-# using just dir names and filenames here because set WORKDIR as:
-# /home/jcohen/viz-workflow/docker-parsl_workflow/app
-# dir = "app/"
-# old_filepaths = ["staging_summary.csv",
-#                  "raster_summary.csv",
-#                  "raster_events.csv",
-#                  "config__updated.json",
-#                  "log.log"]
-# for old_file in old_filepaths:
-#   if os.path.exists(old_file):
-#       os.remove(old_file)
-
-# # remove dirs from past run
-# old_dirs = ["staged",
-#             "geotiff",
-#             "web_tiles"]
-# for old_dir in old_dirs:
-#   if os.path.exists(old_dir) and os.path.isdir(old_dir):
-#       shutil.rmtree(old_dir)
 
 
 def run_pdg_workflow(
@@ -301,52 +270,11 @@ logging.info(f'Starting PDG workflow: staging, rasterization, and web tiling')
 if __name__ == "__main__":
     run_pdg_workflow(workflow_config)
 
-# # transfer visualization log from /tmp to user dir
-# # TODO: Automate the following destination path to be the mounted volume in the config
-# # maybe do this by importing config script that specifies the filepath as a variable at the top
-# # TODO: Decide filepath here, /app/ or . ?
-# cmd = ['mv', '/tmp/log.log', '/home/jcohen/viz-workflow/docker-parsl_workflow/app/']
-# # initiate the process to run that command
-# process = Popen(cmd)
-
-# ----------------------------------------------------------------
-
-# def main():
-
-#     '''Main program.'''
-
-#     # make job last a while with useless computation
-#     size = 30
-#     stat_results = []
-#     for x in range(size):
-#         for y in range(size):
-#             current_time = datetime.now()
-#             print(f'Schedule job at {current_time} for {x} and {y}')
-#             stat_results.append(calc_product_long(x, y))
-
-#     stats = [r.result() for r in stat_results]
-#     print(f"Sum of stats: {sum(stats)}")
-
-
-# @python_app
-# def calc_product_long(x, y):
-#     '''Useless computation to simulate one that takes a long time'''
-#     from datetime import datetime
-#     import time
-#     current_time = datetime.now()
-#     prod = x*y
-#     time.sleep(15)
-#     return(prod)
-
-
-# if __name__ == "__main__":
-#     main()
-
 # ------------------------------------------
 
 
 # Shutdown and clear the parsl executor
-# htex_kube.executors[0].scale_in(htex_kube.executors[0].connected_blocks())
+htex_kube.executors[0].scale_in(len(htex_kube.executors[0].connected_blocks()))
 htex_kube.executors[0].shutdown()
 parsl.clear()
 

@@ -1,98 +1,150 @@
-# Run the visualization workflow with Docker
+# Run the visualization workflow on GKE
 
-This directory contains everything necessary to execute the Permafrost Discovery Gateway visualization workflow with Docker, Kubernetes, and parsl for parallelization.
+Note: This documentation is written to be self-contained, but see also the [PDG GCP infra documentation](https://github.com/PermafrostDiscoveryGateway/pdg-tech/blob/master/gcloud/gcloud-infrastructure.md#gcp-kubernetes-clusters), the [Ray cluster setup instructions](https://github.com/PermafrostDiscoveryGateway/pdg-tech/blob/master/gcloud/raycluster/README.md), and the [docker-parsl-workflow instructions](https://github.com/PermafrostDiscoveryGateway/viz-workflow/blob/enhancement-1-k8s/docker-parsl-workflow/README.md), which contain some similar information.
 
-The following 2 scripts can be run within a Docker container:
-  1. `simple_workflow.py` - a simple version of the visualization workflow with no parallelization
-  2. `parsl_workflow.py` - more complex workflow that integrates parallelization with parsl and kubernetes
+## Prerequisites
 
-## Python environment
+We’re using the following shared GKE autopilot cluster that’s already been set up in the PDG project:
 
-Before executing either of these scripts, create a fresh environment with `conda` or `venv` and install all the requirements specified in the `requirements.txt` file with `pip install -r requirements.txt`
+* project: `pdg-project-406720`
+* cluster: `pdg-autopilot-cluster-1`
+* region: `us-west1`
 
-## Persistent data volumes
+Many of the following instructions use a CLI to deploy changes in the cluster. I’m using Cloud Shell to SSH into an existing GCE VM instance set up for this purpose and then running commands from there, since there are networking restrictions preventing us from running commands directly from Cloud Shell or many other places. (There may be other ways to set up your terminal as well.) To do this:
 
-These scripts can be run locally on a laptop, _or_ on a server. Either way, you will have to specify a persistent data volume because both scripts write the following output:
- - GeoPackage files to a `staging` directory
- - GeoTIFF files to a `geotiff` directory
- - web tiles to a `web_tiles` directory
- - supplementary `csv` files output by the visualization workflow
- - a log file
+1. From Cloud Console VM instances page, start the existing GCE VM instance if it’s currently stopped
+    * instance name: `pdg-gke-entrypoint`
+    * zone: `us-west1-b`
+2. SSH into the VM instance:
+    ```
+    $ gcloud compute ssh --zone us-west1-b pdg-gke-entrypoint --project pdg-project-406720
+    ```
+3. Set up authorization to the cluster:
+    ```
+    $ gcloud auth login
+    $ gcloud container clusters get-credentials pdg-autopilot-cluster-1 --internal-ip --region us-west1 --project pdg-project-406720
+    ```
 
-See the documentation in the [`viz-staging`](https://github.com/PermafrostDiscoveryGateway/viz-staging) and [`viz-raster`](https://github.com/PermafrostDiscoveryGateway/viz-raster/tree/main) repositories for further information about the output.
+## One-time setup
 
-_How_ you specify a persistent data volume for the container differs between the simple workflow and the parallel workflow. In the non-parallelized workflow, we specify the path to the directory of choice within the `docker run` command. In the parallel workflow, the `parsl` config includes the filepath for the mounted persistent volume, and the volume must be configured beforehand. See details for these within the steps for each scipt below.
+The following three objects have been set up once and don't need to be changed during a normal execution - see [Running the script](#running-the-script) below instead for what to change each time you want to rerun the script. However these setup steps are documented for reference in case the setup needs to be modified in the future. Note the service account and persistent volume/persistent volume claim are all namespace-scoped, so one of each needs to be created in every new namespace.
 
-## 1. Run `simple_workflow.py`: Build an image and run the container
+1. A namespace within the cluster
+    * namespace name: `viz-workflow`
+    * See [Set up namespace](#set-up-namespace) instructions below
+2. A (Kubernetes) service account for accessing the GCS bucket
+    * service account name: `viz-workflow-sa`
+    * See [Set up service account](#set-up-service-account) instructions below
+3. A persistent volume/claim pointing to the GCS bucket where we store input/output files
+    * persistent volume name: `viz-workflow-pv`
+    * persistent volume claim name: `viz-workflow-pvc`
+    * See [Set up persistent volume](#set-up-persistent-volume) instructions below
 
-### Overview
+### Set up namespace
 
-- Execute the `docker build` command in the terminal, then the `docker run` command.
-- When the script is complete, see the files written to a new output dir `app` in the `viz-workflow/docker-parsl/workflow` dir.
-- Mounting a volume for output on a server is done in the same way as we do on our local laptop: we specify the filepath when we execute the `docker run` command! It's just a different filepath because now we are on a different machine.
+Kubernetes namespaces provide logical separation between workloads in the cluster. Our cluster is shared between the viz workflow and the PDG data pipelines, so I created a namespace to separate the viz workflow:
+
+1. Create the namespace:
+    ```
+    $ kubectl create namespace viz-workflow
+    ```
+
+### Set up service account
+
+The service account needs to be set up for the leader and worker pods to have permissions to access the GCS bucket. However, because it’s what’s used within the leader pod, it also will need to have permissions on the GKE cluster to be able to modify the cluster to turn up worker pods. This generally follows the GCP docs to [configure KSAs](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity#configure-authz-principals), [configure GCS persistent volume auth](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/cloud-storage-fuse-csi-driver#authentication), and [configure RBAC permisssions](https://cloud.google.com/kubernetes-engine/docs/how-to/role-based-access-control).
+
+1. Create the (Kubernetes) service account:
+    ```
+    $ kubectl create serviceaccount viz-workflow-sa --namespace viz-workflow
+    ```
+
+Ask someone with access to grant the IAM role with GCS permissions to the KSA:
+
+2. Grant the Storage Object User IAM role to the KSA:
+    ```
+    $ gcloud projects add-iam-policy-binding pdg-project-406720 --member=principal://iam.googleapis.com/projects/896944613548/locations/global/workloadIdentityPools/pdg-project-406720.svc.id.goog/subject/ns/viz-workflow/sa/viz-workflow-sa --role=roles/storage.objectUser
+    ```
+    As an alternative, it should be possible to grant permissions only on a specific GCS bucket to the KSA if you prefer - see the GCP doc above.
+
+According to the GCP docs, it should be possible to grant the GKE permissions to the KSA either through an IAM role or through Kubernetes RBAC permissions (which are more fine-grained than the IAM role) - however, I haven’t been able to get the IAM role option working. Instead you can just set up RBAC permissions:
+
+3. Modify the manifests (if needed):
+    * Example role: [manifests/service_account_role.yaml](manifests/service_account_role.yaml)
+    * Example role binding: [manifests/service_account_role_binding.yaml](manifests/service_account_role_binding.yaml)
+4. Create the RBAC role:
+    ```
+    $ kubectl apply -f service_account_role.yaml
+    ```
+5. Create the RBAC role binding:
+    ```
+    $ kubectl apply -f service_account_role_binding.yaml
+    ```
+
+### Set up persistent volume
+
+Currently there’s only one GCS bucket that’s shared across all workflows, which contains a subdirectory for viz-workflow:
+
+* bucket name: `pdg-storage-default`
+
+In the future it’s possible there should be different GCS buckets for different workflows or workflow executions, in which case the instructions below would need to be rerun to point to that bucket. This generally follows the GCP docs to [create a persistent volume](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/cloud-storage-fuse-csi-driver#create-persistentvolume) and [create a persistent volume claim](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/cloud-storage-fuse-csi-driver#create-persistentvolumeclaim).
+
+1. Modify the manifests (if needed, e.g. to point to your GCS bucket. See the docs for more info about requirements):
+    * Example persistent volume: [manifests/persistent_volume.yaml](manifests/persistent_volume.yaml)
+    * Example persistent volume claim: [manifests/persistent_volume_claim.yaml](manifests/persistent_volume_claim.yaml)
+2. Create the persistent volume:
+    ```
+    $ kubectl apply -f manifests/persistent_volume.yaml
+    ```
+3. Create the persistent volume claim:
+    ```
+    $ kubectl apply -f manifests/persistent_volume_claim.yaml
+    ```
+
+## Running the script
+
+The setup creates a leader pod in which the main [parsl_workflow.py](parsl_workflow.py) script is executed. During the script execution, parsl will bring up additional worker pods as needed. These worker pods need to be able to communicate back to the main script, so that’s the reason we run it in the leader pod (since networking restrictions allow easier communication between pods within the cluster than outside of it).
+
+> **TODO:** An alternative setup that the QGreenland project uses is to run a Kubernetes Job with a ConfigMap that runs the script, which we could try also. See comments in the [QGreenland parsl repo](https://github.com/QGreenland-Net/parsl-exploration/blob/main/README.md#submitting-jobs-to-a-remote-cluster).
+
+At the moment, both the leader and worker pods use the same Docker image, but this is not necessary - we could maintain separate images for the leader and worker instead (for example if we wanted to add the command to execute the script to the leader’s Dockerfile). Note that both are required to use the same parsl version. Note that the worker pods are automatically created with an IfNotPresent pull policy so a new image tag needs to be used every time the worker pod image changes.
 
 ### Steps
 
-- If working on a laptop rather than a server, clone repository & open the Docker Desktop app, then navigate to repository in VScode. If working on a server, SSH into the server in VScode, clone the repository, and navigate to the repository.
-- Ensure an environment is activated in the terminal that is built from the same `requirements.txt` file as the docker image. This requires you to create a fresh environment, activate it, then run `pip install -r requirements.txt` in the command line.
-- Retrieve input data to process.
-  - **(TODO: make sample data accessible to people without access to Datateam)**
-- Edit the filepath for the WORKDIR in the Dockerfile as needed.
-  - **TODO: automate this step by adjusting `WORKDIR` in Dockerfile, and potentially defining `ENV` variables prior to defining the `WORKDIR` that are then used in the `WORKDIR`.**
-  - Recall that the default `WORKDIR` is `/` if not otherwise defined.
-- Run `docker build -t image_name .` in the command line.
-- Run the container and specify a persistent directory for input and output data, updating the path as needed: `docker run -v /path/to/repository/viz-workflow/docker-parsl-workflow/app:/app image_name`
-    - Note: The `app` dir does not need ro be created manually, it will be created when the container runs.
+1. Make changes to the worker pod configurations. The worker pods are configured in the script itself, so this changes the code and requires the Docker image to be rebuilt in step 2
+    * Parameters to configure the worker pods are in [parsl_config.py](parsl_config.py)
+    * Things to note:
+        - pod name prefix: `viz-workflow-worker`
+        - `image` **should** be set to the tag that will be used in step 2
+        - The worker pods need to be set up to consume the GCS persistent volume. `persistent_volumes` has been set to the point to the persistent volume claim from [One-time setup](#one-time-setup) above, and the mount path **should** match the directories used for input/output data in [workflow_config.py](workflow_config.py). In addition, a service account and a particular annotation must be provided in order for the worker pods to consume the GCS persistent volume, per the GCP docs on [mounting persistent volumes](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/cloud-storage-fuse-csi-driver#consume-persistentvolumeclaim); this has been done by setting `service_account_name` to the service account from [One-time setup](#one-time-setup) above and including the annotation `{"gke-gcsfuse/volumes": "true"}` in `annotations`
+        - `namespace` has been set to the namespace from [One-time setup](#one-time-setup) above
+2. Make any other changes to the code and rebuild the Docker image replacing `<tag>` below
+    ```
+    $ docker build -t ghcr.io/permafrostdiscoverygateway/viz-workflow:<tag> .
+    $ docker push ghcr.io/permafrostdiscoverygateway/viz-workflow:<tag>
+    ```
+3. Create or modify the leader deployment manifest
+    * Example deployment: [manifests/leader_deployment.yaml](manifests/leader_deployment.yaml)
+    * Things to note:
+        - deployment name (and container name): `viz-workflow-leader`
+        - `image` **should** be set to the tag from step 2
+        - The leader deployment needs to be set up to consume the GCS persistent volume. `volumeMounts` and `volumes` have been set to point to the persistent volume claim from [One-time setup](#one-time-setup) above, and similar to the worker pod config `mountPath` **should** match the directories used for input/output data in [workflow_config.py](workflow_config.py). In addition, `service_account_name` and `annotations` must be provided in the same way as for the worker pods above
+        - `namespace` has been set to the namespace from [One-time setup](#one-time-setup) above
+4. Create or update the leader deployment
+    ```
+    $ kubectl apply -f manifests/leader_deployment.yaml
+    ```
+5. Open a terminal within the leader pod and execute the script in that terminal. The pod name changes every time the deployment is updated so replace `<pod_name>` below with the current name
+    ```
+    $ kubectl exec -it <pod_name> -c viz-workflow-leader -n viz-workflow -- bash
+    $ python parsl_workflow.py
+    ```
 
-## 2. Run `parsl_workflow.py`: Build an image and publish it to the repository, then run a container from the published repository package
+## Cleanup
 
-### Overview
-
-- This script runs the same visualization worklow but processes in parallel with several workers. The amount of workers can be adjusted in the configuration: `parsl_config.py`
-- The GitHub repository "packages" section contains all published Docker images that can be pulled by users. These  are version controlled, so you can point to a specific image version to run. This makes a workflow more reproducibile. The repo and version are specified in the `parsl_config.py`
-
-### Steps
-
-- Make sure your GitHub Personal Access Token allows for publishing packages to the repository.
-    - Navigate to your token on GitHub, then scroll down to `write:packages` and check the box and save.
-- SSH into server in VScode, clone the repository, and navigate to the repository.
-- Ensure an environment is activated in the terminal that is built from the same `requirements.txt` file as the docker image, and the same version of python.
-- Edit the line in the parsl configuration to specify the persistent volume name and mount filepath.
-    - The first item in the list will need to be a persistent volume that is set up by the server admin. See [this repository](https://github.com/mbjones/k8s-parsl?tab=readme-ov-file#persistent-data-volumes) for details.
-    - The second item is the location that you want the volume to be mounted _within your container_. `/mnt/data` is a common path used in this field. Recall that the data will be written there in the container but will be persistently accessible at the location of the persistent volume on your machine.
-```
-persistent_volumes=persistent_volumes=[('pdgrun-dev-0', f'/mnt/data')]
-```
-- Update the string that represents the desired published repository package version of image in `parsl_config.py`. Replace the version number with the next version number you will publish it as:
-```
-image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.2.8',
-```
-- Publish the package to the repository with new version number by running 3 commands one-by-one:
-```
-docker build -t ghcr.io/permafrostdiscoverygateway/viz-workflow:0.2.8 .
-```
-Note: The string representing the organization and repo in these commands must be all lower-case.
-
-```
-echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER --password-stdin
-```
-```
-docker push ghcr.io/permafrostdiscoverygateway/viz-workflow:0.2.8
-```
-- Run `kubectl get pods` to see if any pods are left hanging from the last run in your namespace. This could be the case if a past run failed to shut down the parsl workers.
-    - If there are any hanging, delete them all at once for the specific namespace by running: `kubectl delete pods --all -n {namespace}`
-    - or take the safer route by deleting them by listing each pod name: `kubectl delete pods {podname} {podname} {podname}`
-- Run the python script for the parsl workflow, specifying to print the log output to file:
-
-```
-python parsl_workflow.py > k8s_parsl.log 2>&1
-```
-
-If you simply run `python parsl_workflow.py`, a lot of parsl output will print to the terminal instead.
-
-**General Notes:**
-- If the run is successful, parsl processes should shut down cleanly. If not, you'll need to kill the processes manually.
-  - You can check your processes in the command line with `ps -ef | grep {username}`
-  - In the output, the column next to your username shows the 5-digit identifier for the proess. Run `kill -9 {identifier}` to kill one in particular.
-- After each run, if files were output, remove them from the persistent directory before next run.
-- If testing code and you end up building many images, run `docker images` to list them and you can choose which to delete
+1. From the Cloud Console GKE Workloads page, delete any worker pods. Usually the parsl script itself should clean up these pods at the end of a run, but you may need to do it manually if the previous run exited abnormally:
+    * pod_name prefix: `viz-workflow-worker`
+2. *Optional:* From the Cloud Console GKE Workloads page, delete the leader pod:
+    * deployment name: `viz-workflow-leader`
+3. *Optional:* From Cloud Console GCE VM Instances page, stop the GCE VM instance:
+    * instance name: `pdg-gke-entrypoint`
+    * zone: `us-west1-b`

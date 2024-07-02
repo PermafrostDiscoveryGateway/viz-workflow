@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: viz-workflow-leader
+  labels:
+    app: viz-workflow-leader
+  namespace: viz-workflow
+spec:
+  selector:
+    matchLabels:
+      app: viz-workflow-leader
+  template:
+    metadata:
+      annotations:
+        gke-gcsfuse/volumes: "true"
+      labels:
+        app: viz-workflow-leader
+    spec:
+      serviceAccountName: viz-workflow-sa
+      containers:
+      - name: viz-workflow-leader
+        image: ghcr.io/permafrostdiscoverygateway/viz-workflow:0.2.9
+        imagePullPolicy: Always
+        command:
+        - sleep
+        - infinity
+        volumeMounts:
+          - mountPath: /data
+            name: viz-workflow-volume
+      volumes:
+        - name: viz-workflow-volume
+          persistentVolumeClaim:
+            claimName: viz-workflow-pvc
