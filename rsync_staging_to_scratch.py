@@ -5,20 +5,34 @@ from datetime import datetime
 import subprocess
 from subprocess import PIPE, Popen
 import pprint
-import PRODUCTION_IWP_CONFIG
-IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
 
-#import lake_change_config
-#IWP_CONFIG = lake_change_config.IWP_CONFIG
+# -----------------------------------------------------
+# CHOOSE ONE OF THE FOLLOWING IMPORT & CONFIG CHUNKS
+
+# for processing IWP:
+# import PRODUCTION_IWP_CONFIG
+# IWP_CONFIG = PRODUCTION_IWP_CONFIG.IWP_CONFIG
+# IWP_CONFIG2 = IWP_CONFIG.copy()
+
+# for testing branches with IWP data:
+# import branch_testing_iwp_config
+# IWP_CONFIG = branch_testing_iwp_config.IWP_CONFIG
+# IWP_CONFIG2 = IWP_CONFIG.copy()
+
+# for infrastructure data:
+import infrastructure_config
+CONFIG = infrastructure_config.CONFIG
+CONFIG2 = CONFIG.copy()
+# -----------------------------------------------------
 
 # set config properties for current context
-IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_local']
-SOURCE = IWP_CONFIG['dir_staged']
-IWP_CONFIG['dir_staged'] = IWP_CONFIG['dir_staged_remote']
-DESTINATION = IWP_CONFIG['dir_staged']
+CONFIG2['dir_staged'] = CONFIG2['dir_staged_local']
+SOURCE = CONFIG2['dir_staged']
+CONFIG2['dir_staged'] = CONFIG2['dir_staged_remote']
+DESTINATION = CONFIG2['dir_staged']
 
 print("Using config: ")
-pprint.pprint(IWP_CONFIG)
+pprint.pprint(CONFIG2)
 
 # define user on Delta, avoid writing files to other user's dir
 user = subprocess.check_output("whoami").strip().decode("ascii")

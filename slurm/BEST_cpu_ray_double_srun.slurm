@@ -3,7 +3,7 @@
 #SBATCH --job-name=pdg_viz
 #SBATCH --partition=cpu
 #SBATCH --account=
-#SBATCH --time=01:00:00
+#SBATCH --time=48:00:00
 
 #SBATCH --export=ALL,RAY_worker_register_timeout_seconds=120
 
@@ -38,8 +38,9 @@ set -x
 
 echo "This is BEST_cpu_ray_double_srun.slurm"
 
-# venv init
-source /scratch/bbou/julietcohen/venv/iwp_3/bin/activate
+# venv init or conda activate
+conda activate arc_inf
+# source /scratch/bbou/julietcohen/venv/iwp_3/bin/activate
 # set file soft limit to maximum value (not unlimited because that's not permitted)
 # before any srun's are executed
 ulimit -n 32768
