@@ -6,7 +6,7 @@
 - [Package source code on GitHub](https://github.com/PermafrostDiscoveryGateway/viz-workflow)
 - [Submit bugs and feature requests](https://github.com/PermafrostDiscoveryGateway/viz-workflow/issues/new)
 
-The Permafrost Discovery Gateway visualization workflow uses [viz-staging](https://github.com/PermafrostDiscoveryGateway/viz-staging), [viz-raster](https://github.com/PermafrostDiscoveryGateway/viz-raster/tree/main), and [viz-3dtiles](https://github.com/PermafrostDiscoveryGateway/viz-3dtiles) in parallel using Ray Core and Ray workflows. An alternative workflow that uses `Docker` and `parsl` for parallelization is currently under development.
+The Permafrost Discovery Gateway visualization workflow uses [viz-staging](https://github.com/PermafrostDiscoveryGateway/viz-staging), [viz-raster](https://github.com/PermafrostDiscoveryGateway/viz-raster/tree/main), and [viz-3dtiles](https://github.com/PermafrostDiscoveryGateway/viz-3dtiles) in parallel using Ray Core and Ray workflows. An alternative workflow that uses `Docker` and `parsl` for parallelization is currently under development to deploy on Google Kubernetes Engine and other machines.
 
 ![PDG workflow summary](docs/images/viz_workflow.png)
 
