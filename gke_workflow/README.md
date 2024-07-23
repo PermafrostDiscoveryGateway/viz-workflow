@@ -15,14 +15,22 @@ Many of the following instructions use a CLI to deploy changes in the cluster. I
 1. From Cloud Console VM instances page, start the existing GCE VM instance if it’s currently stopped
     * instance name: `pdg-gke-entrypoint`
     * zone: `us-west1-b`
+    
 2. SSH into the VM instance:
     ```
-    $ gcloud compute ssh --zone us-west1-b pdg-gke-entrypoint --project pdg-project-406720
+    gcloud compute ssh --zone us-west1-b pdg-gke-entrypoint --project pdg-project-406720
     ```
+    You may be prompted to create a passphrase.
+
 3. Set up authorization to the cluster:
     ```
-    $ gcloud auth login
-    $ gcloud container clusters get-credentials pdg-autopilot-cluster-1 --internal-ip --region us-west1 --project pdg-project-406720
+    gcloud auth login
+    ```
+    Follow the prompts to navigate to a link in your browser to access a verification code, then paste it in the terminal.
+
+    Fetch the cluster endpoint and authentication data, and generate a kubeconfig entry:
+    ```
+    gcloud container clusters get-credentials pdg-autopilot-cluster-1 --internal-ip --region us-west1 --project pdg-project-406720
     ```
 
 ## One-time setup
@@ -46,7 +54,7 @@ Kubernetes namespaces provide logical separation between workloads in the cluste
 
 1. Create the namespace:
     ```
-    $ kubectl create namespace viz-workflow
+    kubectl create namespace viz-workflow
     ```
 
 ### Set up service account
@@ -55,14 +63,14 @@ The service account needs to be set up for the leader and worker pods to have pe
 
 1. Create the (Kubernetes) service account:
     ```
-    $ kubectl create serviceaccount viz-workflow-sa --namespace viz-workflow
+    kubectl create serviceaccount viz-workflow-sa --namespace viz-workflow
     ```
 
 Ask someone with access to grant the IAM role with GCS permissions to the KSA:
 
 2. Grant the Storage Object User IAM role to the KSA:
     ```
-    $ gcloud projects add-iam-policy-binding pdg-project-406720 --member=principal://iam.googleapis.com/projects/896944613548/locations/global/workloadIdentityPools/pdg-project-406720.svc.id.goog/subject/ns/viz-workflow/sa/viz-workflow-sa --role=roles/storage.objectUser
+    gcloud projects add-iam-policy-binding pdg-project-406720 --member=principal://iam.googleapis.com/projects/896944613548/locations/global/workloadIdentityPools/pdg-project-406720.svc.id.goog/subject/ns/viz-workflow/sa/viz-workflow-sa --role=roles/storage.objectUser
     ```
     As an alternative, it should be possible to grant permissions only on a specific GCS bucket to the KSA if you prefer - see the GCP doc above.
 
@@ -73,11 +81,11 @@ According to the GCP docs, it should be possible to grant the GKE permissions to
     * Example role binding: [manifests/service_account_role_binding.yaml](manifests/service_account_role_binding.yaml)
 4. Create the RBAC role:
     ```
-    $ kubectl apply -f service_account_role.yaml
+    kubectl apply -f service_account_role.yaml
     ```
 5. Create the RBAC role binding:
     ```
-    $ kubectl apply -f service_account_role_binding.yaml
+    kubectl apply -f service_account_role_binding.yaml
     ```
 
 ### Set up persistent volume
@@ -93,11 +101,11 @@ In the future it’s possible there should be different GCS buckets for differen
     * Example persistent volume claim: [manifests/persistent_volume_claim.yaml](manifests/persistent_volume_claim.yaml)
 2. Create the persistent volume:
     ```
-    $ kubectl apply -f manifests/persistent_volume.yaml
+    kubectl apply -f manifests/persistent_volume.yaml
     ```
 3. Create the persistent volume claim:
     ```
-    $ kubectl apply -f manifests/persistent_volume_claim.yaml
+    kubectl apply -f manifests/persistent_volume_claim.yaml
     ```
 
 ## Running the script
@@ -111,32 +119,38 @@ At the moment, both the leader and worker pods use the same Docker image, but th
 ### Steps
 
 1. Make changes to the worker pod configurations. The worker pods are configured in the script itself, so this changes the code and requires the Docker image to be rebuilt in step 2
-    * Parameters to configure the worker pods are in [parsl_config.py](parsl_config.py)
+    * Parameters to configure the worker pods are in [parsl_config.py](parsl_config.py):
+        * Change the value of `max_workers`, or `min_blocks`, or `max_blocks` to the appropriate number for your job, depending on the size of your input dataset.
+        * If you have made changes that require you to rebuilt the image, then within `parsl_config.py` update the `image` string with a new package version tag (like `0.2.9`). This tag will be the same one used in the command to rebuild the image in step 2.
     * Things to note:
         - pod name prefix: `viz-workflow-worker`
-        - `image` **should** be set to the tag that will be used in step 2
         - The worker pods need to be set up to consume the GCS persistent volume. `persistent_volumes` has been set to the point to the persistent volume claim from [One-time setup](#one-time-setup) above, and the mount path **should** match the directories used for input/output data in [workflow_config.py](workflow_config.py). In addition, a service account and a particular annotation must be provided in order for the worker pods to consume the GCS persistent volume, per the GCP docs on [mounting persistent volumes](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/cloud-storage-fuse-csi-driver#consume-persistentvolumeclaim); this has been done by setting `service_account_name` to the service account from [One-time setup](#one-time-setup) above and including the annotation `{"gke-gcsfuse/volumes": "true"}` in `annotations`
         - `namespace` has been set to the namespace from [One-time setup](#one-time-setup) above
-2. Make any other changes to the code and rebuild the Docker image replacing `<tag>` below
+
+2. Rebuild the Docker image replacing `<tag>` below
     ```
-    $ docker build -t ghcr.io/permafrostdiscoverygateway/viz-workflow:<tag> .
-    $ docker push ghcr.io/permafrostdiscoverygateway/viz-workflow:<tag>
+    docker build -t ghcr.io/permafrostdiscoverygateway/viz-workflow:<tag> .
     ```
+    ```
+    docker push ghcr.io/permafrostdiscoverygateway/viz-workflow:<tag>
+    ```
+
 3. Create or modify the leader deployment manifest
     * Example deployment: [manifests/leader_deployment.yaml](manifests/leader_deployment.yaml)
     * Things to note:
         - deployment name (and container name): `viz-workflow-leader`
-        - `image` **should** be set to the tag from step 2
+        - `image` **should** be set to the tag from step 2, this will need to be changed if you just rebuilt the image
+            > **TODO:** If possible, change the value of `image` to instead be pulled from `parsl_config.py`
         - The leader deployment needs to be set up to consume the GCS persistent volume. `volumeMounts` and `volumes` have been set to point to the persistent volume claim from [One-time setup](#one-time-setup) above, and similar to the worker pod config `mountPath` **should** match the directories used for input/output data in [workflow_config.py](workflow_config.py). In addition, `service_account_name` and `annotations` must be provided in the same way as for the worker pods above
         - `namespace` has been set to the namespace from [One-time setup](#one-time-setup) above
 4. Create or update the leader deployment
     ```
-    $ kubectl apply -f manifests/leader_deployment.yaml
+    kubectl apply -f manifests/leader_deployment.yaml
     ```
 5. Open a terminal within the leader pod and execute the script in that terminal. The pod name changes every time the deployment is updated so replace `<pod_name>` below with the current name
     ```
-    $ kubectl exec -it <pod_name> -c viz-workflow-leader -n viz-workflow -- bash
-    $ python parsl_workflow.py
+    kubectl exec -it <pod_name> -c viz-workflow-leader -n viz-workflow -- bash
+    python parsl_workflow.py
     ```
 
 ## Cleanup
