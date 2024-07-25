@@ -12,7 +12,7 @@ We’re using the following shared GKE autopilot cluster that’s already been s
 
 Many of the following instructions use a CLI to deploy changes in the cluster. I’m using Cloud Shell to SSH into an existing GCE VM instance set up for this purpose and then running commands from there, since there are networking restrictions preventing us from running commands directly from Cloud Shell or many other places. (There may be other ways to set up your terminal as well.) To do this:
 
-1. From Cloud Console VM instances page, start the existing GCE VM instance if it’s currently stopped
+1. From [Cloud Console VM instances page](https://console.cloud.google.com/compute/instances?project=pdg-project-406720&pli=1), start the existing GCE VM instance if it’s currently stopped
     * instance name: `pdg-gke-entrypoint`
     * zone: `us-west1-b`
     
@@ -20,7 +20,7 @@ Many of the following instructions use a CLI to deploy changes in the cluster. I
     ```
     gcloud compute ssh --zone us-west1-b pdg-gke-entrypoint --project pdg-project-406720
     ```
-    You may be prompted to create a passphrase.
+    You may be prompted to create or enter a passphrase.
 
 3. Set up authorization to the cluster:
     ```
@@ -32,6 +32,10 @@ Many of the following instructions use a CLI to deploy changes in the cluster. I
     ```
     gcloud container clusters get-credentials pdg-autopilot-cluster-1 --internal-ip --region us-west1 --project pdg-project-406720
     ```
+
+    If successful, your terminal now displays: `username@pdg-gke-entrypoint:~$`
+
+4. Clone the `viz-workflow` to your home directory in the endpoint so you have access to the files for edits, building/pushing the image, and running the `kubectl` and `python` commands in the next section `Running the script`.
 
 ## One-time setup
 
@@ -118,9 +122,10 @@ At the moment, both the leader and worker pods use the same Docker image, but th
 
 ### Steps
 
-1. Make changes to the worker pod configurations. The worker pods are configured in the script itself, so this changes the code and requires the Docker image to be rebuilt in step 2
+1. Make changes to the worker pod configuration. The worker pods are configured in the script itself, so this changes the code and requires the Docker image to be rebuilt in step 2.
     * Parameters to configure the worker pods are in [parsl_config.py](parsl_config.py):
         * Change the value of `max_workers`, or `min_blocks`, or `max_blocks` to the appropriate number for your job, depending on the size of your input dataset.
+            > TODO: As we experiment more with different sizes of input datasets and different datasets in general, we should update these instructions with more details. 
         * If you have made changes that require you to rebuilt the image, then within `parsl_config.py` update the `image` string with a new package version tag (like `0.2.9`). This tag will be the same one used in the command to rebuild the image in step 2.
     * Things to note:
         - pod name prefix: `viz-workflow-worker`
