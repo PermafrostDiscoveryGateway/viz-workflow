@@ -35,7 +35,7 @@ Many of the following instructions use a CLI to deploy changes in the cluster. I
 
     If successful, your terminal now displays: `username@pdg-gke-entrypoint:~$`
 
-4. Clone the `viz-workflow` to your home directory in the endpoint so you have access to the files for edits, building/pushing the image, and running the `kubectl` and `python` commands in the next section `Running the script`.
+4. Clone or pull updates from the `viz-workflow` to your home directory in the endpoint so you have access to the files for the next section `Running the script`.
 
 ## One-time setup
 
@@ -152,16 +152,46 @@ At the moment, both the leader and worker pods use the same Docker image, but th
     ```
     kubectl apply -f manifests/leader_deployment.yaml
     ```
-5. Open a terminal within the leader pod and execute the script in that terminal. The pod name changes every time the deployment is updated so replace `<pod_name>` below with the current name
+    
+5. Retrieve the name of the leader pod from the Kubernetes Engine UI:
+    - Navigate to the [Kubernetes Engine UI Workloads](https://console.cloud.google.com/kubernetes/workload/overview?project=pdg-project-406720&pageState=(%22savedViews%22:(%22i%22:%22226f72e6aa1747f18ef55672549c7c91%22,%22c%22:%5B%5D,%22n%22:%5B%5D))) page.
+    - Select the `viz-workflow-leader` pod
+    - Scoll down to the `Manged pods` section and select the active pod `viz-workflow-leader-{ID}`. The pod name changes every time the deployment is updated, so the leader pod name ends with a string.
+
+6. Open a terminal within the leader pod. Replace `<pod_name>` below with the current name.
     ```
     kubectl exec -it <pod_name> -c viz-workflow-leader -n viz-workflow -- bash
+    ```
+
+    Your terminal should now display something like: `root@viz-workflow-leader-548bd45d87-fj6tr:/usr/local/share/app#`
+
+7. Execute the script in that terminal.
+    ```
     python parsl_workflow.py
     ```
 
+## Checking status of pods
+
+While SSH'd into the entrypoint, which means your terminal looks like `username@pdg-gke-entrypoint:~$`, you can run the following command to check if the pods in your namespace are running:
+
+```
+kubectl get pods -n viz-workflow
+```
+
+The output displays leader pods with their randomly generated, unique suffix, as well as worker pods. You can have multiple terminals open simultaneously, one to run the script and another to check the status of the pods. 
+
 ## Cleanup
 
-1. From the Cloud Console GKE Workloads page, delete any worker pods. Usually the parsl script itself should clean up these pods at the end of a run, but you may need to do it manually if the previous run exited abnormally:
-    * pod_name prefix: `viz-workflow-worker`
+1. Delete any hanging worker pods, either from the Cloud Console GKE Workloads page, or by running a command with the namespace and pod specified:
+
+```
+kubectl delete pods -n viz-workflow viz-workflow-worker-1722275361950
+```
+
+Usually the parsl script itself should clean up these pods at the end of a run, but you may need to do it manually if the previous run exited abnormally:
+
+- pod_name prefix: `viz-workflow-worker`
+
 2. *Optional:* From the Cloud Console GKE Workloads page, delete the leader pod:
     * deployment name: `viz-workflow-leader`
 3. *Optional:* From Cloud Console GCE VM Instances page, stop the GCE VM instance:
