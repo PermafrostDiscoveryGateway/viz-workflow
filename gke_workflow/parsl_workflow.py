@@ -25,7 +25,7 @@ from parsl.config import Config
 from parsl.executors import HighThroughputExecutor
 from parsl.providers import KubernetesProvider
 from parsl.addresses import address_by_route
-from kubernetes import client, config
+# from kubernetes import client, config
 from parsl_config import config_parsl_cluster
 
 
@@ -277,5 +277,10 @@ if __name__ == "__main__":
 htex_kube.executors[0].scale_in(len(htex_kube.executors[0].connected_blocks()))
 htex_kube.executors[0].shutdown()
 parsl.clear()
+
+# error message output:
+# "WARNING:parsl.dataflow.dflow:Python is exiting with a DFK still running.
+# You should call parsl.dfk().cleanup() before exiting to release any resources"
+parsl.dfk().cleanup()
 
 print("Script complete.")

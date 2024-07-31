@@ -122,6 +122,8 @@ At the moment, both the leader and worker pods use the same Docker image, but th
 
 ### Steps
 
+Building the image should be done in a terminal _not within the entrypoint_. Attempting to run a `docker` command while SSH'd into the entrypoint will result in an error because Docker is not installed. 
+
 1. Make changes to the worker pod configuration. The worker pods are configured in the script itself, so this changes the code and requires the Docker image to be rebuilt in step 2.
     * Parameters to configure the worker pods are in [parsl_config.py](parsl_config.py):
         * Change the value of `max_workers`, or `min_blocks`, or `max_blocks` to the appropriate number for your job, depending on the size of your input dataset.
@@ -148,6 +150,7 @@ At the moment, both the leader and worker pods use the same Docker image, but th
             > **TODO:** If possible, change the value of `image` to instead be pulled from `parsl_config.py`
         - The leader deployment needs to be set up to consume the GCS persistent volume. `volumeMounts` and `volumes` have been set to point to the persistent volume claim from [One-time setup](#one-time-setup) above, and similar to the worker pod config `mountPath` **should** match the directories used for input/output data in [workflow_config.py](workflow_config.py). In addition, `service_account_name` and `annotations` must be provided in the same way as for the worker pods above
         - `namespace` has been set to the namespace from [One-time setup](#one-time-setup) above
+        
 4. Create or update the leader deployment
     ```
     kubectl apply -f manifests/leader_deployment.yaml

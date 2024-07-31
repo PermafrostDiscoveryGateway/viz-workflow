@@ -10,7 +10,7 @@ def config_parsl_cluster(
         max_workers = 4,
         cores_per_worker = 1,
         # TODO: automate this following string to pull most recent release on github?
-        image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.2.9-test',
+        image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.2.9-test-2',
         namespace='viz-workflow'):
 
     htex_kube = Config(
