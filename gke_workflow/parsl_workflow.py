@@ -281,6 +281,7 @@ parsl.clear()
 # error message output:
 # "WARNING:parsl.dataflow.dflow:Python is exiting with a DFK still running.
 # You should call parsl.dfk().cleanup() before exiting to release any resources"
-parsl.dfk().cleanup()
+# parsl.dfk().cleanup()
+# including that line raised NoDataFlowKernelError('Must first load config')
 
 print("Script complete.")
