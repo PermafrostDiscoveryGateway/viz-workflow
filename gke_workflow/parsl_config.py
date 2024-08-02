@@ -10,7 +10,7 @@ def config_parsl_cluster(
         max_workers = 4,
         cores_per_worker = 1,
         # TODO: automate this following string to pull most recent release on github?
-        image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.2.9-test-2',
+        image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.3.0',
         namespace='viz-workflow'):
 
     htex_kube = Config(
@@ -23,6 +23,11 @@ def config_parsl_cluster(
                 # Address for the pod worker to connect back
                 address = address_by_route(),
                 worker_debug = True,
+                # increased seconds allocated towards a task before it is 
+                # considered failed,for loading in large files:
+                heartbeat_threshold = 3600,
+                # default seconds for how often a heartbeat is sent:
+                heartbeat_period = 30, 
                 provider = KubernetesProvider(
 
                     # Namespace in K8S to use for the run
