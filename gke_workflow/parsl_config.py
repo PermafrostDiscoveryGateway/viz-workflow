@@ -10,7 +10,7 @@ def config_parsl_cluster(
         max_workers = 4,
         cores_per_worker = 1,
         # TODO: automate this following string to pull most recent release on github?
-        image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.3.0',
+        image='ghcr.io/permafrostdiscoverygateway/viz-workflow:0.3.1',
         namespace='viz-workflow'):
 
     htex_kube = Config(
@@ -39,8 +39,8 @@ def config_parsl_cluster(
                     # Should follow the Kubernetes naming rules
                     pod_name = 'viz-workflow-worker',
 
-                    init_mem='1Gi',
-                    max_mem='2Gi',
+                    init_mem='4Gi',
+                    max_mem='8Gi',
 
                     nodes_per_block = 1,
                     init_blocks = init_blocks,

@@ -19,7 +19,7 @@ spec:
       serviceAccountName: viz-workflow-sa
       containers:
       - name: viz-workflow-leader
-        image: ghcr.io/permafrostdiscoverygateway/viz-workflow:0.3.0
+        image: ghcr.io/permafrostdiscoverygateway/viz-workflow:0.3.1
         imagePullPolicy: Always
         command:
         - sleep
