@@ -5,3 +5,4 @@ kubernetes==28.1.0
 glances==1.7.3
 git+https://github.com/PermafrostDiscoveryGateway/viz-raster.git
 # Note: installing viz-raster also installs viz-staging as a dependency
+google-cloud-storage==2.18.1

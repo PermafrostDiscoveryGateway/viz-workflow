@@ -100,6 +100,13 @@ Currently there’s only one GCS bucket that’s shared across all workflows, wh
 
 In the future it’s possible there should be different GCS buckets for different workflows or workflow executions, in which case the instructions below would need to be rerun to point to that bucket. This generally follows the GCP docs to [create a persistent volume](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/cloud-storage-fuse-csi-driver#create-persistentvolume) and [create a persistent volume claim](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/cloud-storage-fuse-csi-driver#create-persistentvolumeclaim).
 
+You can access the bucket from the command line after connecting to the entrypoint:
+* `gsutil ls gs://pdg-storage-default/` lists the contents of the bucket
+* `gsutil ls -r gs://pdg-storage-default/viz_workflow/output/** | wc -l` prints the number of files, recursively, in the subdirectory `output` of the bucket
+
+
+    
+
 1. Modify the manifests (if needed, e.g. to point to your GCS bucket. See the docs for more info about requirements):
     * Example persistent volume: [manifests/persistent_volume.yaml](manifests/persistent_volume.yaml)
     * Example persistent volume claim: [manifests/persistent_volume_claim.yaml](manifests/persistent_volume_claim.yaml)

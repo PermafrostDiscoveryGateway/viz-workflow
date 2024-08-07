@@ -1,7 +1,7 @@
 # test docker image and orchestrate containers
 # with kubernetes by running a version of
 # the workflow with a kubernetes parsl config
-# processing 2 small overlapping IWP files
+# processing 2 or 3 small overlapping IWP files
 
 # documentation for parsl config:
 # https://parsl.readthedocs.io/en/stable/userguide/configuring.html#kubernetes-clusters
@@ -9,6 +9,7 @@
 
 from datetime import datetime
 import time
+from google.cloud import storage
 
 import pdgstaging
 import pdgraster
@@ -40,7 +41,8 @@ workflow_config = workflow_config.workflow_config
 
 def run_pdg_workflow(
     workflow_config,
-    batch_size = 300
+    batch_size_input = 1,
+    batch_size_tiles = 300
 ):
     """
     Run the main PDG workflow for the following steps:
@@ -53,9 +55,13 @@ def run_pdg_workflow(
     ----------
     workflow_config : dict
         Configuration for the PDG staging workflow.
-    batch_size: int
-        How many input files, staged files, geotiffs, or web tiles should be included in a single creation
-        task? (each task is run in parallel) Default: 300
+    batch_size_input: int
+        How many input files should be included in a single creation
+        task? (each task is run in parallel) Default: 1
+    batch_size_tiles: int
+        How many staged tiles, geotiff tiles, or web tiles should be 
+        included in a single creation task? 
+        (each task is run in parallel) Default: 300
     """
 
     start_time = datetime.now()
@@ -69,7 +75,7 @@ def run_pdg_workflow(
 
     input_paths = stager.tiles.get_filenames_from_dir('input')
     print(f"Input paths are: {input_paths}")
-    input_batches = make_batch(input_paths, batch_size)
+    input_batches = make_batch(input_paths, batch_size_input)
 
     # Stage all the input files (each batch in parallel)
     app_futures = []
@@ -94,7 +100,7 @@ def run_pdg_workflow(
     logging.info(f'Collecting staged file paths to process...')
     staged_paths = tile_manager.get_filenames_from_dir('staged')
     logging.info(f'Found {len(staged_paths)} staged files to process.')
-    staged_batches = make_batch(staged_paths, batch_size)
+    staged_batches = make_batch(staged_paths, batch_size_tiles)
     logging.info(f'Processing staged files in {len(staged_batches)} batches.')
 
     app_futures = []
@@ -133,7 +139,7 @@ def run_pdg_workflow(
         parent_tiles = list(parent_tiles)
 
         # Break all parent tiles at level z into batches
-        parent_tile_batches = make_batch(parent_tiles, batch_size)
+        parent_tile_batches = make_batch(parent_tiles, batch_size_tiles)
         logging.info(f'Processing highest geotiffs in {len(parent_tile_batches)} batches.')
 
         # Make the next level of parent tiles
@@ -156,7 +162,7 @@ def run_pdg_workflow(
     logging.info(f'Collecting file paths of geotiffs to process...')
     geotiff_paths = tile_manager.get_filenames_from_dir('geotiff')
     logging.info(f'Found {len(geotiff_paths)} geotiffs to process.')
-    geotiff_batches = make_batch(geotiff_paths, batch_size)
+    geotiff_batches = make_batch(geotiff_paths, batch_size_tiles)
     logging.info(f'Processing geotiffs in {len(geotiff_batches)} batches.')
 
     app_futures = []
@@ -272,6 +278,16 @@ if __name__ == "__main__":
 
 # ------------------------------------------
 
+# Initialize a storage client
+storage_client = storage.Client()
+
+# Specify the bucket name and file details
+bucket_name = "pdg-storage-default"
+source_file = "/tmp/log.log"
+destination = "viz_workflow/output/test_0807/log.log"
+bucket = storage_client.bucket(bucket_name)
+blob = bucket.blob(destination)
+blob.upload_from_filename(source_file)
 
 # Shutdown and clear the parsl executor
 htex_kube.executors[0].scale_in(len(htex_kube.executors[0].connected_blocks()))
