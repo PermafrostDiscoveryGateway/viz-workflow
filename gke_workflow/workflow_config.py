@@ -20,7 +20,7 @@ workflow_config = {
     "filename_rasters_summary": "/data/viz_workflow/output/test_0807/raster_summary.csv",
     "simplify_tolerance": 0.1,
     "tms_id": "WGS1984Quad",
-    "z_range": [0,15],
+    "z_range": [0,13],
     "geometricError": 57,
     "z_coord": 0,
     "statistics": [
