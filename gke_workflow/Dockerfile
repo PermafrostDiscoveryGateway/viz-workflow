@@ -8,5 +8,3 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY parsl_workflow.py .
-COPY parsl_config.py .
-COPY workflow_config.py .

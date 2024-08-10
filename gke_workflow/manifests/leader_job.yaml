@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: viz-workflow-leader-job
+  namespace: viz-workflow
+spec:
+  # Supported in k8s 1.23 - ADC has 1.22; GKE has at least 1.30
+  ttlSecondsAfterFinished: 60
+  template:
+    metadata:
+      name: viz-workflow-leader-pod
+      annotations:
+        gke-gcsfuse/volumes: "true"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: viz-workflow-sa
+      containers:
+        - name: viz-workflow-leader-container
+          image: ghcr.io/permafrostdiscoverygateway/viz-workflow:0.3.5
+          volumeMounts:
+            - mountPath: /usr/local/share/app/parameters
+              name: viz-workflow-parameters
+            - mountPath: /data
+              name: viz-workflow-volume
+          workingDir: /usr/local/share/app
+          command:
+            - python
+            - parsl_workflow.py
+      volumes:
+        # This is how the parameters files to the Python script get to the cluster
+        - name: viz-workflow-parameters
+          configMap:
+            name: viz-workflow-cm
+        # Data storage
+        - name: viz-workflow-volume
+          persistentVolumeClaim:
+            claimName: viz-workflow-pvc
