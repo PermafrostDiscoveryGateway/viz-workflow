@@ -15,7 +15,7 @@ Many of the following instructions use a CLI to deploy changes in the cluster. I
 1. From [Cloud Console VM instances page](https://console.cloud.google.com/compute/instances?project=pdg-project-406720&pli=1), start the existing GCE VM instance if it’s currently stopped
     * instance name: `pdg-gke-entrypoint`
     * zone: `us-west1-b`
-    
+
 2. SSH into the VM instance:
     ```
     gcloud compute ssh --zone us-west1-b pdg-gke-entrypoint --project pdg-project-406720
@@ -35,7 +35,7 @@ Many of the following instructions use a CLI to deploy changes in the cluster. I
 
     If successful, your terminal now displays: `username@pdg-gke-entrypoint:~$`
 
-4. Clone or pull updates from the `viz-workflow` to your home directory in the endpoint so you have access to the files for the next section `Running the script`.
+4. Clone or pull updates from the `viz-workflow` to your home directory in the endpoint so you have access to the files for the next section [Running the script](#running-the-script).
 
 ## One-time setup
 
@@ -104,8 +104,7 @@ You can access the bucket from the command line after connecting to the entrypoi
 * `gsutil ls gs://pdg-storage-default/` lists the contents of the bucket
 * `gsutil ls -r gs://pdg-storage-default/viz_workflow/output/** | wc -l` prints the number of files, recursively, in the subdirectory `output` of the bucket
 
-
-    
+or [view the bucket in the Cloud Console](https://console.cloud.google.com/storage/browser/pdg-storage-default;tab=objects?project=pdg-project-406720).
 
 1. Modify the manifests (if needed, e.g. to point to your GCS bucket. See the docs for more info about requirements):
     * Example persistent volume: [manifests/persistent_volume.yaml](manifests/persistent_volume.yaml)
@@ -121,27 +120,19 @@ You can access the bucket from the command line after connecting to the entrypoi
 
 ## Running the script
 
-The setup creates a leader pod in which the main [parsl_workflow.py](parsl_workflow.py) script is executed. During the script execution, parsl will bring up additional worker pods as needed. These worker pods need to be able to communicate back to the main script, so that’s the reason we run it in the leader pod (since networking restrictions allow easier communication between pods within the cluster than outside of it).
+The setup creates a leader job which automatically executes the main [parsl_workflow.py](parsl_workflow.py) script. During the script execution, parsl will bring up additional worker pods as needed. These worker pods need to be able to communicate back to the main script, so that’s the reason we run it within the Kubernetes cluster (since networking restrictions allow easier communication between pods within the cluster than outside of it). After the script completes, the leader job should automatically shut down, but if error states are encounter you may need to delete pods manually (see [Cleanup](#cleanup)).
 
-> **TODO:** An alternative setup that the QGreenland project uses is to run a Kubernetes Job with a ConfigMap that runs the script, which we could try also. See comments in the [QGreenland parsl repo](https://github.com/QGreenland-Net/parsl-exploration/blob/main/README.md#submitting-jobs-to-a-remote-cluster).
+Parameters to the workflow run are defined in the files [parameters/parsl_config.py](parameters/parsl_config.py) and [parameters/workflow_config.py](parameters/workflow_config.py). These are passed as ConfigMaps to the Kubernetes job following the [QGreenland setup](https://github.com/QGreenland-Net/parsl-exploration/blob/main/README.md#submitting-jobs-to-a-remote-cluster). This allows you to change these parameters and execute the job without rebuilding the Docker image used by the leaders and workers.
 
-At the moment, both the leader and worker pods use the same Docker image, but this is not necessary - we could maintain separate images for the leader and worker instead (for example if we wanted to add the command to execute the script to the leader’s Dockerfile). Note that both are required to use the same parsl version. Note that the worker pods are automatically created with an IfNotPresent pull policy so a new image tag needs to be used every time the worker pod image changes.
+At the moment, both the leader and worker pods use the same Docker image, but this is not necessary - we could maintain separate images for the leader and worker instead - however note that both are required to use the same parsl version.
 
 ### Steps
 
-Editing scripts and subsequently rebuilding the image should be done in a terminal _not SSH'd into the entrypoint_. Attempting to run a `docker` command while SSH'd into the entrypoint will result in an error because Docker is not installed. 
+Editing scripts and subsequently rebuilding the image should be done in a terminal _not SSH'd into the entrypoint_. Attempting to run a `docker` command while SSH'd into the entrypoint will result in an error because Docker is not installed. (Alternatively, you could create a conda environment on the entrypoint and install Docker before rebuilding the image.)
 
-1. Make changes to the worker pod configuration. The worker pods are configured in the script itself, so this changes the code and requires the Docker image to be rebuilt in step 2.
-    * Parameters to configure the worker pods are in [parsl_config.py](parsl_config.py):
-        * Change the value of `max_workers`, or `min_blocks`, or `max_blocks` to the appropriate number for your job, depending on the size of your input dataset.
-            > TODO: As we experiment more with different sizes of input datasets and different datasets in general, we should update these instructions with more details. 
-        * If you have made changes that require you to rebuilt the image, then within `parsl_config.py` update the `image` string with a new package version tag (like `0.2.9`). This tag will be the same one used in the command to rebuild the image in step 2.
-    * Things to note:
-        - pod name prefix: `viz-workflow-worker`
-        - The worker pods need to be set up to consume the GCS persistent volume. `persistent_volumes` has been set to the point to the persistent volume claim from [One-time setup](#one-time-setup) above, and the mount path **should** match the directories used for input/output data in [workflow_config.py](workflow_config.py). In addition, a service account and a particular annotation must be provided in order for the worker pods to consume the GCS persistent volume, per the GCP docs on [mounting persistent volumes](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/cloud-storage-fuse-csi-driver#consume-persistentvolumeclaim); this has been done by setting `service_account_name` to the service account from [One-time setup](#one-time-setup) above and including the annotation `{"gke-gcsfuse/volumes": "true"}` in `annotations`
-        - `namespace` has been set to the namespace from [One-time setup](#one-time-setup) above
+1. Make changes that require rebuilding the image. The image contains [parsl_workflow.py](parsl_workflow.py) and the package versions described in [requirements.txt](requirements.txt), including a particular version of `viz-staging` and `viz-raster` packages. If you want to change any of this code, you will need to do so and then rebuild the image in step 2. If you have only changed config parameters in the files in [parameters](parameters) ([parsl_config.py](parameters/parsl_config.py) and [workflow_config.py](parameters/workflow_config.py)), you do not need to rebuild the image and can skip to step 3.
 
-2. Rebuild the Docker image replacing `<tag>` below
+2. If needed, rebuild the Docker image replacing `<tag>` below
     ```
     docker build -t ghcr.io/permafrostdiscoverygateway/viz-workflow:<tag> .
     ```
@@ -149,35 +140,33 @@ Editing scripts and subsequently rebuilding the image should be done in a termin
     docker push ghcr.io/permafrostdiscoverygateway/viz-workflow:<tag>
     ```
 
-3. Create or modify the leader deployment manifest
-    * Example deployment: [manifests/leader_deployment.yaml](manifests/leader_deployment.yaml)
-    * Things to note:
-        - deployment name (and container name): `viz-workflow-leader`
-        - `image` **should** be set to the tag from step 2, this will need to be changed if you just rebuilt the image
+Subsequent steps to edit the parameters that are passed through the ConfigMap and to edit the Kubernetes job manifest may be done in a terminal SSH'd into the entrypoint. The final step to run the script requires `kubectl` so must be done in a terminal SSH'd into the entrypoint.
+
+3. Make changes to the parameter files, [parameters/parsl_config.py](parameters/parsl_config.py) and [parameters/workflow_config.py](parameters/workflow_config.py)
+    * Parameters to configure the worker pods are in [parsl_config.py](parameters/parsl_config.py):
+        * `image` string **should** be set to the version tag (like `0.2.9`) from step 2, this will need to be changed if you just rebuilt the image in step 2 above
+        * Change the value of `max_workers`, or `min_blocks`, or `max_blocks` to the appropriate number for your job, depending on the size of your input dataset.
+            > TODO: As we experiment more with different sizes of input datasets and different datasets in general, we should update these instructions with more details.
+        * Other things to note:
+            - pod name prefix: `viz-workflow-worker`
+            - The worker pods need to be set up to consume the GCS persistent volume. `persistent_volumes` has been set to the point to the persistent volume claim from [One-time setup](#one-time-setup) above, and the mount path **should** match the directories used for input/output data in [workflow_config.py](workflow_config.py). In addition, a service account and a particular annotation must be provided in order for the worker pods to consume the GCS persistent volume, per the GCP docs on [mounting persistent volumes](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/cloud-storage-fuse-csi-driver#consume-persistentvolumeclaim); this has been done by setting `service_account_name` to the service account from [One-time setup](#one-time-setup) above and including the annotation `{"gke-gcsfuse/volumes": "true"}` in `annotations`
+            - `namespace` has been set to the namespace from [One-time setup](#one-time-setup) above
+    * Parameters about the workflow itself are in [workflow_config.py](parameters/workflow_config.py)
+        * The directories used for input/output data **should** be prefixed by the mount paths in both [parsl_config.py](parameters/parsl_config.py) (see above) and [leader_job.yaml](manifests/leader_job.yaml) (see below)
+
+4. Create or modify the leader job manifest
+    * Example job: [manifests/leader_job.yaml](manifests/leader_job.yaml)
+        * `image` **should** be set to the version tag (like `0.2.9`) from step 2, this will need to be changed if you just rebuilt the image in step 2 above
             > **TODO:** If possible, change the value of `image` to instead be pulled from `parsl_config.py`
-        - The leader deployment needs to be set up to consume the GCS persistent volume. `volumeMounts` and `volumes` have been set to point to the persistent volume claim from [One-time setup](#one-time-setup) above, and similar to the worker pod config `mountPath` **should** match the directories used for input/output data in [workflow_config.py](workflow_config.py). In addition, `service_account_name` and `annotations` must be provided in the same way as for the worker pods above
-        - `namespace` has been set to the namespace from [One-time setup](#one-time-setup) above
-        
-4. Create or update the leader deployment _from a terminal SSH'd into the entrypoint_.
-    ```
-    kubectl apply -f manifests/leader_deployment.yaml
-    ```
-    
-5. Retrieve the name of the leader pod from the Kubernetes Engine UI:
-    - Navigate to the [Kubernetes Engine UI Workloads](https://console.cloud.google.com/kubernetes/workload/overview?project=pdg-project-406720&pageState=(%22savedViews%22:(%22i%22:%22226f72e6aa1747f18ef55672549c7c91%22,%22c%22:%5B%5D,%22n%22:%5B%5D))) page.
-    - Select the `viz-workflow-leader` pod
-    - Scoll down to the `Manged pods` section and select the active pod `viz-workflow-leader-{ID}`. The pod name changes every time the deployment is updated, so the leader pod name ends with a string.
+        * Other things to note:
+            - job name: `viz-workflow-leader-job`
+            - The leader job needs to be set up to consume the GCS persistent volume. `volumeMounts` and `volumes` have been set to point to the persistent volume claim from [One-time setup](#one-time-setup) above, and similar to the worker pod config `mountPath` **should** match the directories used for input/output data in [workflow_config.py](workflow_config.py). In addition, `service_account_name` and `annotations` must be provided in the same way as for the worker pods above
+            - The job is set up to also mount the ConfigMap created in [run-remote-job.sh](run-remote-job.sh) as a volume. `mountPath` for the ConfigMap **should** be prefixed by the [Docker image](Dockerfile)'s `WORKDIR` so that the files can be found by [parsl_workflow.py](parsl_workflow.py)
+            - `namespace` has been set to the namespace from [One-time setup](#one-time-setup) above
 
-6. Open a terminal within the leader pod. Replace `<pod_name>` below with the current name.
+5. Run the script to kick off the Kubernetes job on the cluster _from a terminal SSH'd into the entrypoint_. This script creates the ConfigMap from the [parameters](parameters) directory and starts the leader job, which automatically consumes the ConfigMap and executes the main script.
     ```
-    kubectl exec -it <pod_name> -c viz-workflow-leader -n viz-workflow -- bash
-    ```
-
-    Your terminal should now display something like: `root@viz-workflow-leader-548bd45d87-fj6tr:/usr/local/share/app#`
-
-7. Execute the script in that terminal.
-    ```
-    python parsl_workflow.py
+    ./run-remote-job.sh
     ```
 
 ## Checking status of pods
@@ -188,22 +177,34 @@ While SSH'd into the entrypoint, which means your terminal looks like `username@
 kubectl get pods -n viz-workflow
 ```
 
-The output displays leader pods with their randomly generated, unique suffix, as well as worker pods. You can have multiple terminals open simultaneously, one to run the script and another to check the status of the pods. 
+The output displays leader pods with their randomly generated, unique suffix, as well as worker pods. You can have multiple terminals open simultaneously, one to run the script and another to check the status of the pods.
+
+If you want to examine the state of the leader pod, you can open a bash terminal in the pod. This might require you to change the command that the leader pod is running since by default it will exit immediately after running the parsl script (e.g. add a `sleep infinity` in the job manifest).
+
+First, retrieve the name of the leader pod from the Kubernetes Engine UI:
+
+- Navigate to the [Kubernetes Engine UI Workloads](https://console.cloud.google.com/kubernetes/workload/overview?project=pdg-project-406720&pageState=(%22savedViews%22:(%22i%22:%22226f72e6aa1747f18ef55672549c7c91%22,%22c%22:%5B%5D,%22n%22:%5B%5D))) page.
+- Select the `viz-workflow-leader-job` pod
+- Scoll down to the `Managed pods` section and select the active pod `viz-workflow-leader-{ID}`. The pod name changes every time the deployment is updated, so the leader pod name ends with a string.
+
+Then, open a terminal within the leader pod. Replace `<pod_name>` below with the current name.
+
+    ```
+    kubectl exec -it <pod_name> -c viz-workflow-leader -n viz-workflow -- bash
+    ```
+
+Your terminal should now display something like: `root@viz-workflow-leader-548bd45d87-fj6tr:/usr/local/share/app#`
 
 ## Cleanup
 
-1. Delete any hanging worker pods, either from the Cloud Console GKE Workloads page, or by running a command with the namespace and pod specified:
+1. Delete any hanging leader or worker pods, either from the Cloud Console GKE Workloads page, or by running a command with the namespace and pod specified:
 
 ```
 kubectl delete pods -n viz-workflow viz-workflow-worker-1722275361950
 ```
 
-Usually the parsl script itself should clean up these pods at the end of a run, but you may need to do it manually if the previous run exited abnormally:
+Usually the parsl script itself should clean up these pods at the end of a run, but you may need to do it manually if the previous run exited abnormally.
 
-- pod_name prefix: `viz-workflow-worker`
-
-2. *Optional:* From the Cloud Console GKE Workloads page, delete the leader pod:
-    * deployment name: `viz-workflow-leader`
-3. *Optional:* From Cloud Console GCE VM Instances page, stop the GCE VM instance:
+2. *Optional:* From Cloud Console GCE VM Instances page, stop the GCE VM instance:
     * instance name: `pdg-gke-entrypoint`
     * zone: `us-west1-b`

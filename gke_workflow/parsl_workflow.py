@@ -13,7 +13,6 @@ from google.cloud import storage
 
 import pdgstaging
 import pdgraster
-import workflow_config
 
 import json
 import logging
@@ -27,7 +26,9 @@ from parsl.executors import HighThroughputExecutor
 from parsl.providers import KubernetesProvider
 from parsl.addresses import address_by_route
 # from kubernetes import client, config
-from parsl_config import config_parsl_cluster
+
+from parameters.parsl_config import config_parsl_cluster
+from parameters.workflow_config import workflow_config
 
 
 # call parsl config and initiate k8s cluster
@@ -35,8 +36,6 @@ parsl.set_stream_logger()
 # use default settings defined in parsl_config.py:
 htex_kube = config_parsl_cluster()
 parsl.load(htex_kube)
-
-workflow_config = workflow_config.workflow_config
 
 
 def run_pdg_workflow(
@@ -59,8 +58,8 @@ def run_pdg_workflow(
         How many input files should be included in a single creation
         task? (each task is run in parallel) Default: 1
     batch_size_tiles: int
-        How many staged tiles, geotiff tiles, or web tiles should be 
-        included in a single creation task? 
+        How many staged tiles, geotiff tiles, or web tiles should be
+        included in a single creation task?
         (each task is run in parallel) Default: 300
     """
 
