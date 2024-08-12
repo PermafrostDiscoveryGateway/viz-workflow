@@ -154,6 +154,8 @@ Subsequent steps to edit the parameters that are passed through the ConfigMap an
     * Parameters about the workflow itself are in [workflow_config.py](parameters/workflow_config.py)
         * The directories used for input/output data **should** be prefixed by the mount paths in both [parsl_config.py](parameters/parsl_config.py) (see above) and [leader_job.yaml](manifests/leader_job.yaml) (see below)
 
+    To create and run a Kubernetes job that will execute the script automatically:
+
 4. Create or modify the leader job manifest
     * Example job: [manifests/leader_job.yaml](manifests/leader_job.yaml)
         * `image` **should** be set to the version tag (like `0.2.9`) from step 2, this will need to be changed if you just rebuilt the image in step 2 above
@@ -169,6 +171,33 @@ Subsequent steps to edit the parameters that are passed through the ConfigMap an
     ./run-remote-job.sh
     ```
 
+#### Alternative: Manually deploy the script run
+
+Alternatively, you may wish to deploy a Kubernetes job that simply comes up without automatically executing the script. You can then open a bash terminal within the job's pod and manually execute the script when you wish. This may be more helpful for debug runs, since there's better logging and you can inspect the state of the script.
+
+First, do steps 1-3 above.
+
+4. Create or modify the leader job manifest
+    * See the leader job manifest instructions in step 4 above
+    * In addition, change the command that is passed to the leader job container. In the example manifest above, it's set to run the script using the command `python parsl_workflow.py`. Change this command to something like `sleep infinity` - this will cause the job to come up and be idle so that you have time to do the following steps. (If you use this particular command, you will also need to manually delete the job when you're done since the command will never "complete" on its own.)
+
+5. Retrieve the name of the leader pod from the Kubernetes Engine UI:
+    - Navigate to the [Kubernetes Engine UI Workloads](https://console.cloud.google.com/kubernetes/workload/overview?project=pdg-project-406720&pageState=(%22savedViews%22:(%22i%22:%22226f72e6aa1747f18ef55672549c7c91%22,%22c%22:%5B%5D,%22n%22:%5B%5D))) page.
+    - Select the `viz-workflow-leader` pod
+    - Scoll down to the `Manged pods` section and select the active pod `viz-workflow-leader-{ID}`. The pod name changes every time the deployment is updated, so the leader pod name ends with a string.
+
+6. Open a terminal within the leader pod. Replace `<pod_name>` below with the current name.
+    ```
+    kubectl exec -it <pod_name> -c viz-workflow-leader-container -n viz-workflow -- bash
+    ```
+
+   Your terminal should now display something like: `root@viz-workflow-leader-job-548bd45d87-fj6tr:/usr/local/share/app#`
+
+7. Execute the script in that terminal.
+    ```
+    python parsl_workflow.py
+    ```
+
 ## Checking status of pods
 
 While SSH'd into the entrypoint, which means your terminal looks like `username@pdg-gke-entrypoint:~$`, you can run the following command to check if the pods in your namespace are running:
@@ -179,25 +208,10 @@ kubectl get pods -n viz-workflow
 
 The output displays leader pods with their randomly generated, unique suffix, as well as worker pods. You can have multiple terminals open simultaneously, one to run the script and another to check the status of the pods.
 
-If you want to examine the state of the leader pod, you can open a bash terminal in the pod. This might require you to change the command that the leader pod is running since by default it will exit immediately after running the parsl script (e.g. add a `sleep infinity` in the job manifest).
-
-First, retrieve the name of the leader pod from the Kubernetes Engine UI:
-
-- Navigate to the [Kubernetes Engine UI Workloads](https://console.cloud.google.com/kubernetes/workload/overview?project=pdg-project-406720&pageState=(%22savedViews%22:(%22i%22:%22226f72e6aa1747f18ef55672549c7c91%22,%22c%22:%5B%5D,%22n%22:%5B%5D))) page.
-- Select the `viz-workflow-leader-job` pod
-- Scoll down to the `Managed pods` section and select the active pod `viz-workflow-leader-{ID}`. The pod name changes every time the deployment is updated, so the leader pod name ends with a string.
-
-Then, open a terminal within the leader pod. Replace `<pod_name>` below with the current name.
-
-    ```
-    kubectl exec -it <pod_name> -c viz-workflow-leader -n viz-workflow -- bash
-    ```
-
-Your terminal should now display something like: `root@viz-workflow-leader-548bd45d87-fj6tr:/usr/local/share/app#`
 
 ## Cleanup
 
-1. Delete any hanging leader or worker pods, either from the Cloud Console GKE Workloads page, or by running a command with the namespace and pod specified:
+1. Delete any hanging leader job or worker pods, either from the Cloud Console GKE Workloads page, or by running a command with the namespace and pod specified:
 
 ```
 kubectl delete pods -n viz-workflow viz-workflow-worker-1722275361950
