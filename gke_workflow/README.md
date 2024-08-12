@@ -154,7 +154,7 @@ Subsequent steps to edit the parameters that are passed through the ConfigMap an
     * Parameters about the workflow itself are in [workflow_config.py](parameters/workflow_config.py)
         * The directories used for input/output data **should** be prefixed by the mount paths in both [parsl_config.py](parameters/parsl_config.py) (see above) and [leader_job.yaml](manifests/leader_job.yaml) (see below)
 
-    To create and run a Kubernetes job that will execute the script automatically:
+To create and run a Kubernetes job that will execute the script automatically:
 
 4. Create or modify the leader job manifest
     * Example job: [manifests/leader_job.yaml](manifests/leader_job.yaml)
@@ -186,8 +186,6 @@ First, do steps 1-3 above.
     - Select the `viz-workflow-leader` pod
     - Scoll down to the `Manged pods` section and select the active pod `viz-workflow-leader-{ID}`. The pod name changes every time the deployment is updated, so the leader pod name ends with a string.
 
-6. Open a terminal within the leader pod. Replace `<pod_name>` below with the current name.
-    ```
     kubectl exec -it <pod_name> -c viz-workflow-leader-container -n viz-workflow -- bash
     ```
 
