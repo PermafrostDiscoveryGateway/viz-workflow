@@ -27,7 +27,7 @@ class WMTSCapabilitiesGenerator:
         )
         xml_str = generator.generate_capabilities()
     """
-      # Class-level constants for namespaces and schema
+    # Class-level constants and schema
     XMLNS = {
         "default": "http://www.opengis.net/wmts/1.0",
         "ows": "http://www.opengis.net/ows/1.1",
@@ -72,7 +72,7 @@ class WMTSCapabilitiesGenerator:
     ):
         
         """
-        The following parameters shoudl be read and passed from the config.json file
+        The following parameters should contain in the config.json file
         """
         self.title = title
         self.base_url = base_url
