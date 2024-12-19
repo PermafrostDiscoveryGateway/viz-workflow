@@ -6,6 +6,23 @@ class WMTSCapabilitiesGenerator:
     """
     A class to generate WMTS Capabilities XML for a given dataset.
 
+    Parameters:
+        title : str
+        base_url : str
+        doi : str
+        layer_title : str
+        layer_identifier : str
+        tile_format : str (e.g., 'image/png').
+        tile_matrix_set : str
+        tile_width : int
+        tile_height : int
+        max_z_level : int
+        bounding_box : dict, optional
+            A dictionary with keys 'left', 'right', 'bottom', and 'top' that
+            specify the bounding box of the raster. If set to None, the total
+            bounds of the map (global extent) are used:
+            {'left': -180, 'right': 180, 'bottom': -90, 'top': 90}.
+
     Usage Example:
         generator = WMTSCapabilitiesGenerator(
             title="PDG Ice-wedge polygon high",
@@ -13,17 +30,17 @@ class WMTSCapabilitiesGenerator:
             doi="10.18739/A2KW57K57",
             layer_title="iwp_high",
             layer_identifier="iwp_high",
+            tile_format="image/png",
+            tile_matrix_set="WGS1984Quad",
+            tile_width=256,
+            tile_height=256,
+            max_z_level=15,
             bounding_box={
                 "left": -179.91531896747117,
                 "right": 179.91531896747247,
                 "bottom": 50.16996707215903,
                 "top": 80.0978646943821
-            },
-            tile_format="image/png",
-            tile_matrix_set="WGS1984Quad",
-            tile_width=256,
-            tile_height=256,
-            max_z_level=15
+            }
         )
         xml_str = generator.generate_capabilities()
     """
@@ -63,12 +80,12 @@ class WMTSCapabilitiesGenerator:
         doi: str,
         layer_title: str,
         layer_identifier: str,
-        bounding_box: Dict[str, float],
         tile_format: str,
         tile_matrix_set: str,
         tile_width: int,
         tile_height: int,
-        max_z_level: int
+        max_z_level: int,
+        bounding_box: dict = None,
     ):
         
         """
@@ -79,7 +96,6 @@ class WMTSCapabilitiesGenerator:
         self.doi = doi
         self.layer_title = layer_title
         self.layer_identifier = layer_identifier
-        self.bounding_box = bounding_box
         self.tile_format = tile_format
         self.tile_matrix_set = tile_matrix_set
         self.tile_width = tile_width
@@ -97,6 +113,13 @@ class WMTSCapabilitiesGenerator:
         self.top_left_corner = "-180 90"
         self.supported_crs = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
         self.well_known_scale_set = "http://www.opengis.net/def/wkss/OGC/1.0/GoogleCRS84Quad"
+
+        self.bounding_box = bounding_box or {
+            "left": -180,
+            "right": 180,
+            "bottom": -90,
+            "top": 90
+        }
 
 
 
@@ -196,14 +219,14 @@ class WMTSCapabilitiesGenerator:
 
         self._add_tile_matrix_set(contents)
 
-    def _add_tile_matrix_set(self, contents):
+    def _add_tile_matrix_set(self, contents: ET.Element):
         tile_matrix_set = ET.SubElement(contents, "TileMatrixSet", attrib={"xml:id": "WorldCRS84Quad"})
         ET.SubElement(tile_matrix_set, "ows:Title").text = "CRS84 for the World"
         ET.SubElement(tile_matrix_set, "ows:Identifier").text = "WGS1984Quad"
 
         bounding_box = ET.SubElement(tile_matrix_set, "ows:BoundingBox", attrib={"crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"})
-        ET.SubElement(bounding_box, "ows:LowerCorner").text = "-180 -90"
-        ET.SubElement(bounding_box, "ows:UpperCorner").text = "180 90"
+        ET.SubElement(bounding_box, "ows:LowerCorner").text = f"{self.bounding_box['left']} {self.bounding_box['bottom']}"
+        ET.SubElement(bounding_box, "ows:UpperCorner").text = f"{self.bounding_box['right']} {self.bounding_box['top']}"
 
         ET.SubElement(tile_matrix_set, "ows:SupportedCRS").text = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
         ET.SubElement(tile_matrix_set, "WellKnownScaleSet").text = "http://www.opengis.net/def/wkss/OGC/1.0/GoogleCRS84Quad"
@@ -217,31 +240,3 @@ class WMTSCapabilitiesGenerator:
             ET.SubElement(tile_matrix, "TileHeight").text = str(self.tile_height)
             ET.SubElement(tile_matrix, "MatrixWidth").text = str(2 ** (i+1))
             ET.SubElement(tile_matrix, "MatrixHeight").text = str(2 ** i)
-
-# For testing purposes. Remove after
-if __name__ == "__main__":
-    # Example usage
-    generator = WMTSCapabilitiesGenerator(
-        title="PDG Ice-wedge polygon high",
-        base_url="https://arcticdata.io/data/tiles",
-        doi="10.18739/A2KW57K57",
-        layer_title="iwp_high",
-        layer_identifier="iwp_high",
-        bounding_box={
-            "left": -179.91531896747117,
-            "right": 179.91531896747247,
-            "bottom": 50.16996707215903,
-            "top": 80.0978646943821
-        },
-        tile_format="image/png",
-        tile_matrix_set="WGS1984Quad",
-        tile_width=256,
-        tile_height=256,
-        max_z_level=15
-    )
-    wmts_xml = generator.generate_capabilities()
-
-    # Write the output to a file
-    with open("WMTSCapabilities.xml", "w", encoding="utf-8") as f:
-        f.write(wmts_xml)
-    print("WMTS Capabilities document generated successfully!")
