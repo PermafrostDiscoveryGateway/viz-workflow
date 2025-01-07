@@ -12,7 +12,7 @@ class WMTSCapabilitiesGenerator:
         doi : str
         layer_title : str
         layer_identifier : str
-        tile_format : str (e.g., 'image/png').
+        tile_format : str (e.g., '.png').
         tile_matrix_set : str
         tile_width : int
         tile_height : int
@@ -30,7 +30,7 @@ class WMTSCapabilitiesGenerator:
             doi="10.18739/A2KW57K57",
             layer_title="iwp_high",
             layer_identifier="iwp_high",
-            tile_format="image/png",
+            tile_format=".png",
             tile_matrix_set="WGS1984Quad",
             tile_width=256,
             tile_height=256,
@@ -57,20 +57,20 @@ class WMTSCapabilitiesGenerator:
         "http://schemas.opengis.net/wmts/1.0/wmtsGetCapabilities_response.xsd"
     )
 
-    # Mapping of tile_format to file extension
+    # Mapping of file extension
     EXTENSION_MAPPING: Dict[str, str] = {
-        "image/png": "png",
-        "image/jpeg": "jpg",
-        "image/jpg": "jpg",
-        "image/tiff": "tiff",
-        "application/vnd.google-earth.kmz+xml": "kmz",
-        "application/vnd.google-earth.kmz+xml;image_type=image/jpeg": "kmz",
-        "application/vnd.google-earth.kmz+xml;image_type=image/png": "kmz",
-        "application/x-esri-shape": "shp",
-        "application/json": "json",
-        "image/tiff;depth=8": "tiff",
-        "image/tiff;depth=16": "tiff",
-        "image/tiff;depth=32f": "tiff"
+        ".png": "image/png",
+        ".jpeg": "image/jpeg",
+        ".jpg": "image/jpg",
+        ".tiff": "image/tiff",
+        ".kmz": "application/vnd.google-earth.kmz+xml",
+        ".kmz;jpeg": "application/vnd.google-earth.kmz+xml;image_type=image/jpeg",
+        ".kmz;png": "application/vnd.google-earth.kmz+xml;image_type=image/png",
+        ".shp": "application/x-esri-shape",
+        ".json": "application/json",
+        ".tiff;8": "image/tiff;depth=8",
+        ".tiff;16": "image/tiff;depth=16",
+        ".tiff;32f": "image/tiff;depth=32f"
     }
 
     def __init__(
@@ -107,7 +107,7 @@ class WMTSCapabilitiesGenerator:
         self.tiles_url = f"{base_url}/{doi}/"
         self.scale_denominator_base = 279541132.0143589
 
-        # Configure resource template based on tile format
+        # Configure resource template based on tile_format
         self.resource_template = self._configure_resource_template()
 
         self.top_left_corner = "-180 90"
@@ -155,19 +155,19 @@ class WMTSCapabilitiesGenerator:
     
     def _configure_resource_template(self) -> str:
         """
-        Configure the resource template based on the tile format.
+        Configure the resource template based on the tile_format.
 
         Returns:
             A string template for the resource URL.
 
         Raises:
-            ValueError: If the tile format is unsupported.
+            ValueError: If the tile tile_format is unsupported.
         """
-        inferred_extension = self.EXTENSION_MAPPING.get(self.tile_format)
-        if inferred_extension is None:
+        extension = self.EXTENSION_MAPPING.get(self.tile_format)
+        if extension is None:
             raise ValueError(f"Unsupported tile format: {self.tile_format}")
 
-        return f"{self.base_url}/{self.doi}/{{TileMatrixSet}}/{{TileMatrix}}/{{TileCol}}/{{TileRow}}.{inferred_extension}"
+        return f"{self.base_url}/{self.doi}/{{TileMatrixSet}}/{{TileMatrix}}/{{TileCol}}/{{TileRow}}.{extension}"
 
 
     def _add_service_identification(self, root):
@@ -212,7 +212,7 @@ class WMTSCapabilitiesGenerator:
         
 
         resource_url = ET.SubElement(layer, "ResourceURL", attrib={
-            "format": self.tile_format,
+            "tile_format": self.tile_format,
             "resourceType": "tile",
             "template": self.resource_template
         })
