@@ -1,6 +1,15 @@
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
-from typing import Dict
+
+LEFT_BOUNDS_LIMIT = -179.999999
+RIGHT_BOUNDS_LIMIT = 179.999999
+DEFAULT_BOUNDS = {
+            "left": LEFT_BOUNDS_LIMIT,
+            "right": RIGHT_BOUNDS_LIMIT,
+            "bottom": -90,
+            "top": 90
+        }
+
 
 class WMTSCapabilitiesGenerator:
     """
@@ -21,7 +30,7 @@ class WMTSCapabilitiesGenerator:
             A dictionary with keys 'left', 'right', 'bottom', and 'top' that
             specify the bounding box of the raster. If set to None, the total
             bounds of the map (global extent) are used:
-            {'left': -180, 'right': 180, 'bottom': -90, 'top': 90}.
+            {'left': -179.999999, 'right': 179.999999, 'bottom': -90, 'top': 90}.
 
     Usage Example:
         generator = WMTSCapabilitiesGenerator(
@@ -53,12 +62,11 @@ class WMTSCapabilitiesGenerator:
         "gml": "http://www.opengis.net/gml"
     }
     SCHEMA_LOCATION = (
-        "http://www.opengis.net/wmts/1.0 "
-        "http://schemas.opengis.net/wmts/1.0/wmtsGetCapabilities_response.xsd"
+        "http://www.opengis.net/wmts/1.0 http://schemas.opengis.net/wmts/1.0/wmtsGetCapabilities_response.xsd"
     )
 
     # Mapping of file extension
-    EXTENSION_MAPPING: Dict[str, str] = {
+    EXTENSION_MAPPING: dict[str, str] = {
         ".png": "image/png",
         ".jpeg": "image/jpeg",
         ".jpg": "image/jpg",
@@ -73,6 +81,30 @@ class WMTSCapabilitiesGenerator:
         ".tiff;32f": "image/tiff;depth=32f"
     }
 
+    SCALE_DENOMINATORS: list[float] = [
+        279541132.0143589,
+        139770566.0071794,
+        69885283.00358972,
+        34942641.50179486,
+        17471320.75089743,
+        8735660.375448715,
+        4367830.187724357,
+        2183915.093862179,
+        1091957.546931089,
+        545978.7734655447,
+        272989.3867327723,
+        136494.6933663862,
+        68247.34668319309,
+        34123.67334159654,
+        17061.83667079827,
+        8530.918335399136,
+        4265.459167699568,
+        2132.729583849784
+    ]
+
+    TOP_LEFT_CORNER: str = "-180 90"
+    
+
     def __init__(
         self,
         title: str,
@@ -84,8 +116,8 @@ class WMTSCapabilitiesGenerator:
         tile_matrix_set: str,
         tile_width: int,
         tile_height: int,
-        max_z_level: int,
-        bounding_box: dict = None,
+        max_z_level: int = 13,
+        bounding_box: dict = None
     ):
         
         """
@@ -102,24 +134,25 @@ class WMTSCapabilitiesGenerator:
         self.tile_height = tile_height
         self.max_z_level = max_z_level
 
-
         self.capabilities_url = f"{base_url}/{doi}/WMTSCapabilities.xml"
         self.tiles_url = f"{base_url}/{doi}/"
-        self.scale_denominator_base = 279541132.0143589
+        self.bounding_box = bounding_box or DEFAULT_BOUNDS
 
         # Configure resource template based on tile_format
         self.resource_template = self._configure_resource_template()
 
-        self.top_left_corner = "-180 90"
-        self.supported_crs = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
-        self.well_known_scale_set = "http://www.opengis.net/def/wkss/OGC/1.0/GoogleCRS84Quad"
 
-        self.bounding_box = bounding_box or {
-            "left": -180,
-            "right": 180,
-            "bottom": -90,
-            "top": 90
-        }
+        if not (0 <= max_z_level <= 13):
+            raise ValueError(f"max_z_level must be between 0 and 13.")
+
+        self.bounding_box["left"] = max(self.bounding_box["left"], LEFT_BOUNDS_LIMIT)
+        self.bounding_box["right"] = min(self.bounding_box["right"], RIGHT_BOUNDS_LIMIT)
+
+
+    def _configure_resource_template(self) -> str:
+        if self.tile_format not in self.EXTENSION_MAPPING:
+            raise ValueError(f"Unsupported tile format: {self.tile_format}")
+        return f"{self.base_url}/{self.doi}/{{TileMatrixSet}}/{{TileMatrix}}/{{TileCol}}/{{TileRow}}{self.tile_format}"
 
 
 
@@ -128,47 +161,30 @@ class WMTSCapabilitiesGenerator:
         Generates the WMTS Capabilities XML as a formatted string.
         
         Returns:
-            A pretty-printed XML string representing the WMTS Capabilities document.
+            An XML string representing the WMTS Capabilities document.
         """
         root = ET.Element("Capabilities", attrib={
-            "xmlns": self.XMLNS["default"],
-            "xmlns:ows": self.XMLNS["ows"],
-            "xmlns:xlink": self.XMLNS["xlink"],
-            "xmlns:xsi": self.XMLNS["xsi"],
-            "xmlns:gml": self.XMLNS["gml"],
-            "xsi:schemaLocation": self.SCHEMA_LOCATION,
+            "xmlns": WMTSCapabilitiesGenerator.XMLNS["default"],
+            "xmlns:ows": WMTSCapabilitiesGenerator.XMLNS["ows"],
+            "xmlns:xlink": WMTSCapabilitiesGenerator.XMLNS["xlink"],
+            "xmlns:xsi": WMTSCapabilitiesGenerator.XMLNS["xsi"],
+            "xmlns:gml": WMTSCapabilitiesGenerator.XMLNS["gml"],
+            "xsi:schemaLocation": WMTSCapabilitiesGenerator.SCHEMA_LOCATION,
             "version": "1.0.0"
         })
+
 
         self._add_service_identification(root)
         self._add_operations_metadata(root)
         self._add_contents(root)
-
         ET.SubElement(root, "ServiceMetadataURL", attrib={"xlink:href": self.capabilities_url})
 
-        # Pretty-print the XML
         xml_bytes = ET.tostring(root, encoding="utf-8")
         parsed_xml = minidom.parseString(xml_bytes)
 
         # Return the XML string with UTF-8 encoding
         return parsed_xml.toprettyxml(indent="  ", encoding="UTF-8").decode("utf-8")
     
-    def _configure_resource_template(self) -> str:
-        """
-        Configure the resource template based on the tile_format.
-
-        Returns:
-            A string template for the resource URL.
-
-        Raises:
-            ValueError: If the tile tile_format is unsupported.
-        """
-        extension = self.EXTENSION_MAPPING.get(self.tile_format)
-        if extension is None:
-            raise ValueError(f"Unsupported tile format: {self.tile_format}")
-
-        return f"{self.base_url}/{self.doi}/{{TileMatrixSet}}/{{TileMatrix}}/{{TileCol}}/{{TileRow}}.{extension}"
-
 
     def _add_service_identification(self, root):
         service_identification = ET.SubElement(root, "ows:ServiceIdentification")
@@ -205,14 +221,12 @@ class WMTSCapabilitiesGenerator:
         ET.SubElement(style, "ows:Title").text = "Default Style"
         ET.SubElement(style, "ows:Identifier").text = "default"
 
-        ET.SubElement(layer, "Format").text = "image/png"
+        ET.SubElement(layer, "Format").text = WMTSCapabilitiesGenerator.EXTENSION_MAPPING[self.tile_format]
         tile_matrix_set_link = ET.SubElement(layer, "TileMatrixSetLink")
         ET.SubElement(tile_matrix_set_link, "TileMatrixSet").text = "WGS1984Quad"
 
-        
-
-        resource_url = ET.SubElement(layer, "ResourceURL", attrib={
-            "tile_format": self.tile_format,
+        ET.SubElement(layer, "ResourceURL", attrib={
+            "format": WMTSCapabilitiesGenerator.EXTENSION_MAPPING[self.tile_format],
             "resourceType": "tile",
             "template": self.resource_template
         })
@@ -233,9 +247,12 @@ class WMTSCapabilitiesGenerator:
 
         for i in range(self.max_z_level + 1):  # Generate levels from 0 to max_z_level
             tile_matrix = ET.SubElement(tile_matrix_set, "TileMatrix")
+
+            scale_denominator = WMTSCapabilitiesGenerator.SCALE_DENOMINATORS[i]  
+
             ET.SubElement(tile_matrix, "ows:Identifier").text = str(i)
-            ET.SubElement(tile_matrix, "ScaleDenominator").text = str(self.scale_denominator_base / (2 ** i))
-            ET.SubElement(tile_matrix, "TopLeftCorner").text = self.top_left_corner
+            ET.SubElement(tile_matrix, "ScaleDenominator").text = str(scale_denominator)
+            ET.SubElement(tile_matrix, "TopLeftCorner").text = WMTSCapabilitiesGenerator.TOP_LEFT_CORNER
             ET.SubElement(tile_matrix, "TileWidth").text = str(self.tile_width)
             ET.SubElement(tile_matrix, "TileHeight").text = str(self.tile_height)
             ET.SubElement(tile_matrix, "MatrixWidth").text = str(2 ** (i+1))
