@@ -33,25 +33,28 @@ class WMTSCapabilitiesGenerator:
             {'left': -179.999999, 'right': 179.999999, 'bottom': -90, 'top': 90}.
 
     Usage Example:
+        config = pdgstaging.ConfigManager(config)
+        
         generator = WMTSCapabilitiesGenerator(
-            title="PDG Ice-wedge polygon high",
-            base_url="https://arcticdata.io/data/tiles",
-            doi="10.18739/A2KW57K57",
-            layer_title="iwp_high",
-            layer_identifier="iwp_high",
-            tile_format=".png",
-            tile_matrix_set="WGS1984Quad",
-            tile_width=256,
-            tile_height=256,
-            max_z_level=15,
-            bounding_box={
-                "left": -179.91531896747117,
-                "right": 179.91531896747247,
-                "bottom": 50.16996707215903,
-                "top": 80.0978646943821
-            }
+            title=config.get('title'),
+            base_url=config.get('base_url'),
+            doi=config.get('doi'),
+            layer_title=config.get('layer_title'),
+            layer_identifier=config.get('layer_identifier') ,
+            bounding_box=config.get('tile_size'),
+            tile_format=config.get('ext_web_tiles'),
+            tile_matrix_set=tms_id,
+            tile_width=config.get('tile_size')[0],
+            tile_height=config.get('tile_size')[1],
+            max_z_level=config.get('z_range')[1],
         )
-        xml_str = generator.generate_capabilities()
+
+    wmts_xml = generator.generate_capabilities()
+    print("generating WMTSCapabilities")
+
+    # Write to a file
+    with open("WMTSCapabilities.xml", "w") as f:
+        f.write(wmts_xml)
     """
     # Class-level constants and schema
     XMLNS = {
