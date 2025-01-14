@@ -1,4 +1,5 @@
 import xml.etree.ElementTree as ET
+import morecantile
 from xml.dom import minidom
 
 LEFT_BOUNDS_LIMIT = -179.999999
@@ -9,7 +10,6 @@ DEFAULT_BOUNDS = {
             "bottom": -90,
             "top": 90
         }
-
 
 class WMTSCapabilitiesGenerator:
     """
@@ -84,29 +84,7 @@ class WMTSCapabilitiesGenerator:
         ".tiff;32f": "image/tiff;depth=32f"
     }
 
-    SCALE_DENOMINATORS: list[float] = [
-        279541132.0143589,
-        139770566.0071794,
-        69885283.00358972,
-        34942641.50179486,
-        17471320.75089743,
-        8735660.375448715,
-        4367830.187724357,
-        2183915.093862179,
-        1091957.546931089,
-        545978.7734655447,
-        272989.3867327723,
-        136494.6933663862,
-        68247.34668319309,
-        34123.67334159654,
-        17061.83667079827,
-        8530.918335399136,
-        4265.459167699568,
-        2132.729583849784
-    ]
-
     TOP_LEFT_CORNER: str = "-180 90"
-    
 
     def __init__(
         self,
@@ -143,7 +121,6 @@ class WMTSCapabilitiesGenerator:
 
         # Configure resource template based on tile_format
         self.resource_template = self._configure_resource_template()
-
 
         if not (0 <= max_z_level <= 13):
             raise ValueError(f"max_z_level must be between 0 and 13.")
@@ -241,17 +218,17 @@ class WMTSCapabilitiesGenerator:
         ET.SubElement(tile_matrix_set, "ows:Title").text = "CRS84 for the World"
         ET.SubElement(tile_matrix_set, "ows:Identifier").text = "WGS1984Quad"
 
-        bounding_box = ET.SubElement(tile_matrix_set, "ows:BoundingBox", attrib={"crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"})
-        ET.SubElement(bounding_box, "ows:LowerCorner").text = f"{self.bounding_box['left']} {self.bounding_box['bottom']}"
-        ET.SubElement(bounding_box, "ows:UpperCorner").text = f"{self.bounding_box['right']} {self.bounding_box['top']}"
+        b_box = ET.SubElement(tile_matrix_set, "ows:BoundingBox", attrib={"crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"})
+        ET.SubElement(b_box, "ows:LowerCorner").text = "-180 -90"
+        ET.SubElement(b_box, "ows:UpperCorner").text = "180 90"
 
         ET.SubElement(tile_matrix_set, "ows:SupportedCRS").text = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
         ET.SubElement(tile_matrix_set, "WellKnownScaleSet").text = "http://www.opengis.net/def/wkss/OGC/1.0/GoogleCRS84Quad"
 
         for i in range(self.max_z_level + 1):  # Generate levels from 0 to max_z_level
             tile_matrix = ET.SubElement(tile_matrix_set, "TileMatrix")
-
-            scale_denominator = WMTSCapabilitiesGenerator.SCALE_DENOMINATORS[i]  
+           
+            scale_denominator =  morecantile.tms.get("WGS1984Quad").matrix(i).scaleDenominator
 
             ET.SubElement(tile_matrix, "ows:Identifier").text = str(i)
             ET.SubElement(tile_matrix, "ScaleDenominator").text = str(scale_denominator)
