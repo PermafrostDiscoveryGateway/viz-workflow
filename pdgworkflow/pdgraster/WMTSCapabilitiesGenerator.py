@@ -97,13 +97,10 @@ class WMTSCapabilitiesGenerator:
         tile_matrix_set: str,
         tile_width: int,
         tile_height: int,
-        max_z_level: int = 13,
+        max_z_level: int = 15,
         bounding_box: dict = None
     ):
         
-        """
-        The following parameters should contain in the config.json file
-        """
         self.title = title
         self.base_url = base_url
         self.doi = doi
@@ -122,7 +119,7 @@ class WMTSCapabilitiesGenerator:
         # Configure resource template based on tile_format
         self.resource_template = self._configure_resource_template()
 
-        if not (0 <= max_z_level <= 13):
+        if not (0 <= max_z_level <= 23):
             raise ValueError(f"max_z_level must be between 0 and 13.")
 
         self.bounding_box["left"] = max(self.bounding_box["left"], LEFT_BOUNDS_LIMIT)
@@ -201,12 +198,12 @@ class WMTSCapabilitiesGenerator:
         ET.SubElement(style, "ows:Title").text = "Default Style"
         ET.SubElement(style, "ows:Identifier").text = "default"
 
-        ET.SubElement(layer, "Format").text = WMTSCapabilitiesGenerator.EXTENSION_MAPPING[self.tile_format]
+        ET.SubElement(layer, "Format").text = self.EXTENSION_MAPPING[self.tile_format]
         tile_matrix_set_link = ET.SubElement(layer, "TileMatrixSetLink")
-        ET.SubElement(tile_matrix_set_link, "TileMatrixSet").text = "WGS1984Quad"
+        ET.SubElement(tile_matrix_set_link, "TileMatrixSet").text = self.tile_matrix_set or "WGS1984Quad"
 
         ET.SubElement(layer, "ResourceURL", attrib={
-            "format": WMTSCapabilitiesGenerator.EXTENSION_MAPPING[self.tile_format],
+            "format": self.EXTENSION_MAPPING[self.tile_format],
             "resourceType": "tile",
             "template": self.resource_template
         })
@@ -216,7 +213,7 @@ class WMTSCapabilitiesGenerator:
     def _add_tile_matrix_set(self, contents: ET.Element):
         tile_matrix_set = ET.SubElement(contents, "TileMatrixSet", attrib={"xml:id": "WorldCRS84Quad"})
         ET.SubElement(tile_matrix_set, "ows:Title").text = "CRS84 for the World"
-        ET.SubElement(tile_matrix_set, "ows:Identifier").text = "WGS1984Quad"
+        ET.SubElement(tile_matrix_set, "ows:Identifier").text = self.tile_matrix_set or "WGS1984Quad"
 
         b_box = ET.SubElement(tile_matrix_set, "ows:BoundingBox", attrib={"crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"})
         ET.SubElement(b_box, "ows:LowerCorner").text = "-180 -90"
@@ -232,7 +229,7 @@ class WMTSCapabilitiesGenerator:
 
             ET.SubElement(tile_matrix, "ows:Identifier").text = str(i)
             ET.SubElement(tile_matrix, "ScaleDenominator").text = str(scale_denominator)
-            ET.SubElement(tile_matrix, "TopLeftCorner").text = WMTSCapabilitiesGenerator.TOP_LEFT_CORNER
+            ET.SubElement(tile_matrix, "TopLeftCorner").text = self.TOP_LEFT_CORNER
             ET.SubElement(tile_matrix, "TileWidth").text = str(self.tile_width)
             ET.SubElement(tile_matrix, "TileHeight").text = str(self.tile_height)
             ET.SubElement(tile_matrix, "MatrixWidth").text = str(2 ** (i+1))
