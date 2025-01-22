@@ -14,8 +14,6 @@ class WMTSCapabilitiesGenerator:
         layer_identifier : str
         tile_format : str (e.g., '.png').
         tile_matrix_set_id : str
-        tile_width : int
-        tile_height : int
         max_z_level : int
         bounding_box : dict, optional
             A dictionary with keys 'left', 'right', 'bottom', and 'top' that
@@ -35,8 +33,6 @@ class WMTSCapabilitiesGenerator:
             bounding_box=None,
             tile_format=".png",
             tile_matrix_set_id="WorldCRS84Quad",
-            tile_width=128,
-            tile_height=128,
             max_z_level=3
         )
 
@@ -94,8 +90,6 @@ class WMTSCapabilitiesGenerator:
         self.layer_identifier = layer_identifier
         self.tile_format = tile_format
         self.tile_matrix_set_id = tile_matrix_set_id
-        self.tile_width = tile_width
-        self.tile_height = tile_height
         self.max_z_level = max_z_level
 
         self.capabilities_url = f"{base_url}/{doi}/WMTSCapabilities.xml"
@@ -106,6 +100,7 @@ class WMTSCapabilitiesGenerator:
 
         if not (0 <= max_z_level <= 23):
             raise ValueError(f"max_z_level must be between 0 and 23.")
+        
         
         # Get the TileMatrixSet Object from morecantile
         self.tms_object = morecantile.tms.get(self.tile_matrix_set_id)
@@ -212,12 +207,14 @@ class WMTSCapabilitiesGenerator:
         for i in range(self.max_z_level + 1):  # Generate levels from 0 to max_z_level
             tile_matrix = ET.SubElement(tile_matrix_set, "TileMatrix")
            
-            scale_denominator =  morecantile.tms.get(self.tile_matrix_set_id).matrix(i).scaleDenominator
+            scale_denominator =  self.tms_object.matrix(i).scaleDenominator
+            tile_width = self.tms_object.matrix(i).tileWidth
+            tile_height = self.tms_object.matrix(i).tileHeight
 
             ET.SubElement(tile_matrix, "ows:Identifier").text = str(i)
             ET.SubElement(tile_matrix, "ScaleDenominator").text = str(scale_denominator)
             ET.SubElement(tile_matrix, "TopLeftCorner").text = self.top_left_corner
-            ET.SubElement(tile_matrix, "TileWidth").text = str(self.tile_width)
-            ET.SubElement(tile_matrix, "TileHeight").text = str(self.tile_height)
+            ET.SubElement(tile_matrix, "TileWidth").text = str(tile_width)
+            ET.SubElement(tile_matrix, "TileHeight").text = str(tile_height)
             ET.SubElement(tile_matrix, "MatrixWidth").text = str(2 ** (i+1))
             ET.SubElement(tile_matrix, "MatrixHeight").text = str(2 ** i)
