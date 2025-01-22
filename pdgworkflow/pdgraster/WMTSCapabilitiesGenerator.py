@@ -18,8 +18,7 @@ class WMTSCapabilitiesGenerator:
         bounding_box : dict, optional
             A dictionary with keys 'left', 'right', 'bottom', and 'top' that
             specify the bounding box of the raster. If set to None, the total
-            bounds of the map (global extent) are used:
-            {'left': -180, 'right': 180, 'bottom': -90, 'top': 90}.
+            bounds of the map (global extent) are used.
 
 
     Usage Example:
@@ -77,8 +76,6 @@ class WMTSCapabilitiesGenerator:
         layer_identifier: str,
         tile_format: str,
         tile_matrix_set_id: str,
-        tile_width: int,
-        tile_height: int,
         max_z_level: int,
         bounding_box: dict = None
     ):
@@ -98,20 +95,17 @@ class WMTSCapabilitiesGenerator:
         # Configure resource template based on tile_format
         self.resource_template = self._configure_resource_template()
 
-        if not (0 <= max_z_level <= 23):
-            raise ValueError(f"max_z_level must be between 0 and 23.")
-        
-        
         # Get the TileMatrixSet Object from morecantile
         self.tms_object = morecantile.tms.get(self.tile_matrix_set_id)
         self.tms_bounding_box = self.tms_object.xy_bbox
         self.top_left_corner = f"{self.tms_bounding_box.left} {self.tms_bounding_box.top}"
-        self.bounding_box = bounding_box or  self.tms_bounding_box
-        self.crs_authority, self.crs_code = self.tms_object.supportedCRS.to_authority()
-        if self.crs_authority and self.crs_code:
-            self.crs_url = f"http://www.opengis.net/def/crs/{self.crs_authority}/0/{self.crs_code}"
-        else:
-            raise ValueError(f"Invalid tile_matrix_set_id {tile_matrix_set_id}")
+        self.bounding_box = bounding_box or self.tms_bounding_box
+        self.crs = self.tms_object.crs.root
+        self.wellKnownScaleSet = self.tms_object.wellKnownScaleSet
+
+        max_tms_zoom = self.tms_object.maxzoom
+        if not (0 <= max_z_level <= max_tms_zoom):
+            raise ValueError(f"max_z_level must be between 0 and {max_tms_zoom}.")
 
     def _configure_resource_template(self) -> str:
         if self.tile_format not in self.EXTENSION_MAPPING:
@@ -148,7 +142,7 @@ class WMTSCapabilitiesGenerator:
     
     def _add_service_identification(self, root):
         service_identification = ET.SubElement(root, "ows:ServiceIdentification")
-        ET.SubElement(service_identification, "ows:Title").text = self.title
+        ET.SubElement(service_identification, "ows:Title").text = f"{self.title}"
         ET.SubElement(service_identification, "ows:ServiceType").text = "OGC WMTS"
         ET.SubElement(service_identification, "ows:ServiceTypeVersion").text = "1.0.0"
 
@@ -194,15 +188,15 @@ class WMTSCapabilitiesGenerator:
 
     def _add_tile_matrix_set(self, contents: ET.Element):
         tile_matrix_set = ET.SubElement(contents, "TileMatrixSet", attrib={"xml:id": self.tile_matrix_set_id})
-        ET.SubElement(tile_matrix_set, "ows:Title").text = f"{self.crs_code} for the World"
+        ET.SubElement(tile_matrix_set, "ows:Title").text = self.tms_object.title
         ET.SubElement(tile_matrix_set, "ows:Identifier").text = self.tile_matrix_set_id
 
-        b_box = ET.SubElement(tile_matrix_set, "ows:BoundingBox", attrib={"crs": self.crs_url})
+        b_box = ET.SubElement(tile_matrix_set, "ows:BoundingBox", attrib={"crs": self.crs})
         ET.SubElement(b_box, "ows:LowerCorner").text = f"{self.tms_bounding_box.left} {self.tms_bounding_box.bottom}"
         ET.SubElement(b_box, "ows:UpperCorner").text = f"{self.tms_bounding_box.right} {self.tms_bounding_box.top}"
 
-        ET.SubElement(tile_matrix_set, "ows:SupportedCRS").text = self.crs_url
-        ET.SubElement(tile_matrix_set, "WellKnownScaleSet").text = self.tms_object.wellKnownScaleSet
+        ET.SubElement(tile_matrix_set, "ows:SupportedCRS").text = f"{self.crs}"
+        ET.SubElement(tile_matrix_set, "WellKnownScaleSet").text = f"{self.wellKnownScaleSet}"
 
         for i in range(self.max_z_level + 1):  # Generate levels from 0 to max_z_level
             tile_matrix = ET.SubElement(tile_matrix_set, "TileMatrix")
