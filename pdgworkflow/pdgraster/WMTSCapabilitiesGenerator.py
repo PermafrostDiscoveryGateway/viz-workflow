@@ -97,7 +97,7 @@ class WMTSCapabilitiesGenerator:
 
         # Get the TileMatrixSet Object from morecantile
         self.tms_object = morecantile.tms.get(self.tile_matrix_set_id)
-        self.tms_bounding_box = self.tms_object.xy_bbox
+        self.tms_bounding_box = self.tms_object.bbox
         self.top_left_corner = f"{self.tms_bounding_box.left} {self.tms_bounding_box.top}"
         self.bounding_box = bounding_box or self.tms_bounding_box
         self.crs = self.tms_object.crs.root
@@ -187,7 +187,7 @@ class WMTSCapabilitiesGenerator:
         self._add_tile_matrix_set(contents)
 
     def _add_tile_matrix_set(self, contents: ET.Element):
-        tile_matrix_set = ET.SubElement(contents, "TileMatrixSet", attrib={"xml:id": self.tile_matrix_set_id})
+        tile_matrix_set = ET.SubElement(contents, "TileMatrixSet")
         ET.SubElement(tile_matrix_set, "ows:Title").text = self.tms_object.title
         ET.SubElement(tile_matrix_set, "ows:Identifier").text = self.tile_matrix_set_id
 
@@ -196,7 +196,10 @@ class WMTSCapabilitiesGenerator:
         ET.SubElement(b_box, "ows:UpperCorner").text = f"{self.tms_bounding_box.right} {self.tms_bounding_box.top}"
 
         ET.SubElement(tile_matrix_set, "ows:SupportedCRS").text = f"{self.crs}"
-        ET.SubElement(tile_matrix_set, "WellKnownScaleSet").text = f"{self.wellKnownScaleSet}"
+
+        # Adding WellKnownScaleSet only if it is defined
+        if self.wellKnownScaleSet:
+            ET.SubElement(tile_matrix_set, "WellKnownScaleSet").text = f"{self.wellKnownScaleSet}"
 
         for i in range(self.max_z_level + 1):  # Generate levels from 0 to max_z_level
             tile_matrix = ET.SubElement(tile_matrix_set, "TileMatrix")
