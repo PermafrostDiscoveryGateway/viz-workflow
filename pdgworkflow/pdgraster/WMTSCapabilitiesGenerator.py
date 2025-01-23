@@ -2,8 +2,6 @@ import xml.etree.ElementTree as ET
 import morecantile
 from xml.dom import minidom
 
-from pyproj import CRS
-
 class WMTSCapabilitiesGenerator:
     """
     A class to generate WMTS Capabilities XML for a given dataset.
