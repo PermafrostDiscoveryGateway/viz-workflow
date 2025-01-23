@@ -2,6 +2,8 @@ import xml.etree.ElementTree as ET
 import morecantile
 from xml.dom import minidom
 
+from pyproj import CRS
+
 class WMTSCapabilitiesGenerator:
     """
     A class to generate WMTS Capabilities XML for a given dataset.
@@ -20,7 +22,6 @@ class WMTSCapabilitiesGenerator:
             specify the bounding box of the raster. If set to None, the total
             bounds of the map (global extent) are used.
 
-
     Usage Example:
 
     generator = WMTSCapabilitiesGenerator(
@@ -29,7 +30,7 @@ class WMTSCapabilitiesGenerator:
             doi="doi:10.5066/F7VQ30RM",
             layer_title="layer_title",
             layer_identifier="layer_identifier",
-            bounding_box=None,
+            bounding_box={"left":-179.0, "bottom":-87.0, "right":176.0, "top":90.0},
             tile_format=".png",
             tile_matrix_set_id="WorldCRS84Quad",
             max_z_level=3
@@ -97,9 +98,18 @@ class WMTSCapabilitiesGenerator:
 
         # Get the TileMatrixSet Object from morecantile
         self.tms_object = morecantile.tms.get(self.tile_matrix_set_id)
-        self.tms_bounding_box = self.tms_object.bbox
-        self.top_left_corner = f"{self.tms_bounding_box.left} {self.tms_bounding_box.top}"
-        self.bounding_box = bounding_box or self.tms_bounding_box
+        self.top_left_corner = f"{self.tms_object.bbox.left} {self.tms_object.bbox.top}"
+
+        if bounding_box == None:
+            self.bounding_box = {
+            "left": self.tms_object.bbox.left,
+            "bottom": self.tms_object.bbox.bottom,
+            "right": self.tms_object.bbox.right,
+            "top": self.tms_object.bbox.top,       
+             }
+        else:
+            self.bounding_box = bounding_box
+
         self.crs = self.tms_object.crs.root
         self.wellKnownScaleSet = self.tms_object.wellKnownScaleSet
 
@@ -167,8 +177,8 @@ class WMTSCapabilitiesGenerator:
         ET.SubElement(layer, "ows:Identifier").text = self.layer_identifier
 
         wgs84_bbox = ET.SubElement(layer, "ows:WGS84BoundingBox")
-        ET.SubElement(wgs84_bbox, "ows:LowerCorner").text = f"{self.bounding_box.left} {self.bounding_box.bottom}"
-        ET.SubElement(wgs84_bbox, "ows:UpperCorner").text = f"{self.bounding_box.right} {self.bounding_box.top}"
+        ET.SubElement(wgs84_bbox, "ows:LowerCorner").text = f'{self.bounding_box["left"]} {self.bounding_box["bottom"]}'
+        ET.SubElement(wgs84_bbox, "ows:UpperCorner").text = f'{self.bounding_box["right"]} {self.bounding_box["top"]}'
 
         style = ET.SubElement(layer, "Style", attrib={"isDefault": "true"})
         ET.SubElement(style, "ows:Title").text = "Default Style"
@@ -192,8 +202,8 @@ class WMTSCapabilitiesGenerator:
         ET.SubElement(tile_matrix_set, "ows:Identifier").text = self.tile_matrix_set_id
 
         b_box = ET.SubElement(tile_matrix_set, "ows:BoundingBox", attrib={"crs": self.crs})
-        ET.SubElement(b_box, "ows:LowerCorner").text = f"{self.tms_bounding_box.left} {self.tms_bounding_box.bottom}"
-        ET.SubElement(b_box, "ows:UpperCorner").text = f"{self.tms_bounding_box.right} {self.tms_bounding_box.top}"
+        ET.SubElement(b_box, "ows:LowerCorner").text = f"{self.tms_object.bbox.left} {self.tms_object.bbox.bottom}"
+        ET.SubElement(b_box, "ows:UpperCorner").text = f"{self.tms_object.bbox.right} {self.tms_object.bbox.top}"
 
         ET.SubElement(tile_matrix_set, "ows:SupportedCRS").text = f"{self.crs}"
 
