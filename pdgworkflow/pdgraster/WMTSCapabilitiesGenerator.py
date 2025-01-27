@@ -2,15 +2,6 @@ import xml.etree.ElementTree as ET
 import morecantile
 from xml.dom import minidom
 
-LEFT_BOUNDS_LIMIT = -179.999999
-RIGHT_BOUNDS_LIMIT = 179.999999
-DEFAULT_BOUNDS = {
-            "left": LEFT_BOUNDS_LIMIT,
-            "right": RIGHT_BOUNDS_LIMIT,
-            "bottom": -90,
-            "top": 90
-        }
-
 class WMTSCapabilitiesGenerator:
     """
     A class to generate WMTS Capabilities XML for a given dataset.
@@ -22,37 +13,28 @@ class WMTSCapabilitiesGenerator:
         layer_title : str
         layer_identifier : str
         tile_format : str (e.g., '.png').
-        tile_matrix_set : str
-        tile_width : int
-        tile_height : int
+        tile_matrix_set_id : str
         max_z_level : int
         bounding_box : dict, optional
             A dictionary with keys 'left', 'right', 'bottom', and 'top' that
             specify the bounding box of the raster. If set to None, the total
-            bounds of the map (global extent) are used:
-            {'left': -179.999999, 'right': 179.999999, 'bottom': -90, 'top': 90}.
+            bounds of the map (global extent) are used.
 
     Usage Example:
-        config = pdgstaging.ConfigManager(config)
-        
-        generator = WMTSCapabilitiesGenerator(
-            title=config.get('title'),
-            base_url=config.get('base_url'),
-            doi=config.get('doi'),
-            layer_title=config.get('layer_title'),
-            layer_identifier=config.get('layer_identifier') ,
-            bounding_box=config.get('tile_size'),
-            tile_format=config.get('ext_web_tiles'),
-            tile_matrix_set=tms_id,
-            tile_width=config.get('tile_size')[0],
-            tile_height=config.get('tile_size')[1],
-            max_z_level=config.get('z_range')[1],
+
+    generator = WMTSCapabilitiesGenerator(
+            title="This is the title",
+            base_url="https://example.com",
+            doi="doi:10.5066/F7VQ30RM",
+            layer_title="layer_title",
+            layer_identifier="layer_identifier",
+            bounding_box={"left":-179.0, "bottom":-87.0, "right":176.0, "top":90.0},
+            tile_format=".png",
+            tile_matrix_set_id="WorldCRS84Quad",
+            max_z_level=3
         )
 
     wmts_xml = generator.generate_capabilities()
-    print("generating WMTSCapabilities")
-
-    # Write to a file
     with open("WMTSCapabilities.xml", "w") as f:
         f.write(wmts_xml)
     """
@@ -84,8 +66,6 @@ class WMTSCapabilitiesGenerator:
         ".tiff;32f": "image/tiff;depth=32f"
     }
 
-    TOP_LEFT_CORNER: str = "-180 90"
-
     def __init__(
         self,
         title: str,
@@ -94,10 +74,8 @@ class WMTSCapabilitiesGenerator:
         layer_title: str,
         layer_identifier: str,
         tile_format: str,
-        tile_matrix_set: str,
-        tile_width: int,
-        tile_height: int,
-        max_z_level: int = 15,
+        tile_matrix_set_id: str,
+        max_z_level: int,
         bounding_box: dict = None
     ):
         
@@ -107,31 +85,40 @@ class WMTSCapabilitiesGenerator:
         self.layer_title = layer_title
         self.layer_identifier = layer_identifier
         self.tile_format = tile_format
-        self.tile_matrix_set = tile_matrix_set
-        self.tile_width = tile_width
-        self.tile_height = tile_height
+        self.tile_matrix_set_id = tile_matrix_set_id
         self.max_z_level = max_z_level
 
         self.capabilities_url = f"{base_url}/{doi}/WMTSCapabilities.xml"
         self.tiles_url = f"{base_url}/{doi}/"
-        self.bounding_box = bounding_box or DEFAULT_BOUNDS
 
         # Configure resource template based on tile_format
         self.resource_template = self._configure_resource_template()
 
-        if not (0 <= max_z_level <= 23):
-            raise ValueError(f"max_z_level must be between 0 and 13.")
+        # Get the TileMatrixSet Object from morecantile
+        self.tms_object = morecantile.tms.get(self.tile_matrix_set_id)
+        self.top_left_corner = f"{self.tms_object.bbox.left} {self.tms_object.bbox.top}"
 
-        self.bounding_box["left"] = max(self.bounding_box["left"], LEFT_BOUNDS_LIMIT)
-        self.bounding_box["right"] = min(self.bounding_box["right"], RIGHT_BOUNDS_LIMIT)
+        if bounding_box == None:
+            self.bounding_box = {
+            "left": self.tms_object.bbox.left,
+            "bottom": self.tms_object.bbox.bottom,
+            "right": self.tms_object.bbox.right,
+            "top": self.tms_object.bbox.top,       
+             }
+        else:
+            self.bounding_box = bounding_box
 
+        self.crs = self.tms_object.crs.root
+        self.wellKnownScaleSet = self.tms_object.wellKnownScaleSet
+
+        max_tms_zoom = self.tms_object.maxzoom
+        if not (0 <= max_z_level <= max_tms_zoom):
+            raise ValueError(f"max_z_level must be between 0 and {max_tms_zoom}.")
 
     def _configure_resource_template(self) -> str:
         if self.tile_format not in self.EXTENSION_MAPPING:
             raise ValueError(f"Unsupported tile format: {self.tile_format}")
         return f"{self.base_url}/{self.doi}/{{TileMatrixSet}}/{{TileMatrix}}/{{TileCol}}/{{TileRow}}{self.tile_format}"
-
-
 
     def generate_capabilities(self) -> str:
         """
@@ -141,15 +128,14 @@ class WMTSCapabilitiesGenerator:
             An XML string representing the WMTS Capabilities document.
         """
         root = ET.Element("Capabilities", attrib={
-            "xmlns": WMTSCapabilitiesGenerator.XMLNS["default"],
-            "xmlns:ows": WMTSCapabilitiesGenerator.XMLNS["ows"],
-            "xmlns:xlink": WMTSCapabilitiesGenerator.XMLNS["xlink"],
-            "xmlns:xsi": WMTSCapabilitiesGenerator.XMLNS["xsi"],
-            "xmlns:gml": WMTSCapabilitiesGenerator.XMLNS["gml"],
-            "xsi:schemaLocation": WMTSCapabilitiesGenerator.SCHEMA_LOCATION,
+            "xmlns": self.XMLNS["default"],
+            "xmlns:ows": self.XMLNS["ows"],
+            "xmlns:xlink": self.XMLNS["xlink"],
+            "xmlns:xsi": self.XMLNS["xsi"],
+            "xmlns:gml": self.XMLNS["gml"],
+            "xsi:schemaLocation": self.SCHEMA_LOCATION,
             "version": "1.0.0"
         })
-
 
         self._add_service_identification(root)
         self._add_operations_metadata(root)
@@ -162,10 +148,9 @@ class WMTSCapabilitiesGenerator:
         # Return the XML string with UTF-8 encoding
         return parsed_xml.toprettyxml(indent="  ", encoding="UTF-8").decode("utf-8")
     
-
     def _add_service_identification(self, root):
         service_identification = ET.SubElement(root, "ows:ServiceIdentification")
-        ET.SubElement(service_identification, "ows:Title").text = self.title
+        ET.SubElement(service_identification, "ows:Title").text = f"{self.title}"
         ET.SubElement(service_identification, "ows:ServiceType").text = "OGC WMTS"
         ET.SubElement(service_identification, "ows:ServiceTypeVersion").text = "1.0.0"
 
@@ -186,21 +171,20 @@ class WMTSCapabilitiesGenerator:
     def _add_contents(self, root):
         contents = ET.SubElement(root, "Contents")
         layer = ET.SubElement(contents, "Layer")
-        ET.SubElement(layer, "ows:Title").text = "iwp_high"
-        ET.SubElement(layer, "ows:Identifier").text = "iwp_high"
+        ET.SubElement(layer, "ows:Title").text = self.layer_title
+        ET.SubElement(layer, "ows:Identifier").text = self.layer_identifier
 
         wgs84_bbox = ET.SubElement(layer, "ows:WGS84BoundingBox")
-        ET.SubElement(wgs84_bbox, "ows:LowerCorner").text = f"{self.bounding_box['left']} {self.bounding_box['bottom']}"
-        ET.SubElement(wgs84_bbox, "ows:UpperCorner").text = f"{self.bounding_box['right']} {self.bounding_box['top']}"
-
+        ET.SubElement(wgs84_bbox, "ows:LowerCorner").text = f'{self.bounding_box["left"]} {self.bounding_box["bottom"]}'
+        ET.SubElement(wgs84_bbox, "ows:UpperCorner").text = f'{self.bounding_box["right"]} {self.bounding_box["top"]}'
 
         style = ET.SubElement(layer, "Style", attrib={"isDefault": "true"})
         ET.SubElement(style, "ows:Title").text = "Default Style"
         ET.SubElement(style, "ows:Identifier").text = "default"
 
         ET.SubElement(layer, "Format").text = self.EXTENSION_MAPPING[self.tile_format]
-        tile_matrix_set_link = ET.SubElement(layer, "TileMatrixSetLink")
-        ET.SubElement(tile_matrix_set_link, "TileMatrixSet").text = self.tile_matrix_set or "WGS1984Quad"
+        tile_matrix_set = ET.SubElement(layer, "TileMatrixSetLink")
+        ET.SubElement(tile_matrix_set, "TileMatrixSet").text = self.tile_matrix_set_id
 
         ET.SubElement(layer, "ResourceURL", attrib={
             "format": self.EXTENSION_MAPPING[self.tile_format],
@@ -211,26 +195,31 @@ class WMTSCapabilitiesGenerator:
         self._add_tile_matrix_set(contents)
 
     def _add_tile_matrix_set(self, contents: ET.Element):
-        tile_matrix_set = ET.SubElement(contents, "TileMatrixSet", attrib={"xml:id": "WorldCRS84Quad"})
-        ET.SubElement(tile_matrix_set, "ows:Title").text = "CRS84 for the World"
-        ET.SubElement(tile_matrix_set, "ows:Identifier").text = self.tile_matrix_set or "WGS1984Quad"
+        tile_matrix_set = ET.SubElement(contents, "TileMatrixSet")
+        ET.SubElement(tile_matrix_set, "ows:Title").text = self.tms_object.title
+        ET.SubElement(tile_matrix_set, "ows:Identifier").text = self.tile_matrix_set_id
 
-        b_box = ET.SubElement(tile_matrix_set, "ows:BoundingBox", attrib={"crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"})
-        ET.SubElement(b_box, "ows:LowerCorner").text = "-180 -90"
-        ET.SubElement(b_box, "ows:UpperCorner").text = "180 90"
+        b_box = ET.SubElement(tile_matrix_set, "ows:BoundingBox", attrib={"crs": self.crs})
+        ET.SubElement(b_box, "ows:LowerCorner").text = f"{self.tms_object.bbox.left} {self.tms_object.bbox.bottom}"
+        ET.SubElement(b_box, "ows:UpperCorner").text = f"{self.tms_object.bbox.right} {self.tms_object.bbox.top}"
 
-        ET.SubElement(tile_matrix_set, "ows:SupportedCRS").text = "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
-        ET.SubElement(tile_matrix_set, "WellKnownScaleSet").text = "http://www.opengis.net/def/wkss/OGC/1.0/GoogleCRS84Quad"
+        ET.SubElement(tile_matrix_set, "ows:SupportedCRS").text = f"{self.crs}"
+
+        # Adding WellKnownScaleSet only if it is defined
+        if self.wellKnownScaleSet:
+            ET.SubElement(tile_matrix_set, "WellKnownScaleSet").text = f"{self.wellKnownScaleSet}"
 
         for i in range(self.max_z_level + 1):  # Generate levels from 0 to max_z_level
             tile_matrix = ET.SubElement(tile_matrix_set, "TileMatrix")
            
-            scale_denominator =  morecantile.tms.get("WGS1984Quad").matrix(i).scaleDenominator
+            scale_denominator =  self.tms_object.matrix(i).scaleDenominator
+            tile_width = self.tms_object.matrix(i).tileWidth
+            tile_height = self.tms_object.matrix(i).tileHeight
 
             ET.SubElement(tile_matrix, "ows:Identifier").text = str(i)
             ET.SubElement(tile_matrix, "ScaleDenominator").text = str(scale_denominator)
-            ET.SubElement(tile_matrix, "TopLeftCorner").text = self.TOP_LEFT_CORNER
-            ET.SubElement(tile_matrix, "TileWidth").text = str(self.tile_width)
-            ET.SubElement(tile_matrix, "TileHeight").text = str(self.tile_height)
+            ET.SubElement(tile_matrix, "TopLeftCorner").text = self.top_left_corner
+            ET.SubElement(tile_matrix, "TileWidth").text = str(tile_width)
+            ET.SubElement(tile_matrix, "TileHeight").text = str(tile_height)
             ET.SubElement(tile_matrix, "MatrixWidth").text = str(2 ** (i+1))
             ET.SubElement(tile_matrix, "MatrixHeight").text = str(2 ** i)
