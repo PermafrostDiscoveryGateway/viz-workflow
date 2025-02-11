@@ -1,6 +1,6 @@
 import json
 import logging
-from . import logging_config
+from .pdgstaging import logging_config
 import os
 from .Deduplicator import deduplicate_neighbors, deduplicate_by_footprint
 from .TilePathManager import TilePathManager
