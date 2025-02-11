@@ -2,8 +2,7 @@ import json
 import logging
 from .pdgstaging import logging_config
 import os
-from .Deduplicator import deduplicate_neighbors, deduplicate_by_footprint
-from .TilePathManager import TilePathManager
+from pdgstaging import TilePathManager
 import warnings
 from coloraide import Color
 import colormaps as cmaps
@@ -1303,10 +1302,8 @@ class ConfigManager:
             deduplciation function.
         """
         method = self.get("deduplicate_method")
-        if method == "neighbor":
-            return deduplicate_neighbors
-        if method == "footprints":
-            return deduplicate_by_footprint
+        if method == "neighbor" or method == "footprints":
+            return method
         return None
 
     def footprint_path_from_input(self, path, check_exists=False):
