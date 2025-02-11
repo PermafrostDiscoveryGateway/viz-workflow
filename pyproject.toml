@@ -1,0 +1,42 @@
+[tool.poetry]
+name = "pdgworkflow"
+version = "1.0.0"
+description = "PDG Visualization workflow."
+authors = [
+    "Kastan Day <kvday2@illinois.edu>",
+    "Juliet Cohen <jcohen@nceas.ucsb.edu>",
+    "Robyn Thiessen-Bock <thiessenbock@nceas.ucsb.edu>",
+    "Matthew B. Jones <jones@nceas.ucsb.edu>"
+]
+license = "Apache Software License 2.0"
+keywords = ["pdg_workflow"]
+readme = "README.md"
+homepage = "https://github.com/PermafrostDiscoveryGateway/viz-workflow"
+repository = "https://github.com/PermafrostDiscoveryGateway/viz-workflow"
+classifiers=[
+    'Development Status :: 2 - Pre-Alpha',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: Apache Software License',
+    'Natural Language :: English',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.9',
+]
+
+[tool.poetry.dependencies]
+python = ">= 3.9, < 4.0"
+Click = ">=7.0"
+pdgraster = { git = "https://github.com/PermafrostDiscoveryGateway/viz-raster.git", rev = "main" }
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7"
+pre-commit = ">=4.1"
+black = ">=24.1.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ["py39"]
+include = "\\.pyi?$"
