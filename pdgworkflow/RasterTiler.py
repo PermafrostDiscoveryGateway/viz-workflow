@@ -6,11 +6,12 @@ import os
 
 import geopandas as gpd
 import pandas as pd
+import ConfigManager
 import pdgstaging
 
-from . import Raster
-from . import Palette
-from . import WebImage
+from pdgraster import Raster
+from pdgraster import Palette
+from pdgraster import WebImage
 
 logger = logging_config.logger
 
@@ -35,7 +36,7 @@ class RasterTiler:
             JSON file.
         """
 
-        self.config = pdgstaging.ConfigManager(config)
+        self.config = ConfigManager(config)
         self.tiles = pdgstaging.TilePathManager(**self.config.get_path_manager_config())
         # Pre-create the palette for each stat
         palettes = self.config.get_palettes()
