@@ -364,7 +364,7 @@ def create_leaf_3dtiles(staged_paths, config, logging_dict=None):
     """
     Create a batch of leaf 3d tiles from staged vector tiles
     """
-    from pdg_workflow import StagedTo3DConverter
+    from workflow_configs.pdg_workflow import StagedTo3DConverter
     if logging_dict:
         import logging.config
         logging.config.dictConfig(logging_dict)
@@ -382,7 +382,7 @@ def create_parent_3dtiles(tiles, config, limit_bv_to=None, logging_dict=None):
     Create a batch of cesium 3d tileset parent files that point to child
     tilesets
     """
-    from pdg_workflow import StagedTo3DConverter
+    from workflow_configs.pdg_workflow import StagedTo3DConverter
     if logging_dict:
         import logging.config
         logging.config.dictConfig(logging_dict)
