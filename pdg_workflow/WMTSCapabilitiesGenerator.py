@@ -1,5 +1,6 @@
 import xml.etree.ElementTree as ET
 import morecantile
+from morecantile.models import crs_axis_inverted
 from xml.dom import minidom
 
 class WMTSCapabilitiesGenerator:
@@ -100,7 +101,15 @@ class WMTSCapabilitiesGenerator:
 
         # Get the TileMatrixSet Object from morecantile
         self.tms_object = morecantile.tms.get(self.tile_matrix_set_id)
-        self.top_left_corner = f"{self.tms_object.bbox.left} {self.tms_object.bbox.top}"
+
+        # Determine if the CRS axis order is inverted (lat/lon instead of lon/lat)
+        is_inverted = crs_axis_inverted(self.tms_object.geographic_crs)
+
+        # Assign the correct top-left corner based on axis order
+        if is_inverted:
+            self.top_left_corner = f"{self.tms_object.bbox.top} {self.tms_object.bbox.left}"
+        else:
+            self.top_left_corner = f"{self.tms_object.bbox.left} {self.tms_object.bbox.top}"
 
         if bounding_box == None:
             self.bounding_box = {
