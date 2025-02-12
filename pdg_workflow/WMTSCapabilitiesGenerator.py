@@ -10,6 +10,7 @@ class WMTSCapabilitiesGenerator:
         title : str
         base_url : str
         doi : str
+        url_postfix: str
         layer_title : str
         layer_identifier : str
         tile_format : str (e.g., '.png').
@@ -24,8 +25,9 @@ class WMTSCapabilitiesGenerator:
 
     generator = WMTSCapabilitiesGenerator(
             title="This is the title",
-            base_url="https://example.com",
-            doi="doi:10.5066/F7VQ30RM",
+            base_url="https://arcticdata.io/data/tiles",
+            url_postfix="yr2021/web_tiles/seasonal_water"
+            doi="10.5066/F7VQ30RM",
             layer_title="layer_title",
             layer_identifier="layer_identifier",
             bounding_box={"left":-179.0, "bottom":-87.0, "right":176.0, "top":90.0},
@@ -71,6 +73,7 @@ class WMTSCapabilitiesGenerator:
         title: str,
         base_url: str,
         doi: str,
+        url_postfix: str,
         layer_title: str,
         layer_identifier: str,
         tile_format: str,
@@ -82,6 +85,7 @@ class WMTSCapabilitiesGenerator:
         self.title = title
         self.base_url = base_url
         self.doi = doi
+        self.url_postfix = url_postfix
         self.layer_title = layer_title
         self.layer_identifier = layer_identifier
         self.tile_format = tile_format
@@ -118,7 +122,7 @@ class WMTSCapabilitiesGenerator:
     def _configure_resource_template(self) -> str:
         if self.tile_format not in self.EXTENSION_MAPPING:
             raise ValueError(f"Unsupported tile format: {self.tile_format}")
-        return f"{self.base_url}/{self.doi}/{{TileMatrixSet}}/{{TileMatrix}}/{{TileCol}}/{{TileRow}}{self.tile_format}"
+        return f"{self.base_url}/{self.doi}/{self.url_postfix}/{{TileMatrixSet}}/{{TileMatrix}}/{{TileCol}}/{{TileRow}}{self.tile_format}"
 
     def generate_capabilities(self) -> str:
         """
