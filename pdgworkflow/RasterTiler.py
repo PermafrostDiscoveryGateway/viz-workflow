@@ -1,19 +1,20 @@
 import time
 import uuid
 import logging
-from . import logging_config
+# from . import logging_config
 import os
 
 import geopandas as gpd
 import pandas as pd
-import ConfigManager
+from .ConfigManager import ConfigManager
 import pdgstaging
+import pyarrow
 
 from pdgraster import Raster
 from pdgraster import Palette
 from pdgraster import WebImage
 
-logger = logging_config.logger
+# logger = logging_config.logger
 
 
 class RasterTiler:
@@ -123,9 +124,9 @@ class RasterTiler:
         # Track the parent tiles to make for each of the lowest level tiles
         parent_tiles = set()
 
-        logger.info(
-            f"Beginning rasterization of {len(paths)} vector files at z-level" f" {z}."
-        )
+        # logger.info(
+        #     f"Beginning rasterization of {len(paths)} vector files at z-level" f" {z}."
+        # )
 
         # Assume that all vector files are staged, and all at the same z level.
         # Assume that tile paths have followed the convention configured for
@@ -136,7 +137,7 @@ class RasterTiler:
             if tile is not None:
                 parent_tiles.add(self.tiles.get_parent_tile(tile))
 
-        logger.info(f"Finished rasterization of {len(paths)} vector files.")
+        # logger.info(f"Finished rasterization of {len(paths)} vector files.")
 
         # Create the web tiles for the parent tiles.
         if make_parents:
@@ -178,9 +179,9 @@ class RasterTiler:
             out_path = self.tiles.path_from_tile(tile, "geotiff")
 
             if os.path.isfile(out_path) and not overwrite:
-                logger.info(
-                    f"Skip rasterizing {path} for tile {tile}." " Tile already exists."
-                )
+                # logger.info(
+                #     f"Skip rasterizing {path} for tile {tile}." " Tile already exists."
+                # )
                 return None
 
             bounds = self.tiles.get_bounding_box(tile)
@@ -209,7 +210,7 @@ class RasterTiler:
             # Track and log the end of the event
             message = f"Rasterization for tile {tile} complete."
             self.__end_tracking(id, raster=raster, tile=tile, message=message)
-            logger.info(f"Complete rasterization of tile {tile} to {out_path}.")
+            # logger.info(f"Complete rasterization of tile {tile} to {out_path}.")
 
             return tile
 
@@ -259,14 +260,14 @@ class RasterTiler:
         # Get the parent tiles from the current set of tiles.
         parent_tiles = set()
 
-        logger.info(f"Start creating {len(tiles)} parent geotiffs at level {z}.")
+        # logger.info(f"Start creating {len(tiles)} parent geotiffs at level {z}.")
 
         for tile in tiles:
             new_tile = self.parent_geotiff_from_children(tile, overwrite=overwrite)
             if new_tile is not None:
                 parent_tiles.add(self.tiles.get_parent_tile(new_tile))
 
-        logger.info(f"Finished creating {len(tiles)} parent geotiffs at level {z}.")
+        # logger.info(f"Finished creating {len(tiles)} parent geotiffs at level {z}.")
 
         # Create the web tiles for the parent tiles.
         if recursive:
@@ -299,9 +300,9 @@ class RasterTiler:
 
             out_path = self.tiles.path_from_tile(tile, base_dir="geotiff")
             if os.path.isfile(out_path) and not overwrite:
-                logger.info(
-                    f"Skip making parent GeoTIFF tile {tile}." " Tile already exists."
-                )
+                # logger.info(
+                #     f"Skip making parent GeoTIFF tile {tile}." " Tile already exists."
+                # )
                 return None
 
             message = f"Creating tile {tile} from child geotiffs."
@@ -328,7 +329,7 @@ class RasterTiler:
             return tile
 
         except Exception as e:
-            logger.error(e)
+            # logger.error(e)
             message = f"Error creating parent geotiff for tile {tile}."
             self.__end_tracking(id, tile=tile, error=e, message=message)
             return None
@@ -382,7 +383,7 @@ class RasterTiler:
         if update_ranges:
             self.update_ranges()
 
-        logger.info(f"Beginning creation of {len(geotiff_paths)} web tiles")
+        # logger.info(f"Beginning creation of {len(geotiff_paths)} web tiles")
 
         for geotiff_path in geotiff_paths:
             self.webtile_from_geotiff(geotiff_path, overwrite=overwrite)
@@ -431,11 +432,11 @@ class RasterTiler:
                     tile, base_dir="web_tiles", style=stat
                 )
                 if os.path.isfile(output_path) and not overwrite:
-                    logger.info(
-                        f"Skip creating web tile for tile {tile} and "
-                        f"stat {stat}. Web tile already exists at "
-                        f"{output_path}"
-                    )
+                    # logger.info(
+                    #     f"Skip creating web tile for tile {tile} and "
+                    #     f"stat {stat}. Web tile already exists at "
+                    #     f"{output_path}"
+                    # )
                     continue
                 palette = palettes[i]
                 nodata_val = nodata_vals[i]
@@ -526,7 +527,7 @@ class RasterTiler:
         """
         events_path = self.config.get("filename_rasterization_events")
         if events_path is not None:
-            summary = pd.read_csv(events_path)
+            summary = pd.read_parquet(events_path)
             return summary
         else:
             return None
@@ -534,7 +535,7 @@ class RasterTiler:
     def get_rasters_summary(self):
         summary_path = self.config.get("filename_rasters_summary")
         if summary_path is not None:
-            summary = pd.read_csv(summary_path)
+            summary = pd.read_parquet(summary_path)
             return summary
         else:
             return None
@@ -551,8 +552,8 @@ class RasterTiler:
             An optional message to log.
         """
 
-        if message:
-            logger.info(message)
+        # if message:
+        #     # logger.info(message)
 
         start_time = time.time()
         id = str(uuid.uuid4())
@@ -589,12 +590,12 @@ class RasterTiler:
             The error that occurred, if applicable.
         """
 
-        if message:
-            if error:
-                logger.error(message)
-                logger.error(error)
-            else:
-                logger.info(message)
+        # if message:
+        #     if error:
+        #         logger.error(message)
+        #         logger.error(error)
+        #     else:
+        #         logger.info(message)
 
         total_time = None
         end_time = time.time()
@@ -610,6 +611,7 @@ class RasterTiler:
         # do not pull in variable id bc cannot get it working with ray
         event_type = "event_type_replacement"
         start_time = "start_time_replacement"
+        id = self.__start_tracking('geotiffs_from_vectors', message=message)
 
         event = {
             "id": id,
@@ -647,12 +649,12 @@ class RasterTiler:
 
             summary_path = self.config.get("filename_rasters_summary")
             raster_info = pd.DataFrame(raster_info)
-            self.__append_to_csv(summary_path, raster_info)
+            self.__append_to_parquet(summary_path, raster_info)
 
         # Save the event as a row in the summary CSV
         events_path = self.config.get("filename_rasterization_events")
         event = pd.DataFrame(event, index=[0])
-        self.__append_to_csv(events_path, event)
+        self.__append_to_parquet(events_path, event)
 
     def __append_to_csv(self, path, data):
         """
@@ -672,3 +674,22 @@ class RasterTiler:
             header = True
             mode = "w"
         data.to_csv(path, mode=mode, index=False, header=header)
+
+    def __append_to_parquet(self, path, data):
+        """
+        Add data from a DataFrame to a Parquet file. If the Parquet file doesn't exist
+        yet, create it using the provided data.
+        Parameters
+        ----------
+        path : str
+            The path to the Parquet file.
+        data : pandas.DataFrame
+            The data to add to the Parquet file.
+        """
+        if os.path.isfile(path):
+            # Read existing data and append new data
+            existing_data = pd.read_parquet(path)
+            data = pd.concat([existing_data, data], ignore_index=True)
+
+        # Write the combined data back to the Parquet file
+        data.to_parquet(path, index=False)

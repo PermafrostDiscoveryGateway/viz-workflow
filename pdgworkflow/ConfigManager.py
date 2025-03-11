@@ -50,11 +50,11 @@ class ConfigManager:
             The path and filename to save a CSV file that summarizes the
             tiled files that were created during the staging process.
         - filename_rasterization_events : str
-            The path and filename to save a CSV file that summarizes the
+            The path and filename to save a Parquet file that summarizes the
             rasterization events that happened during the rasterization
             process (in the viz-rasterize step).
         - filename_rasters_summary : str
-            The path and filename to save a CSV file that summarizes the
+            The path and filename to save a Parquet file that summarizes the
             data from the rasters that were created during the
             rasterization process.
         - filename_config : str
@@ -360,8 +360,8 @@ class ConfigManager:
         "dir_input": "input",
         "dir_footprints": "footprints",
         "filename_staging_summary": "staging_summary.csv",
-        "filename_rasterization_events": "rasterization_events.csv",
-        "filename_rasters_summary": "rasters_summary.csv",
+        "filename_rasterization_events": "rasterization_events.parquet",
+        "filename_rasters_summary": "rasters_summary.parquet",
         "filename_config": "config.json",
         # File types for input and output
         "ext_web_tiles": ".png",
