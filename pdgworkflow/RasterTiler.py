@@ -651,7 +651,7 @@ class RasterTiler:
             raster_info = pd.DataFrame(raster_info)
             self.__append_to_parquet(summary_path, raster_info)
 
-        # Save the event as a row in the summary CSV
+        # Save the event as a row in the summary parquet
         events_path = self.config.get("filename_rasterization_events")
         event = pd.DataFrame(event, index=[0])
         self.__append_to_parquet(events_path, event)
