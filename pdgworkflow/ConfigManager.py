@@ -47,7 +47,7 @@ class ConfigManager:
             from lower-ranked files will be removed where footprints
             overlap.
         - filename_staging_summary : str
-            The path and filename to save a CSV file that summarizes the
+            The path and filename to save a Parquet file that summarizes the
             tiled files that were created during the staging process.
         - filename_rasterization_events : str
             The path and filename to save a Parquet file that summarizes the
@@ -318,7 +318,7 @@ class ConfigManager:
         "dir_web_tiles": "/path/to/web/tiles/dir",
         "dir_staged": "/path/to/staged/dir",
         "dir_input": "/path/to/input/dir",
-        "filename_staging_summary": "staging_summary.csv",
+        "filename_staging_summary": "staging_summary.parquet",
         "ext_web_tiles": ".png",
         "ext_input": ".shp",
         "ext_staged": ".gpkg",
@@ -359,7 +359,7 @@ class ConfigManager:
         "dir_staged": "staged",
         "dir_input": "input",
         "dir_footprints": "footprints",
-        "filename_staging_summary": "staging_summary.csv",
+        "filename_staging_summary": "staging_summary.parquet",
         "filename_rasterization_events": "rasterization_events.parquet",
         "filename_rasters_summary": "rasters_summary.parquet",
         "filename_config": "config.json",
