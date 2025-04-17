@@ -686,10 +686,17 @@ class RasterTiler:
         data : pandas.DataFrame
             The data to add to the Parquet file.
         """
+        engine = "fastparquet"
         if os.path.isfile(path):
-            # Read existing data and append new data
-            existing_data = pd.read_parquet(path)
-            data = pd.concat([existing_data, data], ignore_index=True)
-
-        # Write the combined data back to the Parquet file
-        data.to_parquet(path, index=False)
+            data.to_parquet(
+                path,
+                engine=engine,
+                append=True,
+                index=False
+            )
+        else:
+            data.to_parquet(
+                path,
+                engine=engine,
+                index=False
+            )
