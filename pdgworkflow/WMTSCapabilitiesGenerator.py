@@ -22,23 +22,47 @@ class WMTSCapabilitiesGenerator:
             bounds of the map (global extent) are used.
 
     Usage Example:
+    1. document-level settings
+    
+    ice_wedge_polygons_wmts = WMTSCapabilitiesGenerator(
+        title="Ice-Wedge Polygons",
+        base_url="https://arcticdata.io/data",
+        doi="10.18739/A2KW57K57",
+        tile_matrix_set_id="WGS1984Quad",
+        max_z_level=15,
+        bounding_box={"left":-179.0, "bottom":-87.0, "right":176.0, "top":90.0},
+    )
 
-    generator = WMTSCapabilitiesGenerator(
-            title="This is the title",
-            base_url="https://example.com",
-            doi="doi:10.5066/F7VQ30RM",
-            layer_title="layer_title",
-            layer_identifier="layer_identifier",
-            bounding_box={"left":-179.0, "bottom":-87.0, "right":176.0, "top":90.0},
+    2. Add layers: PNG 
+        ice_wedge_polygons_wmts.add_layer(
+            layer_title="Ice-Wedge Polygons (png)",
+            layer_identifier="iwp_png",
             tile_format=".png",
-            tile_matrix_set_id="WorldCRS84Quad",
-            max_z_level=3
         )
 
-    wmts_xml = generator.generate_capabilities()
-    with open("WMTSCapabilities.xml", "w") as f:
-        f.write(wmts_xml)
-    """
+    3. Add layers: GeoTiff 
+        ice_wedge_polygons_wmts.add_layer(
+            layer_title="Ice-Wedge Polygons (GeoTiff)",
+            layer_identifier="iwp_geotiff",
+            tile_format=".tiff", 
+            url_postfix="iwp_geotiff_high/{TileMatrixSet}/{TileMatrix}/{TileCol}/{TileRow}.tif",
+        )
+
+    4. Add layers: GeoPackage 
+
+    ice_wedge_polygons_wmts.add_layer(
+        layer_title="Ice-Wedge Polygons (GeoPackage)",
+        layer_identifier="iwp_geopackage",
+        tile_format=".gpkg",
+        url_postfix="iwp_geopackage_high/WGS1984Quad/15/{TileCol}/{TileRow}.gpkg",
+    )
+
+    5. write 
+        xml_text = ice_wedge_polygons_wmts.generate_capabilities()
+
+        with open("WMTSCapabilities.xml", "w", encoding="utf-8") as f:
+            f.write(xml_text)
+        """
 
     # Class-level constants and schema
     XMLNS = {
@@ -55,44 +79,37 @@ class WMTSCapabilitiesGenerator:
         ".png": "image/png",
         ".jpeg": "image/jpeg",
         ".jpg": "image/jpg",
-        ".tiff": "image/tiff",
+        ".tiff": "image/geotiff",
+        ".tif": "image/geotiff",
         ".kmz": "application/vnd.google-earth.kmz+xml",
         ".kmz;jpeg": "application/vnd.google-earth.kmz+xml;image_type=image/jpeg",
         ".kmz;png": "application/vnd.google-earth.kmz+xml;image_type=image/png",
         ".shp": "application/x-esri-shape",
         ".json": "application/json",
+        ".gpkg": "application/geopackage",
         ".tiff;8": "image/tiff;depth=8",
         ".tiff;16": "image/tiff;depth=16",
         ".tiff;32f": "image/tiff;depth=32f",
     }
-
     def __init__(
         self,
         title: str,
         base_url: str,
         doi: str,
-        layer_title: str,
-        layer_identifier: str,
-        tile_format: str,
         tile_matrix_set_id: str,
         max_z_level: int,
-        bounding_box: dict = None,
+        bounding_box: dict | None = None,
     ):
 
         self.title = title
         self.base_url = base_url
         self.doi = doi
-        self.layer_title = layer_title
-        self.layer_identifier = layer_identifier
-        self.tile_format = tile_format
         self.tile_matrix_set_id = tile_matrix_set_id
         self.max_z_level = max_z_level
 
         self.capabilities_url = f"{base_url}/{doi}/WMTSCapabilities.xml"
-        self.tiles_url = f"{base_url}/{doi}/"
+        self.tiles_url = f"{base_url}/tiles/{doi}/"
 
-        # Configure resource template based on tile_format
-        self.resource_template = self._configure_resource_template()
 
         # Get the TileMatrixSet Object from morecantile
         self.tms_object = morecantile.tms.get(self.tile_matrix_set_id)
@@ -115,18 +132,47 @@ class WMTSCapabilitiesGenerator:
         if not (0 <= max_z_level <= max_tms_zoom):
             raise ValueError(f"max_z_level must be between 0 and {max_tms_zoom}.")
 
-    def _configure_resource_template(self) -> str:
-        if self.tile_format not in self.EXTENSION_MAPPING:
-            raise ValueError(f"Unsupported tile format: {self.tile_format}")
-        return f"{self.base_url}/{self.doi}/{{TileMatrixSet}}/{{TileMatrix}}/{{TileCol}}/{{TileRow}}{self.tile_format}"
+        self._layers: list[dict] = []
+
+    def add_layer(
+        self,
+        *,
+        layer_title: str,
+        layer_identifier: str,
+        tile_format: str,
+        url_postfix: str = "",
+    ) -> None:
+        
+        if tile_format not in self.EXTENSION_MAPPING:
+            raise ValueError(f"Unsupported tile format: {tile_format}")
+        if tile_format == ".png":
+            prefix = f"{self.base_url}/tiles/{self.doi}"
+        else:
+            prefix =f"{self.base_url}/{self.doi}"
+
+        if url_postfix:
+            template = f"{prefix}/{url_postfix}"
+        else:
+            template = (
+                f"{prefix}/"
+                "{TileMatrixSet}/{TileMatrix}/{TileCol}/{TileRow}"
+                f"{tile_format}"
+            )
+
+        self._layers.append(
+            {
+                "title": layer_title,
+                "identifier": layer_identifier,
+                "tile_format": tile_format,
+                "mime": self.EXTENSION_MAPPING[tile_format],
+                "template": template,
+            }
+        )
 
     def generate_capabilities(self) -> str:
-        """
-        Generates the WMTS Capabilities XML as a formatted string.
+        if not self._layers:
+            raise ValueError("No layers declared. Call add_layer() first.")
 
-        Returns:
-            An XML string representing the WMTS Capabilities document.
-        """
         root = ET.Element(
             "Capabilities",
             attrib={
@@ -179,36 +225,34 @@ class WMTSCapabilitiesGenerator:
 
     def _add_contents(self, root):
         contents = ET.SubElement(root, "Contents")
-        layer = ET.SubElement(contents, "Layer")
-        ET.SubElement(layer, "ows:Title").text = self.layer_title
-        ET.SubElement(layer, "ows:Identifier").text = self.layer_identifier
+        for lyr in self._layers:
+            layer_el = ET.SubElement(contents, "Layer")
+            ET.SubElement(layer_el, "ows:Title").text = lyr["title"]
+            ET.SubElement(layer_el, "ows:Identifier").text = lyr["identifier"]
 
-        wgs84_bbox = ET.SubElement(layer, "ows:WGS84BoundingBox")
-        ET.SubElement(wgs84_bbox, "ows:LowerCorner").text = (
-            f'{self.bounding_box["left"]} {self.bounding_box["bottom"]}'
-        )
-        ET.SubElement(wgs84_bbox, "ows:UpperCorner").text = (
-            f'{self.bounding_box["right"]} {self.bounding_box["top"]}'
-        )
+            wgs84_bbox = ET.SubElement(layer_el, "ows:WGS84BoundingBox")
+            ET.SubElement(wgs84_bbox, "ows:LowerCorner").text = (
+                f'{self.bounding_box["left"]} {self.bounding_box["bottom"]}'
+            )
+            ET.SubElement(wgs84_bbox, "ows:UpperCorner").text = (
+                f'{self.bounding_box["right"]} {self.bounding_box["top"]}'
+            )
 
-        style = ET.SubElement(layer, "Style", attrib={"isDefault": "true"})
-        ET.SubElement(style, "ows:Title").text = "Default Style"
-        ET.SubElement(style, "ows:Identifier").text = "default"
+            style = ET.SubElement(layer_el, "Style", isDefault="true")
+            ET.SubElement(style, "ows:Title").text = "Default Style"
+            ET.SubElement(style, "ows:Identifier").text = "default"
 
-        ET.SubElement(layer, "Format").text = self.EXTENSION_MAPPING[self.tile_format]
-        tile_matrix_set = ET.SubElement(layer, "TileMatrixSetLink")
-        ET.SubElement(tile_matrix_set, "TileMatrixSet").text = self.tile_matrix_set_id
+            ET.SubElement(layer_el, "Format").text = lyr["mime"]
+            tms_link = ET.SubElement(layer_el, "TileMatrixSetLink")
+            ET.SubElement(tms_link, "TileMatrixSet").text = self.tile_matrix_set_id
 
-        ET.SubElement(
-            layer,
-            "ResourceURL",
-            attrib={
-                "format": self.EXTENSION_MAPPING[self.tile_format],
-                "resourceType": "tile",
-                "template": self.resource_template,
-            },
-        )
-
+            ET.SubElement(
+                layer_el,
+                "ResourceURL",
+                format=lyr["mime"],
+                resourceType="tile",
+                template=lyr["template"],
+            )
         self._add_tile_matrix_set(contents)
 
     def _add_tile_matrix_set(self, contents: ET.Element):

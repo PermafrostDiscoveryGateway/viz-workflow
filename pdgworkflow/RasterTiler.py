@@ -600,16 +600,17 @@ class RasterTiler:
         end_time = time.time()
         if not hasattr(self, "running_processes"):
             self.running_processes = {}
-        # if id in self.running_processes:
-        #     start_time, event_type = self.running_processes.pop(id)
-        #     total_time = end_time - start_time
-        # else:
-        #     raise Exception(f'No event with id {id} found.')
+        if id in self.running_processes:
+            start_time, event_type = self.running_processes.pop(id)
+            total_time = end_time - start_time
+        else:
+            raise Exception(f'No event with id {id} found.')
 
         # replacement code for chunk above
         # do not pull in variable id bc cannot get it working with ray
-        event_type = "event_type_replacement"
-        start_time = "start_time_replacement"
+        # event_type = "event_type_replacement"
+        # start_time = "start_time_replacement"
+        id = self.__start_tracking('geotiffs_from_vectors', message=message)
 
         event = {
             "id": id,
@@ -672,3 +673,28 @@ class RasterTiler:
             header = True
             mode = "w"
         data.to_csv(path, mode=mode, index=False, header=header)
+
+    def __append_to_parquet(self, path, data):
+        """
+        Add data from a DataFrame to a Parquet file. If the Parquet file doesn't exist
+        yet, create it.
+        Parameters
+        ----------
+        path : str
+            The path to the Parquet file.
+        data : pandas.DataFrame
+            The data to add to the Parquet file.
+        """
+        engine = "fastparquet"
+        if os.path.isfile(path):
+            data.to_parquet(
+                path,
+                engine=engine,
+                index=False
+            )
+        else:
+            data.to_parquet(
+                path,
+                engine=engine,
+                index=False
+            )
