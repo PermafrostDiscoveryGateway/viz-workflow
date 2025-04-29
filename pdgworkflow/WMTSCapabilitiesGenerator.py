@@ -45,7 +45,7 @@ class WMTSCapabilitiesGenerator:
             layer_title="Ice-Wedge Polygons (GeoTiff)",
             layer_identifier="iwp_geotiff",
             tile_format=".tiff", 
-            url_postfix="iwp_geotiff_high/{TileMatrixSet}/{TileMatrix}/{TileCol}/{TileRow}.tif",
+            url_postfix="iwp_geotiff_high",
         )
 
     4. Add layers: GeoPackage 
@@ -54,7 +54,7 @@ class WMTSCapabilitiesGenerator:
         layer_title="Ice-Wedge Polygons (GeoPackage)",
         layer_identifier="iwp_geopackage",
         tile_format=".gpkg",
-        url_postfix="iwp_geopackage_high/WGS1984Quad/15/{TileCol}/{TileRow}.gpkg",
+        url_postfix="iwp_geopackage_high",
     )
 
     5. write 
@@ -125,7 +125,7 @@ class WMTSCapabilitiesGenerator:
         else:
             self.bounding_box = bounding_box
 
-        self.crs = self.tms_object.crs.root
+        self.crs = "self.tms_object.crs.root"
         self.wellKnownScaleSet = self.tms_object.wellKnownScaleSet
 
         max_tms_zoom = self.tms_object.maxzoom
@@ -141,7 +141,7 @@ class WMTSCapabilitiesGenerator:
         layer_identifier: str,
         tile_format: str,
         url_postfix: str = "",
-    ) -> None:
+    ) -> None:  
         
         if tile_format not in self.EXTENSION_MAPPING:
             raise ValueError(f"Unsupported tile format: {tile_format}")
@@ -150,10 +150,7 @@ class WMTSCapabilitiesGenerator:
         else:
             prefix =f"{self.base_url}/{self.doi}"
 
-        if url_postfix:
-            template = f"{prefix}/{url_postfix}"
-        else:
-            template = (
+        template = (
                 f"{prefix}/"
                 "{TileMatrixSet}/{TileMatrix}/{TileCol}/{TileRow}"
                 f"{tile_format}"
