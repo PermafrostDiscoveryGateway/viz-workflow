@@ -25,7 +25,8 @@ classifiers=[
 [tool.poetry.dependencies]
 python = ">= 3.9, < 4.0"
 Click = ">=7.0"
-pdgraster = { git = "https://github.com/PermafrostDiscoveryGateway/viz-raster.git", rev = "main" }
+pdgraster = { git = "https://github.com/PermafrostDiscoveryGateway/viz-raster.git", branch = "develop" }
+pdgstaging = { git = "https://github.com/PermafrostDiscoveryGateway/viz-staging.git", branch = "develop" }
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=7"

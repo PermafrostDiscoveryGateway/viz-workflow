@@ -8,14 +8,12 @@ import geopandas as gpd
 import pandas as pd
 import ConfigManager
 import pdgstaging
-import pyarrow
 
 from pdgraster import Raster
 from pdgraster import Palette
 from pdgraster import WebImage
 
 logger = logging_config.logger
-
 
 class RasterTiler:
     """
@@ -675,10 +673,9 @@ class RasterTiler:
             mode = "w"
         data.to_csv(path, mode=mode, index=False, header=header)
 
-    def __append_to_parquet(self, path, data):
+    def __create_parquet(self, path, data):
         """
-        Add data from a DataFrame to a Parquet file. If the Parquet file doesn't exist
-        yet, create it.
+        Add data to a Parquet file. 
         Parameters
         ----------
         path : str
@@ -686,17 +683,5 @@ class RasterTiler:
         data : pandas.DataFrame
             The data to add to the Parquet file.
         """
-        engine = "fastparquet"
-        if os.path.isfile(path):
-            data.to_parquet(
-                path,
-                engine=engine,
-                append=True,
-                index=False
-            )
-        else:
-            data.to_parquet(
-                path,
-                engine=engine,
-                index=False
-            )
+        data.to_parquet(path, index=False, engine="pyarrow", index=False)
+
