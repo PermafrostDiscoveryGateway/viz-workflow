@@ -59,7 +59,7 @@ class RasterTiler:
         paths = self.tiles.get_filenames_from_dir("staged")
         self.rasterize_vectors(paths, overwrite=overwrite)
         self.webtiles_from_all_geotiffs(overwrite=overwrite)
-        self.csv_to_parquet(paths)  
+        self.csv_to_parquet()  
 
     def rasterize_vectors(self, paths, make_parents=True, overwrite=True):
         """
@@ -678,20 +678,21 @@ class RasterTiler:
 
     def csv_to_parquet(self):
         """
-        Convert the CSV files containing rasterization events and raster
+        This method is to converst the CSV files containing rasterization events and raster
         summaries to Parquet format, keeping the original CSVs.
         """
         csv_paths = [
             self.config.get("filename_rasterization_events"),
             self.config.get("filename_rasters_summary"),
         ]
-        
-        for csv_path in csv_paths:
-            root, _ = os.path.splitext(csv_path)
-            parquet_path = f"{root}.parquet"
 
-            parquet_path = csv_path.with_suffix(".parquet")
-            df = pd.read_csv(csv_path)
+        for csv_path in filter(None, csv_paths):         
+            if not os.path.isfile(csv_path):
+                self.logger.warning(f"CSV not found → {csv_path}")
+                continue
+
+            root, _ = os.path.splitext(csv_path) 
+            parquet_path = f"{root}.parquet"        
 
             df = pd.read_csv(csv_path)
             pq.write_table(
@@ -699,5 +700,3 @@ class RasterTiler:
                 parquet_path,
                 compression="snappy",
             )
-
-        self.logger.info("Converted filename_rasterization_events, filename_rasters_summary CSV files to Parquet format.")
