@@ -22,7 +22,6 @@ from .StagedTo3DConverter import StagedTo3DConverter
 from .WMTSCapabilitiesGenerator import WMTSCapabilitiesGenerator
 from pdgstaging import TileStager
 from pdgstaging import TilePathManager
-from viz_3dtiles import Cesium3DTile
 
 
 # Set up logging
@@ -251,9 +250,9 @@ class WokflowManager:
         """
         return self.raster_tiler.rasterize_vectors(path, overwrite=overwrite)
 
-    def run_tiling(self) -> bool:
+    def run_3d_tiling(self) -> bool:
         """
-        Run the tile generation step of the workflow.
+        Run the 3D tile generation step of the workflow.
 
         Args:
             None
@@ -265,22 +264,93 @@ class WokflowManager:
             WokflowManagerError: If tiling fails
             ValueError: If invalid tile format specified
         """
-        pass
+        self.cesium_3d_tiler = self.init_3d_tiling()
 
-    def run_3d_conversion(self) -> bool:
+        self.cesium_3d_tiler.all_staged_to_3dtiles()
+        self.cesium_3d_tiler.make_top_level_tileset()
+        return True
+
+    def init_3d_tiling(self) -> StagedTo3DConverter:
         """
-        Run the 3D tile conversion step of the workflow.
+        Initialize the StagedTo3DConverter instance for 3D tile generation.
 
         Args:
             None
 
         Returns:
-            True if 3D conversion completed successfully
+            StagedTo3DConverter instance configured with tiles and properties
 
         Raises:
-            WokflowManagerError: If 3D conversion fails
+            WokflowManagerError: If initialization fails
+            FileNotFoundError: If input directory doesn't exist
         """
-        pass
+        return StagedTo3DConverter(self.config)
+
+    def generate_3d_tiles(self) -> bool:
+        """
+        Generate 3D tiles from the staged data.
+
+        Args:
+            None
+
+        Returns:
+            True if 3D tile generation completed successfully
+
+        Raises:
+            WokflowManagerError: If 3D tile generation fails
+        """
+
+        return self.cesium_3d_tiler.all_staged_to_3dtiles()
+
+    def all_staged_to_3dtiles(self) -> None:
+        """
+        Process all staged vector tiles into 3D tiles.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+        return self.cesium_3d_tiler.all_staged_to_3dtiles()
+
+    def staged_to_3dtile(self, path: str) -> None:
+        """
+        Convert a staged vector tile into a B3DM tile file and a matching
+        JSON tileset file.
+
+        Parameters
+        ----------
+        path : str
+            The path to the staged vector tile.
+
+        Returns
+        -------
+        None
+        """
+        return self.cesium_3d_tiler.staged_to_3dtile(path)
+
+    def parent_3d_tiles(self, tiles, bv_limit=None) -> None:
+        """
+        Get the parent directories of all 3D tiles.
+
+        Returns
+        -------
+        None
+        """
+        return self.cesium_3d_tiler.parent_3dtiles_from_children(
+            tiles, bv_limit=bv_limit
+        )
+
+    def make_top_level_tileset(self) -> None:
+        """
+        Create a top-level tileset for the 3D tiles.
+
+        Returns
+        -------
+        None
+        """
+        return self.cesium_3d_tiler.make_top_level_tileset()
 
     def generate_wmts_capabilities(self) -> bool:
         """
