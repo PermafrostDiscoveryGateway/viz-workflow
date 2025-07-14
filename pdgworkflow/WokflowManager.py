@@ -21,6 +21,7 @@ from .RasterTiler import RasterTiler
 from .StagedTo3DConverter import StagedTo3DConverter
 from .WMTSCapabilitiesGenerator import WMTSCapabilitiesGenerator
 from pdgstaging import TileStager
+from pdgstaging import TilePathManager
 from viz_3dtiles import Cesium3DTile
 
 
@@ -80,7 +81,16 @@ class WokflowManager:
             ValueError: If config is invalid
             TypeError: If config is wrong type
         """
-        pass
+        self.config = ConfigManager(config)
+
+        self.tiles = TilePathManager(**self.config.get_path_manager_config())
+
+        # Configured names of properties that will be added to each polygon
+        # during either staging or rasterization
+        self.props = self.config.props
+
+        # Create tiles for the maximum z-level configured
+        self.z_level = self.config.get_max_z()
 
     def run_staging(self) -> bool:
         """
@@ -96,7 +106,62 @@ class WokflowManager:
             WokflowManagerError: If staging fails
             FileNotFoundError: If input directory doesn't exist
         """
-        pass
+        self.tile_stager = self.init_tiler()
+
+        return self.tile_stager.stage_all()
+
+    def init_tiler(self) -> TileStager:
+        """
+        Initialize the TileStager instance with configured tiles and properties.
+
+        Args:
+            None
+
+        Returns:
+            TileStager instance configured with tiles and properties
+
+        Raises:
+            WokflowManagerError: If initialization fails
+            FileNotFoundError: If input directory doesn't exist
+        """
+        return TileStager(
+            tiles=self.tiles,
+            props=self.props,
+            z_level=self.z_level,
+        )
+
+    def stage_all(self, Tiler: TileStager) -> bool:
+        """
+        Stage all tiles using the provided TileStager instance.
+
+        Args:
+            Tiler: TileStager instance configured with tiles and properties
+
+        Returns:
+            True if staging completed successfully
+
+        Raises:
+            WokflowManagerError: If staging fails
+            FileNotFoundError: If input directory doesn't exist
+        """
+        return Tiler.stage_all()
+
+    def stage(self, Tiler: TileStager, path: str) -> bool:
+        """
+        Stage a single tile using the provided TileStager instance.
+
+        Args:
+            Tiler: TileStager instance configured with tiles and properties
+            path: Tile path to stage
+
+        Returns:
+            True if staging completed successfully for the specified tile
+
+        Raises:
+            WokflowManagerError: If staging fails
+            FileNotFoundError: If input directory doesn't exist
+        """
+        return Tiler.stage()
 
     def run_rasterization(self) -> bool:
         """
