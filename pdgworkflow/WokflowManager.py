@@ -130,12 +130,12 @@ class WokflowManager:
             z_level=self.z_level,
         )
 
-    def stage_all(self, Tiler: TileStager) -> bool:
+    def stage_all(self) -> bool:
         """
         Stage all tiles using the provided TileStager instance.
 
         Args:
-            Tiler: TileStager instance configured with tiles and properties
+            None
 
         Returns:
             True if staging completed successfully
@@ -144,14 +144,13 @@ class WokflowManager:
             WokflowManagerError: If staging fails
             FileNotFoundError: If input directory doesn't exist
         """
-        return Tiler.stage_all()
+        return self.tile_stager.stage_all()
 
-    def stage(self, Tiler: TileStager, path: str) -> bool:
+    def stage(self, path: str) -> bool:
         """
         Stage a single tile using the provided TileStager instance.
 
         Args:
-            Tiler: TileStager instance configured with tiles and properties
             path: Tile path to stage
 
         Returns:
@@ -161,7 +160,7 @@ class WokflowManager:
             WokflowManagerError: If staging fails
             FileNotFoundError: If input directory doesn't exist
         """
-        return Tiler.stage()
+        return self.tile_stager.stage(path=path)
 
     def run_rasterization(self) -> bool:
         """
@@ -176,7 +175,81 @@ class WokflowManager:
         Raises:
             WokflowManagerError: If rasterization fails
         """
-        pass
+        self.raster_tiler = self.init_raster_tiler()
+
+        return self.raster_tiler.rasterize_all(overwrite=self.config.overwrite)
+
+    def init_raster_tiler(self) -> RasterTiler:
+        """
+        Initialize the RasterTiler instance with configured tiles and properties.
+
+        Args:
+            None
+
+        Returns:
+            RasterTiler instance configured with tiles and properties
+
+        Raises:
+            WokflowManagerError: If initialization fails
+            FileNotFoundError: If input directory doesn't exist
+        """
+        return RasterTiler(
+            config=self.config,
+        )
+
+    def rasterize_all(
+        self,
+        overwrite: bool = True,
+    ) -> bool:
+        """
+        Rasterize all tiles using the provided RasterTiler instance.
+
+        Args:
+            Tiler: RasterTiler instance configured with tiles and properties
+            overwrite: Whether to overwrite existing raster files
+
+        Returns:
+            True if rasterization completed successfully
+
+        Raises:
+            WokflowManagerError: If rasterization fails
+        """
+        return self.raster_tiler.rasterize_all(overwrite=overwrite)
+
+    def rasterize_vectors(self, paths, make_parents=True, overwrite=True) -> bool:
+        """
+        Rasterize vectors data for tiles.
+
+        Args:
+            paths: List of tile paths to rasterize vectors for
+            make_parents: Whether to create parent directories if they don't exist
+            overwrite: Whether to overwrite existing raster files
+
+        Returns:
+            True if vectors rasterization completed successfully
+
+        Raises:
+            WokflowManagerError: If vectors rasterization fails
+        """
+        return self.raster_tiler.rasterize_vectors(
+            paths, make_parents=make_parents, overwrite=overwrite
+        )
+
+    def rasterize_vector(self, path: str, overwrite=True) -> bool:
+        """
+        Rasterize vector data for a single tile.
+
+        Args:
+            path: Tile path to rasterize vectors for
+            overwrite: Whether to overwrite existing raster files
+
+        Returns:
+            True if vector rasterization completed successfully for the specified tile
+
+        Raises:
+            WokflowManagerError: If vector rasterization fails
+        """
+        return self.raster_tiler.rasterize_vectors(path, overwrite=overwrite)
 
     def run_tiling(self) -> bool:
         """
