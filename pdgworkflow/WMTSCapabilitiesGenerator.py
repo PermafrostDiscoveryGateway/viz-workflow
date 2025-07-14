@@ -23,7 +23,7 @@ class WMTSCapabilitiesGenerator:
 
     Usage Example:
     1. document-level settings
-    
+
     ice_wedge_polygons_wmts = WMTSCapabilitiesGenerator(
         title="Ice-Wedge Polygons",
         base_url="https://arcticdata.io/data",
@@ -33,22 +33,22 @@ class WMTSCapabilitiesGenerator:
         bounding_box={"left":-179.0, "bottom":-87.0, "right":176.0, "top":90.0},
     )
 
-    2. Add layers: PNG 
+    2. Add layers: PNG
         ice_wedge_polygons_wmts.add_layer(
             layer_title="Ice-Wedge Polygons (png)",
             layer_identifier="iwp_png",
             tile_format=".png",
         )
 
-    3. Add layers: GeoTiff 
+    3. Add layers: GeoTiff
         ice_wedge_polygons_wmts.add_layer(
             layer_title="Ice-Wedge Polygons (GeoTiff)",
             layer_identifier="iwp_geotiff",
-            tile_format=".tiff", 
+            tile_format=".tiff",
             url_postfix="iwp_geotiff_high",
         )
 
-    4. Add layers: GeoPackage 
+    4. Add layers: GeoPackage
 
     ice_wedge_polygons_wmts.add_layer(
         layer_title="Ice-Wedge Polygons (GeoPackage)",
@@ -57,12 +57,12 @@ class WMTSCapabilitiesGenerator:
         url_postfix="iwp_geopackage_high",
     )
 
-    5. write 
+    5. write
         xml_text = ice_wedge_polygons_wmts.generate_capabilities()
 
         with open("WMTSCapabilities.xml", "w", encoding="utf-8") as f:
             f.write(xml_text)
-        """
+    """
 
     # Class-level constants and schema
     XMLNS = {
@@ -91,6 +91,7 @@ class WMTSCapabilitiesGenerator:
         ".tiff;16": "image/tiff;depth=16",
         ".tiff;32f": "image/tiff;depth=32f",
     }
+
     def __init__(
         self,
         title: str,
@@ -109,7 +110,6 @@ class WMTSCapabilitiesGenerator:
 
         self.capabilities_url = f"{base_url}/{doi}/WMTSCapabilities.xml"
         self.tiles_url = f"{base_url}/tiles/{doi}/"
-
 
         # Get the TileMatrixSet Object from morecantile
         self.tms_object = morecantile.tms.get(self.tile_matrix_set_id)
@@ -141,20 +141,20 @@ class WMTSCapabilitiesGenerator:
         layer_identifier: str,
         tile_format: str,
         url_postfix: str = "",
-    ) -> None:  
-        
+    ) -> None:
+
         if tile_format not in self.EXTENSION_MAPPING:
             raise ValueError(f"Unsupported tile format: {tile_format}")
         if tile_format == ".png":
             prefix = f"{self.base_url}/tiles/{self.doi}"
         else:
-            prefix =f"{self.base_url}/{self.doi}"
+            prefix = f"{self.base_url}/{self.doi}"
 
         template = (
-                f"{prefix}/"
-                "{TileMatrixSet}/{TileMatrix}/{TileCol}/{TileRow}"
-                f"{tile_format}"
-            )
+            f"{prefix}/"
+            "{TileMatrixSet}/{TileMatrix}/{TileCol}/{TileRow}"
+            f"{tile_format}"
+        )
 
         self._layers.append(
             {

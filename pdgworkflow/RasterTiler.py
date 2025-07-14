@@ -59,7 +59,7 @@ class RasterTiler:
         paths = self.tiles.get_filenames_from_dir("staged")
         self.rasterize_vectors(paths, overwrite=overwrite)
         self.webtiles_from_all_geotiffs(overwrite=overwrite)
-        self.csv_to_parquet()  
+        self.csv_to_parquet()
 
     def rasterize_vectors(self, paths, make_parents=True, overwrite=True):
         """
@@ -686,13 +686,13 @@ class RasterTiler:
             self.config.get("filename_rasters_summary"),
         ]
 
-        for csv_path in filter(None, csv_paths):         
+        for csv_path in filter(None, csv_paths):
             if not os.path.isfile(csv_path):
                 self.logger.warning(f"CSV not found → {csv_path}")
                 continue
 
-            root, _ = os.path.splitext(csv_path) 
-            parquet_path = f"{root}.parquet"        
+            root, _ = os.path.splitext(csv_path)
+            parquet_path = f"{root}.parquet"
 
             df = pd.read_csv(csv_path)
             pq.write_table(

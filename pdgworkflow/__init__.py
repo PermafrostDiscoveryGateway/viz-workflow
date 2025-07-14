@@ -7,3 +7,4 @@ __version__ = "0.1.0"
 from .StagedTo3DConverter import StagedTo3DConverter
 from .ConfigManager import ConfigManager
 from .RasterTiler import RasterTiler
+from .WMTSCapabilitiesGenerator import WMTSCapabilitiesGenerator
