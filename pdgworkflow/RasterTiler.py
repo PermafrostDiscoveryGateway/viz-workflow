@@ -1,12 +1,11 @@
 import time
 import uuid
 import logging
-from . import logging_config
 import os
 
 import geopandas as gpd
 import pandas as pd
-import ConfigManager
+from .ConfigManager import ConfigManager
 import pdgstaging
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -15,7 +14,7 @@ from pdgraster import Raster
 from pdgraster import Palette
 from pdgraster import WebImage
 
-logger = logging_config.logger
+logger = logging.getLogger(__name__)
 
 
 class RasterTiler:

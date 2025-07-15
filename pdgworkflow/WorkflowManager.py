@@ -34,7 +34,7 @@ class WokflowManagerError(Exception):
     pass
 
 
-class WokflowManager:
+class WorkflowManager:
     """
     Workflow Manager for orchestrating the complete PDG visualization workflow.
 

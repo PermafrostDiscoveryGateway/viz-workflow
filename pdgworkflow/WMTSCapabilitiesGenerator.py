@@ -1,6 +1,7 @@
 import xml.etree.ElementTree as ET
 import morecantile
 from xml.dom import minidom
+from typing import Optional
 
 
 class WMTSCapabilitiesGenerator:
@@ -99,7 +100,7 @@ class WMTSCapabilitiesGenerator:
         doi: str,
         tile_matrix_set_id: str,
         max_z_level: int,
-        bounding_box: dict | None = None,
+        bounding_box: Optional[dict] = None,
     ):
 
         self.title = title
