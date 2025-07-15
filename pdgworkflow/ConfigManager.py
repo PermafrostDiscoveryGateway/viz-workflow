@@ -7,7 +7,7 @@ import warnings
 from coloraide import Color
 import colormaps as cmaps
 
-logger = logging_config.logger
+logger = logging.getLogger(__name__)
 
 
 class ConfigManager:
