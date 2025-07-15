@@ -1,6 +1,6 @@
 import json
 import logging
-from .pdgstaging import logging_config
+
 import os
 from pdgstaging import TilePathManager
 import warnings
