@@ -126,7 +126,7 @@ class WorkflowManager:
         return TileStager(
             tiles=self.tiles,
             props=self.props,
-            z_level=self.z_level,
+            max_z_level=self.z_level,
         )
 
     def stage_all(self) -> bool:
