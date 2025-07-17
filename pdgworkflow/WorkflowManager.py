@@ -80,7 +80,6 @@ class WorkflowManager:
             ValueError: If config is invalid
             TypeError: If config is wrong type
         """
-
         if isinstance(config, ConfigManager):
             self.config = config
         else:
@@ -200,7 +199,6 @@ class WorkflowManager:
             config=self.config,
         )
         
-
     def rasterize_all(
         self,
         overwrite: bool = True,
