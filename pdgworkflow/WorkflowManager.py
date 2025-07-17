@@ -80,7 +80,11 @@ class WorkflowManager:
             ValueError: If config is invalid
             TypeError: If config is wrong type
         """
-        self.config = ConfigManager(config)
+
+        if isinstance(config, ConfigManager):
+            self.config = config
+        else:
+            self.config = ConfigManager(config)
 
         self.tiles = TilePathManager(**self.config.get_path_manager_config())
 
@@ -176,7 +180,7 @@ class WorkflowManager:
         """
         self.raster_tiler = self.init_raster_tiler()
 
-        return self.raster_tiler.rasterize_all(overwrite=self.config.overwrite)
+        return self.raster_tiler.rasterize_all(overwrite=self.config)
 
     def init_raster_tiler(self) -> RasterTiler:
         """
@@ -195,6 +199,7 @@ class WorkflowManager:
         return RasterTiler(
             config=self.config,
         )
+        
 
     def rasterize_all(
         self,
