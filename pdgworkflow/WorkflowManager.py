@@ -198,7 +198,7 @@ class WorkflowManager:
         return RasterTiler(
             config=self.config,
         )
-        
+
     def rasterize_all(
         self,
         overwrite: bool = True,

@@ -310,6 +310,32 @@ class ConfigManager:
                 geopandas.GeoDataFrame.sindex.valid_query_predicates).
                 Defaults to 'intersects'.
 
+    - Operation control flags. Control which operations are performed and
+      whether to overwrite existing files.
+        - overwrite : bool
+            Whether to overwrite existing output files. If False, the
+            workflow will skip processing for tiles that already have
+            output files. Defaults to False.
+        - enable_raster : bool
+            Whether to enable raster processing (GeoTIFF generation).
+            Defaults to True.
+        - enable_web_tiles : bool
+            Whether to enable web tile generation (PNG/JPG tiles).
+            Defaults to True.
+        - enable_stager : bool
+            Whether to enable staging operations (vector tiling).
+            Defaults to True.
+        - enable_3dtiles : bool
+            Whether to enable 3D tiles generation. Defaults to True.
+        - enable_raster_parents : bool
+            Whether to create parent tiles for raster (GeoTIFF) files by
+            resampling child tiles. Parent tiles provide lower resolution
+            versions for pyramid tiling. Defaults to True.
+        - enable_web_tiles_parents : bool
+            Whether to create parent tiles for web tiles by resampling
+            child tiles. Parent tiles provide lower resolution versions
+            for pyramid tiling. Defaults to True.
+
     Example config:
     ---------------
 
@@ -421,6 +447,14 @@ class ConfigManager:
         "deduplicate_distance_crs": "EPSG:3857",
         "deduplicate_clip_to_footprint": True,
         "deduplicate_clip_method": "intersects",
+        # Operation control flags
+        "overwrite": False,
+        "enable_raster": True,
+        "enable_web_tiles": True,
+        "enable_stager": True,
+        "enable_3dtiles": True,
+        "enable_raster_parents": True,
+        "enable_web_tiles_parents": True,
     }
 
     tiling_scheme_map = {
@@ -1414,6 +1448,83 @@ class ConfigManager:
                 updates.append(f"{key} removed")
 
         return updates
+
+    def should_overwrite(self):
+        """
+        Check if files should be overwritten based on the overwrite flag.
+
+        Returns
+        -------
+        bool
+            Whether to overwrite existing files.
+        """
+        return self.get("overwrite")
+
+    def is_raster_enabled(self):
+        """
+        Check if raster processing (GeoTIFF generation) is enabled.
+
+        Returns
+        -------
+        bool
+            Whether raster processing is enabled.
+        """
+        return self.get("enable_raster")
+
+    def is_web_tiles_enabled(self):
+        """
+        Check if web tile generation (PNG/JPG tiles) is enabled.
+
+        Returns
+        -------
+        bool
+            Whether web tile generation is enabled.
+        """
+        return self.get("enable_web_tiles")
+
+    def is_stager_enabled(self):
+        """
+        Check if staging operations (vector tiling) are enabled.
+
+        Returns
+        -------
+        bool
+            Whether staging operations are enabled.
+        """
+        return self.get("enable_stager")
+
+    def is_3dtiles_enabled(self):
+        """
+        Check if 3D tiles generation is enabled.
+
+        Returns
+        -------
+        bool
+            Whether 3D tiles generation is enabled.
+        """
+        return self.get("enable_3dtiles")
+
+    def is_raster_parents_enabled(self):
+        """
+        Check if parent tile creation for raster (GeoTIFF) files is enabled.
+
+        Returns
+        -------
+        bool
+            Whether raster parent tile creation is enabled.
+        """
+        return self.get("enable_raster_parents")
+
+    def is_web_tiles_parents_enabled(self):
+        """
+        Check if parent tile creation for web tiles is enabled.
+
+        Returns
+        -------
+        bool
+            Whether web tiles parent tile creation is enabled.
+        """
+        return self.get("enable_web_tiles_parents")
 
     @staticmethod
     def to_hex(color_str):
