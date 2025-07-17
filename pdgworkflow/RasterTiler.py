@@ -36,8 +36,10 @@ class RasterTiler:
             A dictionary of configuration settings or a path to a config
             JSON file.
         """
-
-        self.config = ConfigManager(config)
+        if isinstance(config, ConfigManager):
+            self.config = config
+        else:
+            self.config = ConfigManager(config)
         self.tiles = pdgstaging.TilePathManager(**self.config.get_path_manager_config())
         # Pre-create the palette for each stat
         palettes = self.config.get_palettes()
