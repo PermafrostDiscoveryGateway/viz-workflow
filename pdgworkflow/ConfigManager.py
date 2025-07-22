@@ -614,6 +614,17 @@ class ConfigManager:
             palette = [colors, nodata_color]
             palettes.append(palette)
         return palettes
+    
+    def get_doi(self):
+        """
+        Get the DOI for the workflow run, if set.
+
+        Returns
+        -------
+        str or None
+            The DOI, or None if not set.
+        """
+        return self.get("doi")
 
     def get_stat_names(self):
         """
@@ -771,8 +782,8 @@ class ConfigManager:
             num_cols = len(colors)
             # Get min and max. As the Cesium map doesn't support a different
             # palette for each z-level yet, just use the max_z palette
-            minv = self.get_min(stat=stat, z=max_z, sub_general=True)
-            maxv = self.get_max(stat=stat, z=max_z, sub_general=True)
+            minv = self.get_min(stat=stat, z=max_z, sub_general=True) or 0
+            maxv = self.get_max(stat=stat, z=max_z, sub_general=True) or 1
             for i in range(num_cols):
                 color_objs.append(
                     {
@@ -1420,7 +1431,7 @@ class ConfigManager:
         """
         Convert a color string to a hex string without alpha channel
         """
-        color = Color(color_str).convert("sRGB").mask("alpha")
+        color = Color(color_str).convert("srgb").mask("alpha")
         hex_str = color.to_string(hex=True)
         if len(hex_str) == 9:
             hex_str = hex_str[:-2]

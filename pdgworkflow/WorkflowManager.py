@@ -358,17 +358,67 @@ class WorkflowManager:
     def generate_wmts_capabilities(self) -> bool:
         """
         Generate WMTS capabilities document.
-
-        Args:
-            None
-
-        Returns:
-            True if capabilities generation completed successfully
-
-        Raises:
-            WokflowManagerError: If capabilities generation fails
         """
-        pass
+        max_z   = self.config.get_max_z()
+        tms_id  = self.config.get("tms_id")   
+
+        title   = self.config.get("title")
+        if title is None:
+            title = "Placeholder Title"
+            logger.warning("No title configured, using default: 'Placeholder Title'")
+
+        doi = self.config.get("doi")
+        if doi is None:
+            doi = "doi/placeholder"
+            logger.warning("No DOI configured, WMTSCapabilities.xml will include placeholder.")
+
+        try:
+            bbox_vals = self.tiles.get_total_bounding_box("web_tiles", max_z)
+            bbox = {
+                "left": bbox_vals[0],
+                 "bottom": bbox_vals[1],
+                 "right": bbox_vals[2],
+                 "top": bbox_vals[3],
+            }
+        except ValueError:
+            bbox = None
+
+        dir_staged = self.config.get("dir_staged")
+        try:
+            generator = WMTSCapabilitiesGenerator(
+                title=title,
+                base_url=dir_staged,
+                doi=doi,
+                tile_matrix_set_id=tms_id,
+                max_z_level=max_z,
+                bounding_box=bbox,
+            )
+        except ValueError as e:
+            logger.error("Failed to initialize WMTSCapabilitiesGenerator: %s", e)
+
+        layer_config = self.config.get_metacatui_raster_configs()
+        print("Layer Config:", layer_config)
+
+        stats_list = self.config.get("statistics") 
+        for layer in layer_config:
+            name = layer["label"]
+            generator.add_layer(
+                layer_title= title +' ' + name,
+                layer_identifier=name,
+                tile_format= self.config.get("ext_staged"),
+                url_postfix= f"{name}/{{TileMatrix}}/{{TileCol}}/{{TileRow}}{self.config.get('ext_staged')}",
+            )
+
+
+        
+
+        xml_txt = generator.generate_capabilities()
+        out_dir = Path(self.config.get("dir_web_tiles")).resolve()
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / "WMTSCapabilities.xml"
+        out_path.write_text(xml_txt, encoding="utf-8")
+        logger.info("WMTS capabilities written to %s", out_path)
+        return True
 
     def run_workflow(self) -> None:
         """
