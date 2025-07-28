@@ -9,8 +9,7 @@ and tile generation.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 # Third-party imports
 import click
@@ -19,7 +18,6 @@ import click
 from .ConfigManager import ConfigManager
 from .RasterTiler import RasterTiler
 from .StagedTo3DConverter import StagedTo3DConverter
-from .WMTSCapabilitiesGenerator import WMTSCapabilitiesGenerator
 from pdgstaging import TileStager
 from pdgstaging import TilePathManager
 
@@ -94,6 +92,15 @@ class WorkflowManager:
         # Create tiles for the maximum z-level configured
         self.z_level = self.config.get_max_z()
 
+        # Initialize tile stager to None (will be created when needed)
+        self.tile_stager = None
+
+        # Initialize raster tiler to None (will be created when needed)
+        self.raster_tiler = None
+
+        # Initialize 3D tiler to None (will be created when needed)
+        self.cesium_3d_tiler = None
+
     def run_staging(self) -> bool:
         """
         Run the data staging step of the workflow.
@@ -146,6 +153,9 @@ class WorkflowManager:
             WokflowManagerError: If staging fails
             FileNotFoundError: If input directory doesn't exist
         """
+        if not self.tile_stager:
+            self.tile_stager = self.init_tiler()
+
         return self.tile_stager.stage_all()
 
     def stage(self, path: str) -> bool:
@@ -162,6 +172,9 @@ class WorkflowManager:
             WokflowManagerError: If staging fails
             FileNotFoundError: If input directory doesn't exist
         """
+        if not self.tile_stager:
+            self.tile_stager = self.init_tiler()
+
         return self.tile_stager.stage(path=path)
 
     def run_rasterization(self) -> bool:
@@ -179,7 +192,7 @@ class WorkflowManager:
         """
         self.raster_tiler = self.init_raster_tiler()
 
-        return self.raster_tiler.rasterize_all(overwrite=self.config)
+        return self.raster_tiler.rasterize_all(overwrite=self.config.should_overwrite())
 
     def init_raster_tiler(self) -> RasterTiler:
         """
@@ -216,6 +229,9 @@ class WorkflowManager:
         Raises:
             WokflowManagerError: If rasterization fails
         """
+        if not self.raster_tiler:
+            self.raster_tiler = self.init_raster_tiler()
+
         return self.raster_tiler.rasterize_all(overwrite=overwrite)
 
     def rasterize_vectors(self, paths, make_parents=True, overwrite=True) -> bool:
@@ -233,6 +249,9 @@ class WorkflowManager:
         Raises:
             WokflowManagerError: If vectors rasterization fails
         """
+        if not self.raster_tiler:
+            self.raster_tiler = self.init_raster_tiler()
+
         return self.raster_tiler.rasterize_vectors(
             paths, make_parents=make_parents, overwrite=overwrite
         )
@@ -251,6 +270,9 @@ class WorkflowManager:
         Raises:
             WokflowManagerError: If vector rasterization fails
         """
+        if not self.raster_tiler:
+            self.raster_tiler = self.init_raster_tiler()
+
         return self.raster_tiler.rasterize_vectors(path, overwrite=overwrite)
 
     def run_3d_tiling(self) -> bool:
@@ -302,6 +324,8 @@ class WorkflowManager:
         Raises:
             WokflowManagerError: If 3D tile generation fails
         """
+        if not self.cesium_3d_tiler:
+            self.cesium_3d_tiler = self.init_3d_tiling()
 
         return self.cesium_3d_tiler.all_staged_to_3dtiles()
 
@@ -315,6 +339,9 @@ class WorkflowManager:
         Returns:
             None
         """
+        if not self.cesium_3d_tiler:
+            self.cesium_3d_tiler = self.init_3d_tiling()
+
         return self.cesium_3d_tiler.all_staged_to_3dtiles()
 
     def staged_to_3dtile(self, path: str) -> None:
@@ -331,6 +358,9 @@ class WorkflowManager:
         -------
         None
         """
+        if not self.cesium_3d_tiler:
+            self.cesium_3d_tiler = self.init_3d_tiling()
+
         return self.cesium_3d_tiler.staged_to_3dtile(path)
 
     def parent_3d_tiles(self, tiles, bv_limit=None) -> None:
@@ -341,6 +371,9 @@ class WorkflowManager:
         -------
         None
         """
+        if not self.cesium_3d_tiler:
+            self.cesium_3d_tiler = self.init_3d_tiling()
+
         return self.cesium_3d_tiler.parent_3dtiles_from_children(
             tiles, bv_limit=bv_limit
         )
@@ -353,6 +386,9 @@ class WorkflowManager:
         -------
         None
         """
+        if not self.cesium_3d_tiler:
+            self.cesium_3d_tiler = self.init_3d_tiling()
+
         return self.cesium_3d_tiler.make_top_level_tileset()
 
     def generate_wmts_capabilities(self) -> bool:
@@ -390,7 +426,18 @@ class WorkflowManager:
         Raises:
             WokflowManagerError: If workflow fails
         """
-        pass
+
+        if self.config.is_stager_enabled():
+            logger.info("Staging enabled, starting tile staging...")
+            self.run_staging()
+
+        if self.config.is_raster_enabled():
+            logger.info("Rasterization enabled, starting rasterization process...")
+            self.run_rasterization()
+
+        if self.config.is_3dtiles_enabled():
+            logger.info("3D tiles enabled, starting 3D tile generation...")
+            self.run_3d_tiling()
 
 
 # CLI interface
