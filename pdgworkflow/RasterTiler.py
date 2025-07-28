@@ -59,7 +59,10 @@ class RasterTiler:
 
         paths = self.tiles.get_filenames_from_dir("staged")
         self.rasterize_vectors(paths, overwrite=overwrite)
-        self.webtiles_from_all_geotiffs(overwrite=overwrite)
+
+        if self.config.is_web_tiles_enabled():
+            self.webtiles_from_all_geotiffs(overwrite=overwrite)
+
         self.csv_to_parquet()
 
     def rasterize_vectors(self, paths, make_parents=True, overwrite=True):
