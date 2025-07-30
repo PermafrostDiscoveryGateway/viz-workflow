@@ -396,7 +396,7 @@ class ConfigManager:
         "filename_rasters_summary": "rasters_summary.csv",
         "filename_config": "config.json",
         "title": "Placeholder Title",
-        "doi": None,
+        "doi": "doi/placeholder",
         # File types for input and output
         "ext_web_tiles": ".png",
         "ext_input": ".shp",

@@ -109,8 +109,8 @@ class WMTSCapabilitiesGenerator:
         self.tile_matrix_set_id = tile_matrix_set_id
         self.max_z_level = max_z_level
 
-        self.capabilities_url = f"{base_url}/{doi}/WMTSCapabilities.xml"
-        self.tiles_url = f"{base_url}/tiles/{doi}/"
+        self.capabilities_url = f"{base_url}{doi}/WMTSCapabilities.xml"
+        self.tiles_url = f"{base_url}tiles{doi}/"
 
         # Get the TileMatrixSet Object from morecantile
         self.tms_object = morecantile.tms.get(self.tile_matrix_set_id)
@@ -149,7 +149,7 @@ class WMTSCapabilitiesGenerator:
         if tile_format == ".png":
             prefix = f"{self.base_url}/tiles/{self.doi}"
         else:
-            prefix = f"{self.base_url}/{self.doi}"
+            prefix = f"{self.base_url}{self.doi}"
 
         template = (
             f"{prefix}/"

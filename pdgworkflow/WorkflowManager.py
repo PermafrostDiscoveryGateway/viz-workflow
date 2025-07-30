@@ -400,16 +400,10 @@ class WorkflowManager:
         max_z   = self.config.get_max_z()
         tms_id  = self.config.get("tms_id")   
         title = self.config.get("title")
+        base_url = "https://arcticdata.io/data/"
         doi = self.config.get("doi")
-        if doi is None:
-            doi = "doi/placeholder"
-            logger.warning("No DOI configured, WMTSCapabilities.xml will include placeholder.")
-
         paths = self.config.get_path_manager_config()
-        print(f"Paths: {paths}")
-
-        dir_geotiff = paths["base_dirs"]["geotiff"]["path"]
-
+        input_dir = paths["base_dirs"]["input"]["path"]
 
         try:
             bbox_vals = self.tiles.get_total_bounding_box("web_tiles", max_z)
@@ -420,12 +414,13 @@ class WorkflowManager:
                  "top": bbox_vals[3],
             }
         except ValueError:
+            logger.warning("Bounding box could not be retrieved for WMTSCapabilities.xml; using global extent.")
             bbox = None
 
         try:
             generator = WMTSCapabilitiesGenerator(
                 title=title,
-                base_url=paths["base_dirs"]["input"]["path"],
+                base_url=base_url,
                 doi=doi,
                 tile_matrix_set_id=tms_id,
                 max_z_level=max_z,
@@ -436,32 +431,42 @@ class WorkflowManager:
 
          # Add Staged layer
         if self.config.is_stager_enabled():
-            extention = self.config.get("ext_staged")
+            ext = self.config.get("ext_staged")
             dir_staged = paths["base_dirs"]["staged"]["path"]
 
             generator.add_layer(
-            layer_title= title +' ' + extention,
-            layer_identifier= title+'('+ extention+')',
-            tile_format= extention,
+            layer_title= f"{title} {ext}",
+            layer_identifier=f"{title}({ext})",
+            tile_format= ext,
             url_postfix= dir_staged,
             )
-        # Add Raster layers
-        if self.config.is_raster_enabled():
-            stats_names = self.config.get_stat_names()
-            extention = self.config.get("ext_web_tiles")
-            dir_web_tiles = paths["base_dirs"]["web_tiles"]["path"]
 
-            for layer in stats_names:
-                name = layer
+        # Add Raster .tif layer
+        if self.config.is_raster_enabled():
+            ext = ".tif"
+            dir_geotiff = paths["base_dirs"]["geotiff"]["path"]
+            generator.add_layer(
+            layer_title=f"{title} {ext}",
+            layer_identifier=f"{title}({ext})",
+            tile_format= ext,
+            url_postfix= dir_geotiff,
+            )
+
+        # Add Web Tiles layers (png)
+        if self.config.is_web_tiles_enabled():
+            stats_names = self.config.get_stat_names()
+            ext = self.config.get("ext_web_tiles")
+            for layer_name in stats_names:
+                dir_web_tiles = paths["base_dirs"]["web_tiles"]["path"]
                 generator.add_layer(
-                    layer_title= title +' ' + name,
-                    layer_identifier= title+'('+ extention+')',
-                    tile_format= extention,
-                    url_postfix= dir_web_tiles
+                    layer_title=f"{title} {layer_name}",
+                    layer_identifier=f"{title}{layer_name}({ext})",
+                    tile_format= ext,
+                    url_postfix= f"{dir_web_tiles}/{layer_name}",
                 )
 
         xml_txt = generator.generate_capabilities()
-        out_dir = Path(self.config.get("dir_web_tiles")).resolve()
+        out_dir = Path(input_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / "WMTSCapabilities.xml"
         out_path.write_text(xml_txt, encoding="utf-8")
