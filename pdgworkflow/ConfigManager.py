@@ -28,6 +28,8 @@ class ConfigManager:
       current working directory.
         - dir_input: str
             The directory to read input vector files from.
+        - dir_output: str
+            The directory to write output files to. 
         - dir_staged: str
             The directory to save staged files to.
         - dir_geotiff : str
@@ -62,6 +64,9 @@ class ConfigManager:
             automatically if the config is passed as a path string. When
             the config is updated, it will be saved to this filename, but
             with a suffix indicating that it is an updated.
+        - title : str
+            The title of the tileset. This will be used in the WMTSCapabilities.xml file.
+            Defaults to "Placeholder Title".
 
     - Filetypes for input and output data.
         - ext_input : str
@@ -327,6 +332,8 @@ class ConfigManager:
             Defaults to True.
         - enable_3dtiles : bool
             Whether to enable 3D tiles generation. Defaults to True.
+        - generate_wmtsCapabilities : bool
+            Whether to generate WMTSCapabilities.xml document
         - enable_raster_parents : bool
             Whether to create parent tiles for raster (GeoTIFF) files by
             resampling child tiles. Parent tiles provide lower resolution
@@ -348,6 +355,7 @@ class ConfigManager:
         "ext_web_tiles": ".png",
         "ext_input": ".shp",
         "ext_staged": ".gpkg",
+        "title": "Infrustructure Data",
         "statistics": [
             {
                 "name": "polygon_count",
@@ -384,11 +392,14 @@ class ConfigManager:
         "dir_3dtiles": "3dtiles",
         "dir_staged": "staged",
         "dir_input": "input",
+        "dir_output": "output",
         "dir_footprints": "footprints",
         "filename_staging_summary": "staging_summary.csv",
         "filename_rasterization_events": "rasterization_events.csv",
         "filename_rasters_summary": "rasters_summary.csv",
         "filename_config": "config.json",
+        "title": "Placeholder Title",
+        "doi": None,
         # File types for input and output
         "ext_web_tiles": ".png",
         "ext_input": ".shp",
@@ -455,6 +466,7 @@ class ConfigManager:
         "enable_3dtiles": True,
         "enable_raster_parents": True,
         "enable_web_tiles_parents": True,
+        "generate_wmtsCapabilities": True,
     }
 
     tiling_scheme_map = {
@@ -660,6 +672,19 @@ class ConfigManager:
         """
         return self.get("doi")
 
+    def get_title(self):
+        """
+        Get the title for the workflow run, if set.
+
+        Returns
+        -------
+        str or None
+            The title, or None if not set.
+        """
+        
+        return self.get("title")
+    
+
     def get_stat_names(self):
         """
         Get all statistic names from the config object.
@@ -816,8 +841,8 @@ class ConfigManager:
             num_cols = len(colors)
             # Get min and max. As the Cesium map doesn't support a different
             # palette for each z-level yet, just use the max_z palette
-            minv = self.get_min(stat=stat, z=max_z, sub_general=True) or 0
-            maxv = self.get_max(stat=stat, z=max_z, sub_general=True) or 1
+            minv = self.get_min(stat=stat, z=max_z, sub_general=True)
+            maxv = self.get_max(stat=stat, z=max_z, sub_general=True)
             for i in range(num_cols):
                 color_objs.append(
                     {
@@ -1536,6 +1561,18 @@ class ConfigManager:
             Whether web tiles parent tile creation is enabled.
         """
         return self.get("enable_web_tiles_parents")
+    
+
+    def is_generate_wmtsCapabilities_enabled(self):
+        """
+        Check if WMTS capabilities generation is enabled.
+
+        Returns
+        -------
+        bool
+            Whether WMTS capabilities generation is enabled.
+        """
+        return self.get("generate_wmtsCapabilities")
 
     @staticmethod
     def to_hex(color_str):

@@ -20,6 +20,8 @@ from .RasterTiler import RasterTiler
 from .StagedTo3DConverter import StagedTo3DConverter
 from pdgstaging import TileStager
 from pdgstaging import TilePathManager
+from .WMTSCapabilitiesGenerator import WMTSCapabilitiesGenerator
+from pathlib import Path
 
 
 # Set up logging
@@ -397,16 +399,17 @@ class WorkflowManager:
         """
         max_z   = self.config.get_max_z()
         tms_id  = self.config.get("tms_id")   
-
-        title   = self.config.get("title")
-        if title is None:
-            title = "Placeholder Title"
-            logger.warning("No title configured, using default: 'Placeholder Title'")
-
+        title = self.config.get("title")
         doi = self.config.get("doi")
         if doi is None:
             doi = "doi/placeholder"
             logger.warning("No DOI configured, WMTSCapabilities.xml will include placeholder.")
+
+        paths = self.config.get_path_manager_config()
+        print(f"Paths: {paths}")
+
+        dir_geotiff = paths["base_dirs"]["geotiff"]["path"]
+
 
         try:
             bbox_vals = self.tiles.get_total_bounding_box("web_tiles", max_z)
@@ -419,11 +422,10 @@ class WorkflowManager:
         except ValueError:
             bbox = None
 
-        dir_staged = self.config.get("dir_staged")
         try:
             generator = WMTSCapabilitiesGenerator(
                 title=title,
-                base_url=dir_staged,
+                base_url=paths["base_dirs"]["input"]["path"],
                 doi=doi,
                 tile_matrix_set_id=tms_id,
                 max_z_level=max_z,
@@ -432,21 +434,31 @@ class WorkflowManager:
         except ValueError as e:
             logger.error("Failed to initialize WMTSCapabilitiesGenerator: %s", e)
 
-        layer_config = self.config.get_metacatui_raster_configs()
-        print("Layer Config:", layer_config)
+         # Add Staged layer
+        if self.config.is_stager_enabled():
+            extention = self.config.get("ext_staged")
+            dir_staged = paths["base_dirs"]["staged"]["path"]
 
-        stats_list = self.config.get("statistics") 
-        for layer in layer_config:
-            name = layer["label"]
             generator.add_layer(
-                layer_title= title +' ' + name,
-                layer_identifier=name,
-                tile_format= self.config.get("ext_staged"),
-                url_postfix= f"{name}/{{TileMatrix}}/{{TileCol}}/{{TileRow}}{self.config.get('ext_staged')}",
+            layer_title= title +' ' + extention,
+            layer_identifier= title+'('+ extention+')',
+            tile_format= extention,
+            url_postfix= dir_staged,
             )
+        # Add Raster layers
+        if self.config.is_raster_enabled():
+            stats_names = self.config.get_stat_names()
+            extention = self.config.get("ext_web_tiles")
+            dir_web_tiles = paths["base_dirs"]["web_tiles"]["path"]
 
-
-        
+            for layer in stats_names:
+                name = layer
+                generator.add_layer(
+                    layer_title= title +' ' + name,
+                    layer_identifier= title+'('+ extention+')',
+                    tile_format= extention,
+                    url_postfix= dir_web_tiles
+                )
 
         xml_txt = generator.generate_capabilities()
         out_dir = Path(self.config.get("dir_web_tiles")).resolve()
@@ -455,7 +467,7 @@ class WorkflowManager:
         out_path.write_text(xml_txt, encoding="utf-8")
         logger.info("WMTS capabilities written to %s", out_path)
         return True
-
+    
     def run_workflow(self) -> None:
         """
         Run the complete visualization workflow.
@@ -489,6 +501,9 @@ class WorkflowManager:
             logger.info("3D tiles enabled, starting 3D tile generation...")
             self.run_3d_tiling()
 
+        if self.config.is_generate_wmtsCapabilities_enabled():
+            logger.info("Generating WMTSCapabilities.xml ")
+            self.generate_wmts_capabilities()  
 
 # CLI interface
 @click.group()
