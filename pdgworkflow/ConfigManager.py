@@ -28,8 +28,6 @@ class ConfigManager:
       current working directory.
         - dir_input: str
             The directory to read input vector files from.
-        - dir_output: str
-            The directory to write output files to. 
         - dir_staged: str
             The directory to save staged files to.
         - dir_geotiff : str
@@ -392,7 +390,6 @@ class ConfigManager:
         "dir_3dtiles": "3dtiles",
         "dir_staged": "staged",
         "dir_input": "input",
-        "dir_output": "output",
         "dir_footprints": "footprints",
         "filename_staging_summary": "staging_summary.csv",
         "filename_rasterization_events": "rasterization_events.csv",
@@ -683,7 +680,6 @@ class ConfigManager:
         """
         
         return self.get("title")
-    
 
     def get_stat_names(self):
         """
@@ -1565,7 +1561,6 @@ class ConfigManager:
 
     def is_generate_wmtsCapabilities_enabled(self):
         """
-        Check if WMTS capabilities generation is enabled.
 
         Returns
         -------
