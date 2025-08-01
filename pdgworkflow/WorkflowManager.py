@@ -20,6 +20,8 @@ from .RasterTiler import RasterTiler
 from .StagedTo3DConverter import StagedTo3DConverter
 from pdgstaging import TileStager
 from pdgstaging import TilePathManager
+from .WMTSCapabilitiesGenerator import WMTSCapabilitiesGenerator
+from pathlib import Path
 
 
 # Set up logging
@@ -394,18 +396,83 @@ class WorkflowManager:
     def generate_wmts_capabilities(self) -> bool:
         """
         Generate WMTS capabilities document.
-
-        Args:
-            None
-
-        Returns:
-            True if capabilities generation completed successfully
-
-        Raises:
-            WokflowManagerError: If capabilities generation fails
         """
-        pass
+        max_z   = self.config.get_max_z()
+        tms_id  = self.config.get("tms_id")   
+        title = self.config.get("title")
+        base_url = "https://arcticdata.io/data/"
+        doi = self.config.get("doi")
+        paths = self.config.get_path_manager_config()
+        input_dir = paths["base_dirs"]["input"]["path"]
 
+        try:
+            bbox_vals = self.tiles.get_total_bounding_box("web_tiles", max_z)
+            bbox = {
+                "left": bbox_vals[0],
+                 "bottom": bbox_vals[1],
+                 "right": bbox_vals[2],
+                 "top": bbox_vals[3],
+            }
+        except ValueError:
+            logger.warning("Bounding box could not be retrieved for WMTSCapabilities.xml; using global extent.")
+            bbox = None
+
+        try:
+            generator = WMTSCapabilitiesGenerator(
+                title=title,
+                base_url=base_url,
+                doi=doi,
+                tile_matrix_set_id=tms_id,
+                max_z_level=max_z,
+                bounding_box=bbox,
+            )
+        except ValueError as e:
+            logger.error("Failed to initialize WMTSCapabilitiesGenerator: %s", e)
+
+         # Add Staged layer
+        if self.config.is_stager_enabled():
+            ext = self.config.get("ext_staged")
+            dir_staged = paths["base_dirs"]["staged"]["path"]
+
+            generator.add_layer(
+            layer_title= f"{title} {ext}",
+            layer_identifier=f"{title}({ext})",
+            tile_format= ext,
+            url_postfix= dir_staged,
+            )
+
+        # Add Raster .tif layer
+        if self.config.is_raster_enabled():
+            ext = ".tif"
+            dir_geotiff = paths["base_dirs"]["geotiff"]["path"]
+            generator.add_layer(
+            layer_title=f"{title} {ext}",
+            layer_identifier=f"{title}({ext})",
+            tile_format= ext,
+            url_postfix= dir_geotiff,
+            )
+
+        # Add Web Tiles layers (png)
+        if self.config.is_web_tiles_enabled():
+            stats_names = self.config.get_stat_names()
+            ext = self.config.get("ext_web_tiles")
+            for layer_name in stats_names:
+                dir_web_tiles = paths["base_dirs"]["web_tiles"]["path"]
+                generator.add_layer(
+                    layer_title=f"{title} {layer_name}",
+                    layer_identifier=f"{title}{layer_name}({ext})",
+                    tile_format= ext,
+                    url_postfix= f"{dir_web_tiles}/{layer_name}",
+                )
+
+        xml_txt = generator.generate_capabilities()
+        out_dir = Path(input_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / "WMTSCapabilities.xml"
+        out_path.write_text(xml_txt, encoding="utf-8")
+        logger.info("WMTS capabilities written to %s", out_path)
+        return True
+    
     def run_workflow(self) -> None:
         """
         Run the complete visualization workflow.
@@ -439,6 +506,9 @@ class WorkflowManager:
             logger.info("3D tiles enabled, starting 3D tile generation...")
             self.run_3d_tiling()
 
+        if self.config.is_generate_wmtsCapabilities_enabled():
+            logger.info("Generating WMTSCapabilities.xml ")
+            self.generate_wmts_capabilities()  
 
 # CLI interface
 @click.group()

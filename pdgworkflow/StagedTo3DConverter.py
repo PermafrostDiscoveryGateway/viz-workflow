@@ -5,7 +5,7 @@ import geopandas as gpd
 from shapely.geometry import box
 
 import pdgstaging
-from viz_3dtiles import TreeGenerator, BoundingVolumeRegion
+from pdg3dtiles import TreeGenerator, BoundingVolumeRegion
 
 
 logger = logging.getLogger(__name__)

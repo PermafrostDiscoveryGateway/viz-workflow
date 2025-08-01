@@ -62,6 +62,9 @@ class ConfigManager:
             automatically if the config is passed as a path string. When
             the config is updated, it will be saved to this filename, but
             with a suffix indicating that it is an updated.
+        - title : str
+            The title of the tileset. This will be used in the WMTSCapabilities.xml file.
+            Defaults to "Placeholder Title".
 
     - Filetypes for input and output data.
         - ext_input : str
@@ -327,6 +330,8 @@ class ConfigManager:
             Defaults to True.
         - enable_3dtiles : bool
             Whether to enable 3D tiles generation. Defaults to True.
+        - generate_wmtsCapabilities : bool
+            Whether to generate WMTSCapabilities.xml document
         - enable_raster_parents : bool
             Whether to create parent tiles for raster (GeoTIFF) files by
             resampling child tiles. Parent tiles provide lower resolution
@@ -348,6 +353,7 @@ class ConfigManager:
         "ext_web_tiles": ".png",
         "ext_input": ".shp",
         "ext_staged": ".gpkg",
+        "title": "Infrustructure Data",
         "statistics": [
             {
                 "name": "polygon_count",
@@ -389,6 +395,8 @@ class ConfigManager:
         "filename_rasterization_events": "rasterization_events.csv",
         "filename_rasters_summary": "rasters_summary.csv",
         "filename_config": "config.json",
+        "title": "Placeholder Title",
+        "doi": "doi/placeholder",
         # File types for input and output
         "ext_web_tiles": ".png",
         "ext_input": ".shp",
@@ -455,6 +463,7 @@ class ConfigManager:
         "enable_3dtiles": True,
         "enable_raster_parents": True,
         "enable_web_tiles_parents": True,
+        "generate_wmtsCapabilities": True,
     }
 
     tiling_scheme_map = {
@@ -648,6 +657,29 @@ class ConfigManager:
             palette = [colors, nodata_color]
             palettes.append(palette)
         return palettes
+    
+    def get_doi(self):
+        """
+        Get the DOI for the workflow run, if set.
+
+        Returns
+        -------
+        str or None
+            The DOI, or None if not set.
+        """
+        return self.get("doi")
+
+    def get_title(self):
+        """
+        Get the title for the workflow run, if set.
+
+        Returns
+        -------
+        str or None
+            The title, or None if not set.
+        """
+        
+        return self.get("title")
 
     def get_stat_names(self):
         """
@@ -1525,13 +1557,24 @@ class ConfigManager:
             Whether web tiles parent tile creation is enabled.
         """
         return self.get("enable_web_tiles_parents")
+    
+
+    def is_generate_wmtsCapabilities_enabled(self):
+        """
+
+        Returns
+        -------
+        bool
+            Whether WMTS capabilities generation is enabled.
+        """
+        return self.get("generate_wmtsCapabilities")
 
     @staticmethod
     def to_hex(color_str):
         """
         Convert a color string to a hex string without alpha channel
         """
-        color = Color(color_str).convert("sRGB").mask("alpha")
+        color = Color(color_str).convert("srgb").mask("alpha")
         hex_str = color.to_string(hex=True)
         if len(hex_str) == 9:
             hex_str = hex_str[:-2]
