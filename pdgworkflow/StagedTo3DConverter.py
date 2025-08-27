@@ -232,10 +232,11 @@ class StagedTo3DConverter:
         tile_manager = self.tiles
         config_manager = self.config
         min_z = config_manager.get_min_z()
+        max_z = config_manager.get_max_z()
 
         # Make a parent tileset.json - this will combine the top level tiles if
         # there are 2, otherwise it will just refer to the top level tile.
-        top_level_tiles = tile_manager.get_filenames_from_dir("3dtiles", z=min_z)
+        top_level_tiles = tile_manager.get_filenames_from_dir("3dtiles", z=max_z)
         top_level_dir = tile_manager.get_base_dir("3dtiles")["path"]
 
         return TreeGenerator.parent_tile_from_children_json(
