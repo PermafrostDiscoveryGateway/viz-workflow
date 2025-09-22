@@ -21,6 +21,7 @@ from .StagedTo3DConverter import StagedTo3DConverter
 from pdgstaging import TileStager
 from pdgstaging import TilePathManager
 from .WMTSCapabilitiesGenerator import WMTSCapabilitiesGenerator
+from .STACGenerator import STACGenerator
 from pathlib import Path
 
 
@@ -473,6 +474,95 @@ class WorkflowManager:
         logger.info("WMTS capabilities written to %s", out_path)
         return True
     
+
+    def generate_stac(self) -> bool:
+        """
+        Generate STAC catalog+collection document.
+        """
+        max_z   = self.config.get_max_z()
+        tms_id  = self.config.get("tms_id")
+        title   = self.config.get("title")
+        base_url = "https://arcticdata.io/data/"
+        doi     = self.config.get("doi")
+        paths   = self.config.get_path_manager_config()
+        input_dir = paths["base_dirs"]["input"]["path"]
+
+        try:
+            bbox_vals = self.tiles.get_total_bounding_box("web_tiles", max_z)
+            bbox = {
+                "left": bbox_vals[0],
+                "bottom": bbox_vals[1],
+                "right": bbox_vals[2],
+                "top": bbox_vals[3],
+            }
+        except ValueError:
+            logger.warning("Bounding box could not be retrieved for STAC; using global extent.")
+            bbox = None
+
+        try:
+            generator = STACGenerator(
+                title=title,
+                base_url=base_url,
+                doi=doi,
+                tile_matrix_set_id=tms_id,
+                max_z_level=max_z,
+                bounding_box=bbox,
+            )
+        except ValueError as e:
+            logger.error("Failed to initialize STACGenerator: %s", e)
+            return False
+
+        # Add staged layer
+        if self.config.is_stager_enabled():
+            ext = self.config.get("ext_staged")
+            dir_staged = paths["base_dirs"]["staged"]["path"]
+            generator.add_asset(
+                key=f"{title}_staged",
+                title=f"{title} {ext}",
+                href=f"{base_url}{doi}/{dir_staged}/{{z}}/{{x}}/{{y}}{ext}",
+                media_type="application/octet-stream",  # adjust if known
+            )
+
+        # Add raster .tif layer
+        if self.config.is_raster_enabled():
+            ext = ".tif"
+            dir_geotiff = paths["base_dirs"]["geotiff"]["path"]
+            generator.add_asset(
+                key=f"{title}_tif",
+                title=f"{title} {ext}",
+                href=f"{base_url}{doi}/{dir_geotiff}/{title}{ext}",
+                media_type="image/tiff; application=geotiff",
+            )
+
+        # Add web tiles layers
+        if self.config.is_web_tiles_enabled():
+            stats_names = self.config.get_stat_names()
+            ext = self.config.get("ext_web_tiles")
+            for layer_name in stats_names:
+                dir_web_tiles = paths["base_dirs"]["web_tiles"]["path"]
+                generator.add_asset(
+                    key=f"{title}_{layer_name}",
+                    title=f"{title} {layer_name}",
+                    href=f"{base_url}tiles/{doi}/{dir_web_tiles}/{layer_name}/{{z}}/{{x}}/{{y}}{ext}",
+                    media_type="image/png",  # adjust if ext is not png
+                    roles=["tiles"],
+                )
+
+        # Generate catalog (with embedded collection)
+        catalog_txt = generator.generate_catalog(
+            catalog_id="arcticdata-root",
+            catalog_description=f"Root catalog containing {title} collection",
+            catalog_self_href="http://localhost:8000/catalog.json",
+        )
+
+        out_dir = Path(input_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / "catalog.json"
+        out_path.write_text(catalog_txt, encoding="utf-8")
+        logger.info("STAC catalog written to %s", out_path)
+
+        return True
+
     def run_workflow(self) -> None:
         """
         Run the complete visualization workflow.
@@ -498,9 +588,9 @@ class WorkflowManager:
             logger.info("Staging enabled, starting tile staging...")
             self.run_staging()
 
-        if self.config.is_raster_enabled():
-            logger.info("Rasterization enabled, starting rasterization process...")
-            self.run_rasterization()
+        # if self.config.is_raster_enabled():
+        #     logger.info("Rasterization enabled, starting rasterization process...")
+        #     self.run_rasterization()
 
         if self.config.is_3dtiles_enabled():
             logger.info("3D tiles enabled, starting 3D tile generation...")
@@ -508,7 +598,11 @@ class WorkflowManager:
 
         if self.config.is_generate_wmtsCapabilities_enabled():
             logger.info("Generating WMTSCapabilities.xml ")
-            self.generate_wmts_capabilities()  
+            self.generate_wmts_capabilities()
+
+        if self.config.is_generate_stac_enabled():
+            logger.info("Generating STAC catalog.json ")
+            self.generate_stac()
 
 # CLI interface
 @click.group()
