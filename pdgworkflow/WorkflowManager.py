@@ -17,7 +17,7 @@ import click
 # Local imports
 from .ConfigManager import ConfigManager
 from .RasterTiler import RasterTiler
-from .StagedTo3DConverter import StagedTo3DConverter
+# from .StagedTo3DConverter import StagedTo3DConverter
 from pdgstaging import TileStager
 from pdgstaging import TilePathManager
 from .WMTSCapabilitiesGenerator import WMTSCapabilitiesGenerator
@@ -510,6 +510,39 @@ class WorkflowManager:
             logger.info("Generating WMTSCapabilities.xml ")
             self.generate_wmts_capabilities()  
 
+        if self.config.generate_from_external_tifs():
+            logger.info(" ")
+            self.tile_external_tifs()  
+
+    def tile_external_tifs(
+        self,
+        tif,
+        *,
+        style_prefix: Optional[str] = None,
+        min_value: Optional[float] = None,
+        max_value: Optional[float] = None,
+        reverse_palette: bool = False,
+        overwrite: bool = True,
+        min_z: Optional[int] = None,
+        max_z: Optional[int] = None,
+        tms_id: Optional[str] = None,
+    ) -> bool:
+            if not self.raster_tiler:
+                self.raster_tiler = self.init_raster_tiler()
+
+            self.raster_tiler.webtiles_from_external_tifs(
+                tif_paths=tif,
+                overwrite=overwrite,
+                style_prefix=style_prefix,
+                min_value=min_value,
+                max_value=max_value,
+                reverse_palette=reverse_palette,
+                min_z=min_z,
+                max_z=max_z,
+                tms_id=tms_id,
+            )
+            return True
+        
 # CLI interface
 @click.group()
 @click.option(
