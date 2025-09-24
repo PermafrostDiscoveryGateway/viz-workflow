@@ -464,6 +464,8 @@ class ConfigManager:
         "enable_raster_parents": True,
         "enable_web_tiles_parents": True,
         "generate_wmtsCapabilities": True,
+        "generate_stac": True
+
     }
 
     tiling_scheme_map = {
@@ -1568,6 +1570,15 @@ class ConfigManager:
             Whether WMTS capabilities generation is enabled.
         """
         return self.get("generate_wmtsCapabilities")
+    
+    def is_generate_stac_enabled(self):
+        """
+        Returns
+        -------
+        bool
+            Whether STAC catalog/collection generation is enabled.
+        """
+        return self.get("generate_stac")
 
     @staticmethod
     def to_hex(color_str):
