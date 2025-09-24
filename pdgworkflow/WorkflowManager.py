@@ -589,9 +589,9 @@ class WorkflowManager:
             logger.info("Staging enabled, starting tile staging...")
             self.run_staging()
 
-        # if self.config.is_raster_enabled():
-        #     logger.info("Rasterization enabled, starting rasterization process...")
-        #     self.run_rasterization()
+        if self.config.is_raster_enabled():
+            logger.info("Rasterization enabled, starting rasterization process...")
+            self.run_rasterization()
 
         if self.config.is_3dtiles_enabled():
             logger.info("3D tiles enabled, starting 3D tile generation...")
