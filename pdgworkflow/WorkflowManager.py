@@ -407,7 +407,10 @@ class WorkflowManager:
         input_dir = paths["base_dirs"]["input"]["path"]
 
         try:
-            bbox_vals = self.tiles.get_total_bounding_box("web_tiles", max_z)
+            if self.config.is_stager_enabled():
+                bbox_vals = self.tiles.get_total_bounding_box("staged", max_z)
+            elif self.config.is_web_tiles_enabled():
+                bbox_vals = self.tiles.get_total_bounding_box("web_tiles", max_z)
             bbox = {
                 "left": bbox_vals[0],
                  "bottom": bbox_vals[1],
@@ -486,18 +489,17 @@ class WorkflowManager:
         doi     = self.config.get("doi")
         paths   = self.config.get_path_manager_config()
         input_dir = paths["base_dirs"]["input"]["path"]
-
-        try:
+        
+        if self.config.is_stager_enabled():
+            bbox_vals = self.tiles.get_total_bounding_box("staged", max_z)
+        elif self.config.is_web_tiles_enabled():
             bbox_vals = self.tiles.get_total_bounding_box("web_tiles", max_z)
-            bbox = {
-                "left": bbox_vals[0],
-                "bottom": bbox_vals[1],
-                "right": bbox_vals[2],
-                "top": bbox_vals[3],
-            }
-        except ValueError:
-            logger.warning("Bounding box could not be retrieved for STAC; using global extent.")
-            bbox = None
+        bbox = {
+            "left":   bbox_vals[0],
+            "bottom": bbox_vals[1],
+            "right":  bbox_vals[2],
+            "top":    bbox_vals[3],
+        }
 
         try:
             generator = STACGenerator(
@@ -552,7 +554,6 @@ class WorkflowManager:
         catalog_txt = generator.generate_catalog(
             catalog_id="arcticdata-root",
             catalog_description=f"Root catalog containing {title} collection",
-            catalog_self_href="http://localhost:8000/catalog.json",
         )
 
         out_dir = Path(input_dir)

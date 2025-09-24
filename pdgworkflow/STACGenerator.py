@@ -20,23 +20,17 @@ class STACGenerator:
         self.tile_matrix_set_id = tile_matrix_set_id
         self.max_z_level = max_z_level
 
-        # get TileMatrixSet from morecantile
         self.tms_object = morecantile.tms.get(self.tile_matrix_set_id)
 
-        if bounding_box is None:
-            self.bounding_box = [
-                self.tms_object.bbox.left,
-                self.tms_object.bbox.bottom,
-                self.tms_object.bbox.right,
-                self.tms_object.bbox.top,
-            ]
+        if bounding_box == None:
+            self.bounding_box = {
+                "left": self.tms_object.bbox.left,
+                "bottom": self.tms_object.bbox.bottom,
+                "right": self.tms_object.bbox.right,
+                "top": self.tms_object.bbox.top,
+            }
         else:
-            self.bounding_box = [
-                bounding_box["left"],
-                bounding_box["bottom"],
-                bounding_box["right"],
-                bounding_box["top"],
-            ]
+            self.bounding_box = bounding_box
 
         self.assets: Dict[str, dict] = {}
 
@@ -48,7 +42,6 @@ class STACGenerator:
         media_type: str,
         roles: Optional[List[str]] = None,
     ) -> None:
-        """Add an asset (like a tile URL template or raster file)."""
         self.assets[key] = {
             "title": title,
             "href": href,
@@ -57,10 +50,6 @@ class STACGenerator:
         }
 
     def _with_tms_in_tiles(self, assets: Dict[str, dict]) -> Dict[str, dict]:
-        """
-        If an asset has role 'tiles' and looks like a template .../{z}/{x}/{y}.<ext>,
-        ensure the TMS id is inserted before {z}/
-        """
         out = {}
         for k, a in assets.items():
             a_copy = dict(a)
@@ -77,10 +66,6 @@ class STACGenerator:
         return out
 
     def build_collection_obj(self, parent_catalog_href: Optional[str] = None) -> dict:
-        """
-        Build the Collection object. If `parent_catalog_href` is provided,
-        include only a 'parent' link (matching your target example).
-        """
         collection = {
             "stac_version": "1.0.0",
             "type": "Collection",
@@ -123,12 +108,10 @@ class STACGenerator:
         self,
         catalog_id: str,
         catalog_description: str,
-        catalog_self_href: str,
     ) -> str:
-        """
-        Return a single JSON string representing a Catalog that embeds this Collection
-        under `children`, exactly like the shape you requested.
-        """
+        
+        catalog_self_href = f"{self.base_url}/catalog.json"
+
         catalog_obj = {
             "stac_version": "1.0.0",
             "type": "Catalog",
@@ -145,39 +128,3 @@ class STACGenerator:
             ],
         }
         return json.dumps(catalog_obj, indent=2)
-
-
-#  Usage Example
-
-stac_gen = STACGenerator(
-    title="Ice-Wedge Polygons",
-    base_url="https://arcticdata.io/data",
-    doi="10.18739/A2KW57K57",
-    tile_matrix_set_id="WGS1984Quad",
-    max_z_level=15,
-)
-
-# Add PNG tile layer
-stac_gen.add_asset(
-    key="iwp_png",
-    title="Ice-Wedge Polygons (png)",
-    href="https://arcticdata.io/data/tiles/10.18739/A2KW57K57/{z}/{x}/{y}.png",
-    media_type="image/png",
-    roles=["tiles"],
-)
-
-# Add GeoTIFF
-stac_gen.add_asset(
-    key="iwp_geotiff",
-    title="Ice-Wedge Polygons (GeoTIFF)",
-    href="https://arcticdata.io/data/10.18739/A2KW57K57/iwp_geotiff_high.tif",
-    media_type="image/tiff; application=geotiff",
-)
-
-print(
-    stac_gen.generate_catalog(
-        catalog_id="arcticdata-root",
-        catalog_description="Root catalog containing Ice-Wedge Polygons collection",
-        catalog_self_href="http://localhost:8000/catalog.json",
-    )
-)
