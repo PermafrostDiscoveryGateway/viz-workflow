@@ -546,7 +546,7 @@ class WorkflowManager:
                     key=f"{title}_{layer_name}",
                     title=f"{title} {layer_name}",
                     href=f"{base_url}tiles/{doi}/{dir_web_tiles}/{layer_name}/{{z}}/{{x}}/{{y}}{ext}",
-                    media_type="image/png",  # adjust if ext is not png
+                    media_type="image/png",
                     roles=["tiles"],
                 )
 
