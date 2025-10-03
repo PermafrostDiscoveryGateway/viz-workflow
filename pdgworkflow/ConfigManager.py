@@ -1,13 +1,13 @@
 import json
 import logging
-from .pdgstaging import logging_config
+
 import os
 from pdgstaging import TilePathManager
 import warnings
 from coloraide import Color
 import colormaps as cmaps
 
-logger = logging_config.logger
+logger = logging.getLogger(__name__)
 
 
 class ConfigManager:
@@ -62,6 +62,9 @@ class ConfigManager:
             automatically if the config is passed as a path string. When
             the config is updated, it will be saved to this filename, but
             with a suffix indicating that it is an updated.
+        - title : str
+            The title of the tileset. This will be used in the WMTSCapabilities.xml file.
+            Defaults to "Placeholder Title".
 
     - Filetypes for input and output data.
         - ext_input : str
@@ -310,6 +313,34 @@ class ConfigManager:
                 geopandas.GeoDataFrame.sindex.valid_query_predicates).
                 Defaults to 'intersects'.
 
+    - Operation control flags. Control which operations are performed and
+      whether to overwrite existing files.
+        - overwrite : bool
+            Whether to overwrite existing output files. If False, the
+            workflow will skip processing for tiles that already have
+            output files. Defaults to False.
+        - enable_raster : bool
+            Whether to enable raster processing (GeoTIFF generation).
+            Defaults to True.
+        - enable_web_tiles : bool
+            Whether to enable web tile generation (PNG/JPG tiles).
+            Defaults to True.
+        - enable_stager : bool
+            Whether to enable staging operations (vector tiling).
+            Defaults to True.
+        - enable_3dtiles : bool
+            Whether to enable 3D tiles generation. Defaults to True.
+        - generate_wmtsCapabilities : bool
+            Whether to generate WMTSCapabilities.xml document
+        - enable_raster_parents : bool
+            Whether to create parent tiles for raster (GeoTIFF) files by
+            resampling child tiles. Parent tiles provide lower resolution
+            versions for pyramid tiling. Defaults to True.
+        - enable_web_tiles_parents : bool
+            Whether to create parent tiles for web tiles by resampling
+            child tiles. Parent tiles provide lower resolution versions
+            for pyramid tiling. Defaults to True.
+
     Example config:
     ---------------
 
@@ -322,6 +353,7 @@ class ConfigManager:
         "ext_web_tiles": ".png",
         "ext_input": ".shp",
         "ext_staged": ".gpkg",
+        "title": "Infrustructure Data",
         "statistics": [
             {
                 "name": "polygon_count",
@@ -363,6 +395,8 @@ class ConfigManager:
         "filename_rasterization_events": "rasterization_events.csv",
         "filename_rasters_summary": "rasters_summary.csv",
         "filename_config": "config.json",
+        "title": "Placeholder Title",
+        "doi": "doi/placeholder",
         # File types for input and output
         "ext_web_tiles": ".png",
         "ext_input": ".shp",
@@ -421,6 +455,15 @@ class ConfigManager:
         "deduplicate_distance_crs": "EPSG:3857",
         "deduplicate_clip_to_footprint": True,
         "deduplicate_clip_method": "intersects",
+        # Operation control flags
+        "overwrite": False,
+        "enable_raster": True,
+        "enable_web_tiles": True,
+        "enable_stager": True,
+        "enable_3dtiles": True,
+        "enable_raster_parents": True,
+        "enable_web_tiles_parents": True,
+        "generate_wmtsCapabilities": True,
     }
 
     tiling_scheme_map = {
@@ -614,6 +657,29 @@ class ConfigManager:
             palette = [colors, nodata_color]
             palettes.append(palette)
         return palettes
+    
+    def get_doi(self):
+        """
+        Get the DOI for the workflow run, if set.
+
+        Returns
+        -------
+        str or None
+            The DOI, or None if not set.
+        """
+        return self.get("doi")
+
+    def get_title(self):
+        """
+        Get the title for the workflow run, if set.
+
+        Returns
+        -------
+        str or None
+            The title, or None if not set.
+        """
+        
+        return self.get("title")
 
     def get_stat_names(self):
         """
@@ -1415,12 +1481,100 @@ class ConfigManager:
 
         return updates
 
+    def should_overwrite(self):
+        """
+        Check if files should be overwritten based on the overwrite flag.
+
+        Returns
+        -------
+        bool
+            Whether to overwrite existing files.
+        """
+        return self.get("overwrite")
+
+    def is_raster_enabled(self):
+        """
+        Check if raster processing (GeoTIFF generation) is enabled.
+
+        Returns
+        -------
+        bool
+            Whether raster processing is enabled.
+        """
+        return self.get("enable_raster")
+
+    def is_web_tiles_enabled(self):
+        """
+        Check if web tile generation (PNG/JPG tiles) is enabled.
+
+        Returns
+        -------
+        bool
+            Whether web tile generation is enabled.
+        """
+        return self.get("enable_web_tiles")
+
+    def is_stager_enabled(self):
+        """
+        Check if staging operations (vector tiling) are enabled.
+
+        Returns
+        -------
+        bool
+            Whether staging operations are enabled.
+        """
+        return self.get("enable_stager")
+
+    def is_3dtiles_enabled(self):
+        """
+        Check if 3D tiles generation is enabled.
+
+        Returns
+        -------
+        bool
+            Whether 3D tiles generation is enabled.
+        """
+        return self.get("enable_3dtiles")
+
+    def is_raster_parents_enabled(self):
+        """
+        Check if parent tile creation for raster (GeoTIFF) files is enabled.
+
+        Returns
+        -------
+        bool
+            Whether raster parent tile creation is enabled.
+        """
+        return self.get("enable_raster_parents")
+
+    def is_web_tiles_parents_enabled(self):
+        """
+        Check if parent tile creation for web tiles is enabled.
+
+        Returns
+        -------
+        bool
+            Whether web tiles parent tile creation is enabled.
+        """
+        return self.get("enable_web_tiles_parents")
+    
+
+    def is_generate_wmtsCapabilities_enabled(self):
+        """
+
+        Returns
+        -------
+        bool
+            Whether WMTS capabilities generation is enabled.
+        """
+        return self.get("generate_wmtsCapabilities")
+
     @staticmethod
     def to_hex(color_str):
         """
         Convert a color string to a hex string without alpha channel
         """
-        color = Color(color_str).convert("sRGB").mask("alpha")
+        color = Color(color_str).convert("srgb").mask("alpha")
         hex_str = color.to_string(hex=True)
         if len(hex_str) == 9:
             hex_str = hex_str[:-2]

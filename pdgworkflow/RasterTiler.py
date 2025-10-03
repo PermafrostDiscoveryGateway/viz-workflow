@@ -1,19 +1,20 @@
 import time
 import uuid
 import logging
-from . import logging_config
 import os
 
 import geopandas as gpd
 import pandas as pd
-import ConfigManager
+from .ConfigManager import ConfigManager
 import pdgstaging
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from pdgraster import Raster
 from pdgraster import Palette
 from pdgraster import WebImage
 
-logger = logging_config.logger
+logger = logging.getLogger(__name__)
 
 
 class RasterTiler:
@@ -35,8 +36,10 @@ class RasterTiler:
             A dictionary of configuration settings or a path to a config
             JSON file.
         """
-
-        self.config = ConfigManager(config)
+        if isinstance(config, ConfigManager):
+            self.config = config
+        else:
+            self.config = ConfigManager(config)
         self.tiles = pdgstaging.TilePathManager(**self.config.get_path_manager_config())
         # Pre-create the palette for each stat
         palettes = self.config.get_palettes()
@@ -56,7 +59,11 @@ class RasterTiler:
 
         paths = self.tiles.get_filenames_from_dir("staged")
         self.rasterize_vectors(paths, overwrite=overwrite)
-        self.webtiles_from_all_geotiffs(overwrite=overwrite)
+
+        if self.config.is_web_tiles_enabled():
+            self.webtiles_from_all_geotiffs(overwrite=overwrite)
+
+        self.csv_to_parquet()
 
     def rasterize_vectors(self, paths, make_parents=True, overwrite=True):
         """
@@ -672,3 +679,28 @@ class RasterTiler:
             header = True
             mode = "w"
         data.to_csv(path, mode=mode, index=False, header=header)
+
+    def csv_to_parquet(self):
+        """
+        This method is to converst the CSV files containing rasterization events and raster
+        summaries to Parquet format, keeping the original CSVs.
+        """
+        csv_paths = [
+            self.config.get("filename_rasterization_events"),
+            self.config.get("filename_rasters_summary"),
+        ]
+
+        for csv_path in filter(None, csv_paths):
+            if not os.path.isfile(csv_path):
+                self.logger.warning(f"CSV not found → {csv_path}")
+                continue
+
+            root, _ = os.path.splitext(csv_path)
+            parquet_path = f"{root}.parquet"
+
+            df = pd.read_csv(csv_path)
+            pq.write_table(
+                pa.Table.from_pandas(df, preserve_index=False),
+                parquet_path,
+                compression="snappy",
+            )
