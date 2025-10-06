@@ -3,10 +3,12 @@ name = "pdgworkflow"
 version = "1.0.0"
 description = "PDG Visualization workflow."
 authors = [
-    {name = "Kastan Day", email = "kvday2@illinois.edu"},
-    {name = "Juliet Cohen", email = "jcohen@nceas.ucsb.edu"},
     {name = "Robyn Thiessen-Bock", email = "thiessenbock@nceas.ucsb.edu"},
+    {name = "Juliet Cohen", email = "jcohen@nceas.ucsb.edu"},
+    {name = "Lauren Walker", email = "walker@nceas.ucsb.edu"},
     {name = "Matthew B. Jones", email = "jones@nceas.ucsb.edu"},
+    {name = "Rushiraj Nenuji", email = "nenuji@nceas.ucsb.edu"},
+    {name = "Alyona Kosobokova", email = "alyonak@nceas.ucsb.edu"}  
 ]
 license = {text = "Apache Software License 2.0"}
 readme = "README.md"
