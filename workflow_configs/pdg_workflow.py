@@ -8,10 +8,12 @@ import argparse
 import parsl
 from parsl import python_app
 from parsl.config import Config
-#from parsl.channels import LocalChannel
+
+# from parsl.channels import LocalChannel
 from parsl.executors import HighThroughputExecutor
-#from parsl.executors.threads import ThreadPoolExecutor
-#from parsl.providers import LocalProvider
+
+# from parsl.executors.threads import ThreadPoolExecutor
+# from parsl.providers import LocalProvider
 from parsl.providers import KubernetesProvider
 from parsl.addresses import address_by_route
 from kubernetes import client, config
@@ -26,39 +28,34 @@ import geopandas as gpd
 
 def init_parsl():
     parsl.set_stream_logger()
-    #from parslexec import local_exec
-    #from parslexec import htex_kube
+    # from parslexec import local_exec
+    # from parslexec import htex_kube
 
     htex_kube = Config(
         executors=[
             HighThroughputExecutor(
-                label='kube-htex',
+                label="kube-htex",
                 cores_per_worker=1,
                 max_workers=2,
-                worker_logdir_root='/',
+                worker_logdir_root="/",
                 # Address for the pod worker to connect back
                 # address=address_by_route(),
-                address='192.168.0.103',
+                address="192.168.0.103",
                 # address_probe_timeout=3600,
                 worker_debug=True,
                 provider=KubernetesProvider(
                     namespace="test",
-
                     # Docker image url to use for pods
-                    image='mbjones/python3-parsl:0.2',
-
+                    image="mbjones/python3-parsl:0.2",
                     # Command to be run upon pod start, such as:
                     # 'module load Anaconda; source activate parsl_env'.
                     # or 'pip install parsl'
-                    #worker_init='echo "Worker started..."; lf=`find . -name \'manager.log\'` tail -n+1 -f ${lf}',
+                    # worker_init='echo "Worker started..."; lf=`find . -name \'manager.log\'` tail -n+1 -f ${lf}',
                     worker_init='echo "Worker started..."',
-
                     # The secret key to download the image
                     # secret="YOUR_KUBE_SECRET",
-
                     # Should follow the Kubernetes naming rules
-                    pod_name='parsl-worker',
-
+                    pod_name="parsl-worker",
                     nodes_per_block=1,
                     init_blocks=2,
                     min_blocks=1,
@@ -80,7 +77,7 @@ def run_pdg_workflow(
     batch_size_3dtiles=20,
     batch_size_parent_3dtiles=500,
     batch_size_geotiffs=200,
-    batch_size_web_tiles=200
+    batch_size_web_tiles=200,
 ):
     """
     Run the main PDG workflow
@@ -123,7 +120,7 @@ def run_pdg_workflow(
     # STEP 1: Stage all inputs
 
     # Get all paths to input files and create batches of paths
-    input_paths = stager.tiles.get_filenames_from_dir('input')
+    input_paths = stager.tiles.get_filenames_from_dir("input")
     input_batches = make_batch(input_paths, batch_size_staging)
 
     start_time = datetime.now()
@@ -138,14 +135,15 @@ def run_pdg_workflow(
     [a.result() for a in app_futures]
 
     end_time = datetime.now()
-    logging.info(f'Total time to stage {len(input_paths)} files: '
-                 f'{end_time - start_time}')
+    logging.info(
+        f"Total time to stage {len(input_paths)} files: " f"{end_time - start_time}"
+    )
 
     # =================================================================================
     # STEP 2: Deduplicate & rasterize all staged tiles (only highest z-level)
 
     # Get paths to all the newly staged tiles
-    staged_paths = stager.tiles.get_filenames_from_dir('staged')
+    staged_paths = stager.tiles.get_filenames_from_dir("staged")
     staged_batches = make_batch(staged_paths, batch_size_rasterization)
 
     start_time = datetime.now()
@@ -159,8 +157,10 @@ def run_pdg_workflow(
     [a.result() for a in app_futures]
 
     end_time = datetime.now()
-    logging.info(f'⏰ Total time to rasterize {len(staged_paths)} tiles: '
-                 f'{end_time - start_time}')
+    logging.info(
+        f"⏰ Total time to rasterize {len(staged_paths)} tiles: "
+        f"{end_time - start_time}"
+    )
 
     # =================================================================================
     # STEP 3: Create parent geotiffs for all z-levels (except highest)
@@ -172,7 +172,7 @@ def run_pdg_workflow(
 
         # Determine which tiles we need to make for the next z-level based on the
         # path names of the files just created
-        child_paths = tile_manager.get_filenames_from_dir('geotiff', z=z + 1)
+        child_paths = tile_manager.get_filenames_from_dir("geotiff", z=z + 1)
         parent_tiles = set()
         for child_path in child_paths:
             parent_tile = tile_manager.get_parent_tile(child_path)
@@ -186,7 +186,8 @@ def run_pdg_workflow(
         app_futures = []
         for parent_tile_batch in parent_tile_batches:
             app_future = create_composite_geotiffs(
-                parent_tile_batch, workflow_config, logging_dict)
+                parent_tile_batch, workflow_config, logging_dict
+            )
             app_futures.append(app_future)
 
         # Don't start the next z-level, and don't move to step 4, until the
@@ -194,8 +195,9 @@ def run_pdg_workflow(
         [a.result() for a in app_futures]
 
     end_time = datetime.now()
-    logging.info(f'⏰ Total time to create parent geotiffs: '
-                 f'{end_time - start_time}')
+    logging.info(
+        f"⏰ Total time to create parent geotiffs: " f"{end_time - start_time}"
+    )
 
     # =================================================================================
     # STEP 4: Create web tiles from geotiffs
@@ -206,7 +208,7 @@ def run_pdg_workflow(
     rasterizer.update_ranges()
 
     # Process web tiles in batches
-    geotiff_paths = tile_manager.get_filenames_from_dir('geotiff')
+    geotiff_paths = tile_manager.get_filenames_from_dir("geotiff")
     geotiff_batches = make_batch(geotiff_paths, batch_size_web_tiles)
 
     app_futures = []
@@ -219,8 +221,7 @@ def run_pdg_workflow(
 
     end_time = datetime.now()
 
-    logging.info(f'⏰ Total time to create web tiles: '
-                 f'{end_time - start_time}')
+    logging.info(f"⏰ Total time to create web tiles: " f"{end_time - start_time}")
 
     # =================================================================================
     # STEP 5: Deduplicate & make leaf 3D tiles all staged tiles (only highest
@@ -229,7 +230,7 @@ def run_pdg_workflow(
     # each staged file once.
 
     # Get paths to all the newly staged tiles
-    staged_paths = stager.tiles.get_filenames_from_dir('staged')
+    staged_paths = stager.tiles.get_filenames_from_dir("staged")
     staged_batches = make_batch(staged_paths, batch_size_3dtiles)
 
     start_time = datetime.now()
@@ -244,8 +245,10 @@ def run_pdg_workflow(
     [a.result() for a in app_futures]
 
     end_time = datetime.now()
-    logging.info(f'⏰ Total time to create {len(staged_paths)} 3d tiles: '
-                 f'{end_time - start_time}')
+    logging.info(
+        f"⏰ Total time to create {len(staged_paths)} 3d tiles: "
+        f"{end_time - start_time}"
+    )
 
     # =================================================================================
     # STEP 6: Create parent cesium 3d tilesets for all z-levels (except highest)
@@ -258,13 +261,12 @@ def run_pdg_workflow(
     # convert the paths to tiles
     max_z_tiles = [tile_manager.tile_from_path(path) for path in staged_paths]
     # get the total bounds for all the tiles
-    max_z_bounds = [tile_manager.get_bounding_box(
-        tile) for tile in max_z_tiles]
+    max_z_bounds = [tile_manager.get_bounding_box(tile) for tile in max_z_tiles]
     # get the total bounds for all the tiles
-    polygons = [box(bounds['left'],
-                    bounds['bottom'],
-                    bounds['right'],
-                    bounds['top']) for bounds in max_z_bounds]
+    polygons = [
+        box(bounds["left"], bounds["bottom"], bounds["right"], bounds["top"])
+        for bounds in max_z_bounds
+    ]
     max_z_bounds = gpd.GeoSeries(polygons, crs=tile_manager.tms.crs)
 
     bound_volume_limit = max_z_bounds.total_bounds
@@ -274,8 +276,7 @@ def run_pdg_workflow(
 
         # Determine which tiles we need to make for the next z-level based on the
         # path names of the files just created
-        all_child_paths = tiles3dmaker.tiles.get_filenames_from_dir(
-            '3dtiles', z=z + 1)
+        all_child_paths = tiles3dmaker.tiles.get_filenames_from_dir("3dtiles", z=z + 1)
         parent_tiles = set()
         for child_path in all_child_paths:
             parent_tile = tile_manager.get_parent_tile(child_path)
@@ -283,17 +284,14 @@ def run_pdg_workflow(
         parent_tiles = list(parent_tiles)
 
         # Break all parent tiles at level z into batches
-        parent_tile_batches = make_batch(
-            parent_tiles, batch_size_parent_3dtiles)
+        parent_tile_batches = make_batch(parent_tiles, batch_size_parent_3dtiles)
 
         # Make the next level of parent tiles
         app_futures = []
         for parent_tile_batch in parent_tile_batches:
             app_future = create_parent_3dtiles(
-                parent_tile_batch,
-                workflow_config,
-                bound_volume_limit,
-                logging_dict)
+                parent_tile_batch, workflow_config, bound_volume_limit, logging_dict
+            )
             app_futures.append(app_future)
 
         # Don't start the next z-level until the current z-level is complete
@@ -305,15 +303,16 @@ def run_pdg_workflow(
     tiles3dmaker.make_top_level_tileset()
 
     end_time = datetime.now()
-    logging.info(f'⏰ Total time to create parent 3d tiles: '
-                 f'{end_time - start_time}')
+    logging.info(
+        f"⏰ Total time to create parent 3d tiles: " f"{end_time - start_time}"
+    )
 
     # ================================================================
     # End the workflow
 
     overall_end = datetime.now()
     total_time = overall_end - overall_start
-    message = f'⏰ Total time to complete workflow: {total_time}'
+    message = f"⏰ Total time to complete workflow: {total_time}"
     logging.info(message)
     print(message)
 
@@ -324,8 +323,10 @@ def stage(paths, config, logging_dict=None):
     Stage a file (step 1)
     """
     import pdgstaging
+
     if logging_dict:
         import logging.config
+
         logging.config.dictConfig(logging_dict)
     stager = pdgstaging.TileStager(config)
     for path in paths:
@@ -339,8 +340,10 @@ def rasterize(staged_paths, config, logging_dict=None):
     Rasterize a batch of vector files (step 2)
     """
     import pdgraster
+
     if logging_dict:
         import logging.config
+
         logging.config.dictConfig(logging_dict)
     rasterizer = pdgraster.RasterTiler(config)
     return rasterizer.rasterize_vectors(staged_paths, make_parents=False)
@@ -352,8 +355,10 @@ def create_composite_geotiffs(tiles, config, logging_dict=None):
     Make composite geotiffs (step 3)
     """
     import pdgraster
+
     if logging_dict:
         import logging.config
+
         logging.config.dictConfig(logging_dict)
     rasterizer = pdgraster.RasterTiler(config)
     return rasterizer.parent_geotiffs_from_children(tiles, recursive=False)
@@ -364,9 +369,11 @@ def create_leaf_3dtiles(staged_paths, config, logging_dict=None):
     """
     Create a batch of leaf 3d tiles from staged vector tiles
     """
-    from pdg_workflow import StagedTo3DConverter
+    from workflow_configs.pdg_workflow import StagedTo3DConverter
+
     if logging_dict:
         import logging.config
+
         logging.config.dictConfig(logging_dict)
     converter3d = StagedTo3DConverter(config)
     tilesets = []
@@ -382,9 +389,11 @@ def create_parent_3dtiles(tiles, config, limit_bv_to=None, logging_dict=None):
     Create a batch of cesium 3d tileset parent files that point to child
     tilesets
     """
-    from pdg_workflow import StagedTo3DConverter
+    from workflow_configs.pdg_workflow import StagedTo3DConverter
+
     if logging_dict:
         import logging.config
+
         logging.config.dictConfig(logging_dict)
     converter3d = StagedTo3DConverter(config)
     return converter3d.parent_3dtiles_from_children(tiles, limit_bv_to)
@@ -397,26 +406,27 @@ def create_web_tiles(geotiff_paths, config, logging_dict=None):
     Create a batch of webtiles from geotiffs (step 4)
     """
     import pdgraster
+
     if logging_dict:
         import logging.config
+
         logging.config.dictConfig(logging_dict)
     rasterizer = pdgraster.RasterTiler(config)
-    return rasterizer.webtiles_from_geotiffs(
-        geotiff_paths, update_ranges=False)
+    return rasterizer.webtiles_from_geotiffs(geotiff_paths, update_ranges=False)
 
 
 def make_batch(items, batch_size):
     """
     Create batches of a given size from a list of items.
     """
-    return [items[i:i + batch_size] for i in range(0, len(items), batch_size)]
+    return [items[i : i + batch_size] for i in range(0, len(items), batch_size)]
 
 
 def setup_logging(log_json_file):
     """
     Setup logging configuration
     """
-    with open(log_json_file, 'r') as f:
+    with open(log_json_file, "r") as f:
         logging_dict = json.load(f)
     logging.config.dictConfig(logging_dict)
     return logging_dict
@@ -424,16 +434,21 @@ def setup_logging(log_json_file):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(
-        description='Run the PDG visualization workflow.')
-    parser.add_argument('-c', '--config',
-                        help='Path to the pdg-viz configuration JSON file.',
-                        default='config.json',
-                        type=str)
-    parser.add_argument('-l', '--logging',
-                        help='Path to the logging configuration JSON file.',
-                        default='logging.json',
-                        type=str)
+    parser = argparse.ArgumentParser(description="Run the PDG visualization workflow.")
+    parser.add_argument(
+        "-c",
+        "--config",
+        help="Path to the pdg-viz configuration JSON file.",
+        default="config.json",
+        type=str,
+    )
+    parser.add_argument(
+        "-l",
+        "--logging",
+        help="Path to the logging configuration JSON file.",
+        default="logging.json",
+        type=str,
+    )
     args = parser.parse_args()
 
     logging_dict = setup_logging(args.logging)

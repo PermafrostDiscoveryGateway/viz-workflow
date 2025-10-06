@@ -141,3 +141,4 @@ nodes_array.txt
 
 # output of slurm processes
 slurm-*.out
+.DS_Store
