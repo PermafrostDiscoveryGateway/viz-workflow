@@ -17,7 +17,7 @@ import click
 # Local imports
 from .ConfigManager import ConfigManager
 from .RasterTiler import RasterTiler
-# from .StagedTo3DConverter import StagedTo3DConverter
+from .StagedTo3DConverter import StagedTo3DConverter
 from pdgstaging import TileStager
 from pdgstaging import TilePathManager
 from .WMTSCapabilitiesGenerator import WMTSCapabilitiesGenerator
@@ -523,7 +523,6 @@ class WorkflowManager:
         if self.config.generate_from_external_tifs():
             logger.info(" ")
             self.tile_external_tifs()  
-
         
 # CLI interface
 @click.group()
