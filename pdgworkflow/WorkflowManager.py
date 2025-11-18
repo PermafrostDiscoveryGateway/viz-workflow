@@ -364,6 +364,16 @@ class WorkflowManager:
             self.cesium_3d_tiler = self.init_3d_tiling()
 
         return self.cesium_3d_tiler.staged_to_3dtile(path)
+    
+    def tile_external_tifs(self) -> bool:
+        """
+        Generate web tiles directly from external GeoTIFFs, using only config.
+        """
+        if not self.raster_tiler:
+            self.raster_tiler = self.init_raster_tiler()
+        self.raster_tiler.webtiles_from_external_tifs()
+        
+        return True
 
     def parent_3d_tiles(self, tiles, bv_limit=None) -> None:
         """
@@ -514,34 +524,6 @@ class WorkflowManager:
             logger.info(" ")
             self.tile_external_tifs()  
 
-    def tile_external_tifs(
-        self,
-        tif,
-        *,
-        style_prefix: Optional[str] = None,
-        min_value: Optional[float] = None,
-        max_value: Optional[float] = None,
-        reverse_palette: bool = False,
-        overwrite: bool = True,
-        min_z: Optional[int] = None,
-        max_z: Optional[int] = None,
-        tms_id: Optional[str] = None,
-    ) -> bool:
-            if not self.raster_tiler:
-                self.raster_tiler = self.init_raster_tiler()
-
-            self.raster_tiler.webtiles_from_external_tifs(
-                tif_paths=tif,
-                overwrite=overwrite,
-                style_prefix=style_prefix,
-                min_value=min_value,
-                max_value=max_value,
-                reverse_palette=reverse_palette,
-                min_z=min_z,
-                max_z=max_z,
-                tms_id=tms_id,
-            )
-            return True
         
 # CLI interface
 @click.group()

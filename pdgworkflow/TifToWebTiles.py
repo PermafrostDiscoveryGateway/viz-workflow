@@ -1,17 +1,19 @@
-# TifToWebTiles.py (rio-tiler version)
-from typing import List, Optional, Sequence, Tuple, Iterable, Union
-import numpy as np
-import os
 from pathlib import Path
+from typing import Iterable, List, Optional, Sequence, Union
 
+import numpy as np
 import morecantile
-from morecantile import Tile, TileMatrixSet
+from morecantile import TileMatrixSet
 from rio_tiler.io import COGReader
-from rio_tiler.errors import PointOutsideBounds
+from rio_tiler.errors import PointOutsideBounds, TileOutsideBounds
 
 from pdgraster import WebImage, Palette
 from colormaps.colormap import Colormap
 import colormaps as cmaps
+
+
+DEFAULT_COLORS = ["#00000000", "#c2e699", "#78c679", "#238443", "#004529"]
+DEFAULT_NODATA_COLOR = "#00000000"
 
 
 def _ensure_palette(
@@ -19,36 +21,38 @@ def _ensure_palette(
     nodata_color: Optional[str],
     reverse: bool = False,
 ) -> Palette:
-    # hard defaults so callers may pass None
-    if colors is None:
-        colors = ["#ffffcc", "#c2e699", "#78c679", "#238443", "#004529"]
-    if nodata_color is None:
-        nodata_color = "#ffffff00"
+    colors = colors or DEFAULT_COLORS
+    nodata_color = nodata_color or DEFAULT_NODATA_COLOR
 
     if isinstance(colors, str):
-        cmap_palette = getattr(cmaps, colors)
+        cmap: Colormap = getattr(cmaps, colors)
         if reverse:
-            cmap_palette = Colormap(cmap_palette.reversed().colors)
-        return Palette(cmap_palette, nodata_color)
-    cols = list(colors)[::-1] if reverse else list(colors)
+            cmap = Colormap(cmap.reversed().colors)
+        return Palette(cmap, nodata_color)
+
+    cols = list(colors)
+    if reverse:
+        cols.reverse()
     return Palette(cols, nodata_color)
 
 
 def _band_names_from_reader(reader: COGReader) -> List[str]:
-    n = reader.dataset.count
+    count = reader.dataset.count
     names: List[str] = []
     try:
-        for b in range(1, n + 1):
+        for b in range(1, count + 1):
             tags = reader.dataset.tags(b)
             names.append(tags.get("NAME") or tags.get("BANDNAME") or f"band_{b}")
     except Exception:
-        names = [f"band_{b}" for b in range(1, n + 1)]
+        names = [f"band_{b}" for b in range(1, count + 1)]
     return names
 
 
 def tiles_covering_bounds(
-    tms: TileMatrixSet, bounds: Tuple[float, float, float, float], z: int
-) -> Iterable[Tile]:
+    tms: TileMatrixSet,
+    bounds: Sequence[float],
+    z: int,
+) -> Iterable[morecantile.Tile]:
     w, s, e, n = bounds
     return tms.tiles(w, s, e, n, [z])
 
@@ -57,98 +61,98 @@ def generate_tiles_from_tif(
     tif_path: str,
     out_dir: str,
     *,
-    tms_id: str = "WebMercatorQuad",   # set to your custom TMS id if needed
-    min_z: int = 0,
-    max_z: int = 7,
+    tms_id: str = "WGS1984Quad",
+    min_z,
+    max_z,
     colors: Optional[Union[Sequence[str], str]] = None,
     nodata_color: Optional[str] = None,
     reverse_palette: bool = False,
     min_value: Optional[float] = None,
     max_value: Optional[float] = None,
-    style_prefix: Optional[str] = None,
     nodata_val_fallback: float = np.nan,
 ) -> List[str]:
-    # Robust defaults and path check
-    if colors is None:
-        colors = ["#ffffcc", "#c2e699", "#78c679", "#238443", "#004529"]
-    if nodata_color is None:
-        nodata_color = "#ffffff00"
-    tif_path = os.fspath(tif_path)
-    if not Path(tif_path).is_file():
-        raise FileNotFoundError(f"GeoTIFF not found: {Path(tif_path).resolve()}")
+    """
+    Create web tiles from a GeoTIFF.
 
-    os.makedirs(out_dir, exist_ok=True)
+    If min_value / max_value are None, per-band, per-tile min/max are computed
+    directly from the data. If they are provided, those global values are used
+    for all tiles.
+    """
+    tif_path_p = Path(tif_path)
+    if not tif_path_p.is_file():
+        raise FileNotFoundError(f"GeoTIFF not found: {tif_path_p.resolve()}")
+
+    out_dir_p = Path(out_dir)
+    out_dir_p.mkdir(parents=True, exist_ok=True)
 
     tms = morecantile.tms.get(tms_id)
     palette = _ensure_palette(colors, nodata_color, reverse_palette)
     written: List[str] = []
 
-    with COGReader(tif_path, tms=tms) as reader:
-        bounds = reader.bounds
+    with COGReader(str(tif_path_p), tms=tms) as reader:
+        if reader.crs is None:
+            raise ValueError(
+                f"{tif_path_p} has no CRS/georeferencing. "
+                "Assign a CRS before tiling."
+            )
+        bounds = getattr(reader, "geographic_bounds", reader.bounds)
+
         band_names = _band_names_from_reader(reader)
         band_count = reader.dataset.count
         ds_nodata = reader.dataset.nodata
-        nodata_val = ds_nodata if ds_nodata is not None else nodata_val_fallback
-
-        # Auto min/max if not provided
-        if min_value is None or max_value is None:
-            try:
-                stats = reader.statistics()
-                mins = [s.min for s in stats.values()]
-                maxs = [s.max for s in stats.values()]
-                auto_min = float(np.nanmin(mins))
-                auto_max = float(np.nanmax(maxs))
-                min_value = auto_min if min_value is None else min_value
-                max_value = auto_max if max_value is None else max_value
-            except Exception:
-                # conservative fallback
-                min_value = -1.0 if min_value is None else min_value
-                max_value =  1.0 if max_value is None else max_value
+        nodata_val = nodata_val_fallback
 
         for z in range(max_z, min_z - 1, -1):
             for tile in tiles_covering_bounds(tms, bounds, z):
                 x, y = tile.x, tile.y
                 try:
-                    t = reader.tile(x, y, z)  # rio-tiler ImageData
-                except PointOutsideBounds:
+                    image = reader.tile(x, y, z)
+                except (PointOutsideBounds, TileOutsideBounds):
                     continue
 
-                # ---- rio-tiler v6: handle array + mask (replaces .as_masked()) ----
-                arr = t.array.astype("float32")          # (bands, H, W)
-                mask = t.mask                             # (H, W) or (bands, H, W) or None
+                arr = image.array.astype("float32")  # (bands, H, W)
+                mask = image.mask                    # (H, W) or (bands, H, W) or None
+
                 if mask is not None:
                     if mask.ndim == 2:
                         mask = np.broadcast_to(mask, arr.shape)
-                    arr = np.where(mask, np.nan, arr)
-                # -------------------------------------------------------------------
+                    invalid = mask == 0  # 0 = nodata, 255 = valid
+                    arr = np.where(invalid, np.nan, arr)
 
                 for b in range(band_count):
-                    band_img = arr[b].copy()
+                    band = arr[b]
 
-                    # Respect dataset nodata
-                    if ds_nodata is not None:
-                        band_img[band_img == ds_nodata] = np.nan
+                    if ds_nodata is not None and np.isfinite(ds_nodata):
+                        band = np.where(band == ds_nodata, np.nan, band)
 
-                    # Clip to [min_value, max_value] with transparency outside
-                    if min_value is not None:
-                        band_img[band_img < min_value] = np.nan
-                    if max_value is not None:
-                        band_img[band_img > max_value] = np.nan
+                    # Decide min/max for this band/tile
+                    if min_value is None or max_value is None:
+                        if not np.isfinite(band).any():
+                            continue
+                        band_min = float(np.nanmin(band))
+                        band_max = float(np.nanmax(band))
+                        if band_min == band_max:
+                            continue
+                    else:
+                        band_min = float(min_value)
+                        band_max = float(max_value)
 
-                    masked = np.ma.masked_invalid(band_img)
+                    masked = np.ma.masked_invalid(band)
+
                     webimg = WebImage(
                         image_data=masked.filled(nodata_val),
                         palette=palette,
-                        min_val=min_value,
-                        max_val=max_value,
+                        min_val=band_min,
+                        max_val=band_max,
                         nodata_val=nodata_val,
                     )
 
-                    style = style_prefix or (band_names[b] if b < len(band_names) else f"band_{b+1}")
-                    rel = f"{style}/{tms_id}/{z}/{x}/{y}.png"
-                    dst = os.path.join(out_dir, rel)
-                    os.makedirs(os.path.dirname(dst), exist_ok=True)
-                    webimg.save(dst)
-                    written.append(dst)
+                    style =   band_names[b] if b < len(band_names) else f"band_{b+1}"
+                    rel = Path(style) / tms_id / str(z) / str(x) / f"{y}.png"
+                    dst = out_dir_p / rel
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+
+                    webimg.save(str(dst))
+                    written.append(str(dst))
 
     return written

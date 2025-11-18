@@ -9,6 +9,9 @@ from .ConfigManager import ConfigManager
 import pdgstaging
 import pyarrow as pa
 import pyarrow.parquet as pq
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
 
 from pdgraster import Raster
 from pdgraster import Palette
@@ -706,36 +709,30 @@ class RasterTiler:
                 compression="snappy",
             )
 
-    from typing import Any, Dict, List, Optional, Union
-    def webtiles_from_external_tifs(
-        self,
-        tif_paths: Union[str, List[str], Dict[str, Any]],
-        *,
-        overwrite: bool = True,
-        min_z: Optional[int] = None,
-        max_z: Optional[int] = None,
-        tms_id: Optional[str] = None,
-        colors: Optional[Union[List[str], str]] = None,
-        nodata_color: Optional[str] = None,
-        reverse_palette: bool = False,
-        min_value: Optional[float] = None,
-        max_value: Optional[float] = None,
-        style_prefix: Optional[str] = None,
-    ):
-        tms_id = tms_id or self.config.get("tms_id") or "WebMercatorQuad"
-        min_z  = self.config.get_min_z() if min_z is None else min_z
-        max_z  = self.config.get_max_z() if max_z is None else max_z
+    def webtiles_from_external_tifs(self, tif_paths=None):
+
+        tms_id = self.config.get("tms_id")
+        min_z = self.config.get_min_z()
+        max_z = self.config.get_max_z()
         web_dir = self.tiles.base_dirs["web_tiles"]["path"]
+        pals = self.config.get_palettes()
+        if pals:
+            colors = pals[0][0]
+        else:
+            colors = ["#000000", "#c2e699", "#78c679", "#238443", "#004529"]
 
-        if colors is None:
-            pals = self.config.get_palettes()
-            colors = pals[0][0] if pals else ["#ffffcc","#c2e699","#78c679","#238443","#004529"]
-        if nodata_color is None:
-            nodata_color = "#ffffff00"
+        nodata_color = self.config.get("nodata_color") or "#ffffff00"
+        reverse_palette_cfg = self.config.get("external_reverse_palette")
+        reverse_palette = bool(reverse_palette_cfg) if reverse_palette_cfg is not None else False
 
-        # Build list of tifs
-        if isinstance(tif_paths, dict):
-            base = tif_paths["path"]; ext = tif_paths.get("ext", ".tif")
+        # Build list of TIFs
+        if tif_paths is None:
+            base = self.config.get("dir_input") or "."
+            ext = self.config.get("input_file_ext") or ".tif"
+            paths = [str(p) for p in Path(base).rglob(f"*{ext}")]
+        elif isinstance(tif_paths, dict):
+            base = tif_paths["path"]
+            ext = tif_paths.get("ext", ".tif")
             paths = [str(p) for p in Path(base).rglob(f"*{ext}")]
         elif isinstance(tif_paths, str):
             if os.path.isdir(tif_paths):
@@ -746,7 +743,6 @@ class RasterTiler:
             paths = list(tif_paths)
 
         for p in paths:
-            # naive skip if not overwriting (you can refine with a check on web_dir/z/x dirs)
             generate_tiles_from_tif(
                 tif_path=p,
                 out_dir=web_dir,
@@ -756,7 +752,6 @@ class RasterTiler:
                 colors=colors,
                 nodata_color=nodata_color,
                 reverse_palette=reverse_palette,
-                min_value=min_value,
-                max_value=max_value,
-                style_prefix=style_prefix,
+                min_value=None,
+                max_value=None
             )

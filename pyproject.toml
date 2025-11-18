@@ -25,7 +25,9 @@ classifiers = [
 dependencies = [
     "Click >= 7.0",
     "pdgraster @ git+https://github.com/PermafrostDiscoveryGateway/viz-raster.git@feature-raster-k8s",
-    "pdgstaging @ git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git@feature-tiling-k8s"
+    "pdgstaging @ git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git@feature-tiling-k8s",
+    "pdg3dtiles @ git+https://github.com/PermafrostDiscoveryGateway/viz-3dtiles.git@develop",
+    "rio-tiler>=5,<6",
 ]
 
 [project.urls]
