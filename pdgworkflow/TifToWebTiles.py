@@ -118,19 +118,14 @@ def generate_tiles_from_tif(
                 arr = image.array.astype("float32", copy=False)
                 mask = image.mask
 
-                # Apply mask (0 = nodata)
                 if mask is not None:
                     if mask.ndim == 2:
                         mask = np.broadcast_to(mask, arr.shape)
                     arr = np.where(mask == 0, np.nan, arr)
 
-                # Apply dataset nodata once to all bands
                 if ds_nodata is not None:
                     arr = np.where(arr == ds_nodata, np.nan, arr)
 
-                # -------------------------------
-                # 1. SAVE GEOTIFF TILE
-                # -------------------------------
                 if save_tiff:
                     left, bottom, right, top = tms.xy_bounds(tile)
                     _, height, width = arr.shape
@@ -155,9 +150,6 @@ def generate_tiles_from_tif(
                     with rasterio.open(tif_path_tile, "w", **profile) as dst:
                         dst.write(arr_tif)
 
-                # -------------------------------
-                # 2. SAVE PNG WEB TILES (per-band)
-                # -------------------------------
                 for b in range(band_count):
                     band = arr[b]
 
