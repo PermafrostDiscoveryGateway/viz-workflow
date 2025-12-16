@@ -68,7 +68,7 @@ def generate_tiles_from_tif(
     *,
     tms_id: str = "WGS1984Quad",
     min_z: int = 0,
-    max_z: int = 7,
+    max_z: int = 13,
     colors: Optional[Union[Sequence[str], str]] = None,
     nodata_color: Optional[str] = None,
     reverse_palette: bool = False,
@@ -105,7 +105,6 @@ def generate_tiles_from_tif(
     palette = _ensure_palette(colors, nodata_color, reverse_palette)
     written: List[str] = []
 
-    # Open first asset for metadata
     with Reader(tif_list[0]) as meta_reader:
         if meta_reader.crs is None:
             raise ValueError("Input TIFFs must have valid CRS")
@@ -115,7 +114,6 @@ def generate_tiles_from_tif(
         ds_nodata = meta_reader.dataset.nodata
         nodata_val = ds_nodata if ds_nodata is not None else nodata_val_fallback
 
-    # Compute union bounds across all assets
     all_bounds = []
     for asset in tif_list:
         with Reader(asset) as r:

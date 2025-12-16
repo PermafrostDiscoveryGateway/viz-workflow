@@ -521,7 +521,7 @@ class WorkflowManager:
             self.generate_wmts_capabilities()  
 
         if self.config.generate_from_external_tifs():
-            logger.info(" ")
+            logger.info("Genereating web tiles from external TIFs")
             self.tile_external_tifs()  
         
 # CLI interface

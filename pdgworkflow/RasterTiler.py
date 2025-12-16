@@ -18,6 +18,7 @@ from pdgraster import Palette
 from pdgraster import WebImage
 from .TifToWebTiles import generate_tiles_from_tif
 
+
 logger = logging.getLogger(__name__)
 
 
