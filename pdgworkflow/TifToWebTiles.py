@@ -6,9 +6,10 @@ import rasterio
 import morecantile
 from morecantile import TileMatrixSet
 from rasterio.transform import from_bounds
-from rio_tiler.io import COGReader
 from rio_tiler.errors import PointOutsideBounds, TileOutsideBounds
-
+from rio_tiler.io import Reader
+from rio_tiler.mosaic import mosaic_reader
+from rio_tiler.mosaic.methods import HighestMethod
 from pdgraster import WebImage, Palette
 from colormaps.colormap import Colormap
 import colormaps as cmaps
@@ -38,7 +39,7 @@ def _ensure_palette(
     return Palette(cols, nodata_color)
 
 
-def _band_names_from_reader(reader: COGReader) -> List[str]:
+def _band_names_from_reader(reader: Reader) -> List[str]:
     count = reader.dataset.count
     names: List[str] = []
 
@@ -47,7 +48,6 @@ def _band_names_from_reader(reader: COGReader) -> List[str]:
             tags = reader.dataset.tags(b)
             names.append(tags.get("NAME") or tags.get("BANDNAME") or f"band_{b}")
     except Exception:
-        # Fallback if tags access fails for any band
         names = [f"band_{b}" for b in range(1, count + 1)]
 
     return names
@@ -63,7 +63,7 @@ def tiles_covering_bounds(
 
 
 def generate_tiles_from_tif(
-    tif_path: Union[str, Path],
+    tif_path: Union[str, Path, List[Union[str, Path]]],
     out_dir: Union[str, Path],
     *,
     tms_id: str = "WGS1984Quad",
@@ -79,9 +79,19 @@ def generate_tiles_from_tif(
     save_tiff: bool = True,
 ) -> List[str]:
 
-    tif_path_p = Path(tif_path)
-    if not tif_path_p.is_file():
-        raise FileNotFoundError(f"GeoTIFF not found: {tif_path_p.resolve()}")
+    if isinstance(tif_path, (str, Path)):
+        tif_list = [str(tif_path)]
+    else:
+        tif_list = [str(p) for p in tif_path]
+
+    tif_list = [p for p in tif_list if p.lower().endswith(".tif")]
+
+    if len(tif_list) == 0:
+        raise ValueError("No TIFF files passed to generate_tiles_from_tif")
+
+    for p in tif_list:
+        if not Path(p).is_file():
+            raise FileNotFoundError(f"GeoTIFF not found: {p}")
 
     web_root = Path(out_dir)
     png_root = web_root / "png"
@@ -95,91 +105,108 @@ def generate_tiles_from_tif(
     palette = _ensure_palette(colors, nodata_color, reverse_palette)
     written: List[str] = []
 
-    with COGReader(str(tif_path_p), tms=tms) as reader:
-        if reader.crs is None:
-            raise ValueError(f"{tif_path_p} has no CRS/georeferencing.")
+    # Open first asset for metadata
+    with Reader(tif_list[0]) as meta_reader:
+        if meta_reader.crs is None:
+            raise ValueError("Input TIFFs must have valid CRS")
 
-        bounds = getattr(reader, "geographic_bounds", reader.bounds)
-
-        band_names = _band_names_from_reader(reader)
-        band_count = reader.dataset.count
-        ds_nodata = reader.dataset.nodata
+        band_count = meta_reader.dataset.count
+        band_names = _band_names_from_reader(meta_reader)
+        ds_nodata = meta_reader.dataset.nodata
         nodata_val = ds_nodata if ds_nodata is not None else nodata_val_fallback
 
-        for z in range(max_z, min_z - 1, -1):
-            for tile in tiles_covering_bounds(tms, bounds, z):
-                x, y = tile.x, tile.y
+    # Compute union bounds across all assets
+    all_bounds = []
+    for asset in tif_list:
+        with Reader(asset) as r:
+            b = getattr(r, "geographic_bounds", r.bounds)
+            all_bounds.append(b)
 
-                try:
-                    image = reader.tile(x, y, z)
-                except (TileOutsideBounds, PointOutsideBounds):
-                    continue
+    w = min(b[0] for b in all_bounds)
+    s = min(b[1] for b in all_bounds)
+    e = max(b[2] for b in all_bounds)
+    n = max(b[3] for b in all_bounds)
+    bounds = (w, s, e, n)
 
-                arr = image.array.astype("float32", copy=False)
-                mask = image.mask
+    def _tif_tiler(asset: str, x: int, y: int, z: int, **kwargs):
+        with Reader(asset) as src:
+            return src.tile(x, y, z, **kwargs)
 
-                if mask is not None:
-                    if mask.ndim == 2:
-                        mask = np.broadcast_to(mask, arr.shape)
-                    arr = np.where(mask == 0, np.nan, arr)
+    for z in range(max_z, min_z - 1, -1):
+        for tile in tiles_covering_bounds(tms, bounds, z):
+            x = int(tile.x)
+            y = int(tile.y)
+            z_int = int(z)
 
-                if ds_nodata is not None:
-                    arr = np.where(arr == ds_nodata, np.nan, arr)
+            try:
+                img, assets_used = mosaic_reader(
+                    tif_list,
+                    _tif_tiler,
+                    x,
+                    y,
+                    z_int,
+                    pixel_selection=HighestMethod(),
+                )
+            except (TileOutsideBounds, PointOutsideBounds):
+                continue
+            arr = img.data.astype("float32", copy=False)
+            mask = img.mask.astype("uint8")
+            arr = np.where(mask == 0, np.nan, arr)
 
-                if save_tiff:
-                    left, bottom, right, top = tms.xy_bounds(tile)
-                    _, height, width = arr.shape
-                    transform = from_bounds(left, bottom, right, top, width, height)
-                    arr_tif = np.where(np.isnan(arr), nodata_val, arr)
+            if save_tiff:
+                left, bottom, right, top = tms.xy_bounds(tile)
+                _, height, width = arr.shape
+                transform = from_bounds(left, bottom, right, top, width, height)
+                arr_tif = np.where(np.isnan(arr), nodata_val, arr)
 
-                    tif_rel = Path(tms_id) / str(z) / str(x) / f"{y}.tif"
-                    tif_path_tile = tif_root / tif_rel
-                    tif_path_tile.parent.mkdir(parents=True, exist_ok=True)
+                tif_rel = Path(tms_id) / str(z_int) / str(x) / f"{y}.tif"
+                tif_path_tile = tif_root / tif_rel
+                tif_path_tile.parent.mkdir(parents=True, exist_ok=True)
 
-                    profile = {
-                        "driver": "GTiff",
-                        "height": height,
-                        "width": width,
-                        "count": band_count,
-                        "dtype": "float32",
-                        "crs": reader.crs,
-                        "transform": transform,
-                        "nodata": nodata_val,
-                    }
+                profile = {
+                    "driver": "GTiff",
+                    "height": height,
+                    "width": width,
+                    "count": band_count,
+                    "dtype": "float32",
+                    "crs": meta_reader.dataset.crs,
+                    "transform": transform,
+                    "nodata": nodata_val,
+                }
 
-                    with rasterio.open(tif_path_tile, "w", **profile) as dst:
-                        dst.write(arr_tif)
+                with rasterio.open(tif_path_tile, "w", **profile) as dst:
+                    dst.write(arr_tif)
 
-                for b in range(band_count):
-                    band = arr[b]
+            # Save PNG tiles by band
+            for b in range(band_count):
+                band = arr[b]
 
-                    # Determine value range
-                    if min_value is None or max_value is None:
-                        if not np.isfinite(band).any():
-                            continue
-                        bmin = float(np.nanmin(band))
-                        bmax = float(np.nanmax(band))
-                        if bmin == bmax:
-                            continue
-                    else:
-                        bmin, bmax = float(min_value), float(max_value)
+                if min_value is None or max_value is None:
+                    if not np.isfinite(band).any():
+                        continue
+                    bmin = float(np.nanmin(band))
+                    bmax = float(np.nanmax(band))
+                    if bmin == bmax:
+                        continue
+                else:
+                    bmin, bmax = float(min_value), float(max_value)
 
-                    masked = np.ma.masked_invalid(band)
+                masked = np.ma.masked_invalid(band)
 
-                    web_img = WebImage(
-                        image_data=masked.filled(nodata_val),
-                        palette=palette,
-                        min_val=bmin,
-                        max_val=bmax,
-                        nodata_val=nodata_val,
-                    )
+                web_img = WebImage(
+                    image_data=masked.filled(nodata_val),
+                    palette=palette,
+                    min_val=bmin,
+                    max_val=bmax,
+                    nodata_val=nodata_val,
+                )
 
-                    style = style_prefix or band_names[b]
-                    png_rel = Path(style) / tms_id / str(z) / str(x) / f"{y}.png"
-                    png_path = png_root / png_rel
-                    png_path.parent.mkdir(parents=True, exist_ok=True)
+                style = style_prefix or band_names[b]
+                png_rel = Path(style) / tms_id / str(z_int) / str(x) / f"{y}.png"
+                png_path = png_root / png_rel
+                png_path.parent.mkdir(parents=True, exist_ok=True)
 
-                    web_img.save(str(png_path))
-                    written.append(str(png_path))
+                web_img.save(str(png_path))
+                written.append(str(png_path))
 
     return written

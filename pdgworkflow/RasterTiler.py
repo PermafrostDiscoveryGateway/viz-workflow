@@ -715,6 +715,7 @@ class RasterTiler:
         min_z = self.config.get_min_z()
         max_z = self.config.get_max_z()
         web_dir = self.tiles.base_dirs["web_tiles"]["path"]
+
         pals = self.config.get_palettes()
         if pals:
             colors = pals[0][0]
@@ -725,7 +726,6 @@ class RasterTiler:
         reverse_palette_cfg = self.config.get("external_reverse_palette")
         reverse_palette = bool(reverse_palette_cfg) if reverse_palette_cfg is not None else False
 
-        # Build list of TIFs
         if tif_paths is None:
             base = self.config.get("dir_input") or "."
             ext = self.config.get("input_file_ext") or ".tif"
@@ -742,16 +742,18 @@ class RasterTiler:
         else:
             paths = list(tif_paths)
 
-        for p in paths:
-            generate_tiles_from_tif(
-                tif_path=p,
-                out_dir=web_dir,
-                tms_id=tms_id,
-                min_z=min_z,
-                max_z=max_z,
-                colors=colors,
-                nodata_color=nodata_color,
-                reverse_palette=reverse_palette,
-                min_value=None,
-                max_value=None
-            )
+        if len(paths) == 0:
+            raise ValueError("No TIFF files found.")
+        
+        generate_tiles_from_tif(
+            tif_path=paths,
+            out_dir=web_dir,
+            tms_id=tms_id,
+            min_z=min_z,
+            max_z=max_z,
+            colors=colors,
+            nodata_color=nodata_color,
+            reverse_palette=reverse_palette,
+            min_value=None,
+            max_value=None
+        )
