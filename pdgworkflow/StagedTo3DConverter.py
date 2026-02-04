@@ -1,5 +1,6 @@
 import logging
 import os
+import gc
 
 import geopandas as gpd
 from shapely.geometry import box
@@ -42,8 +43,11 @@ class StagedTo3DConverter:
         # Get the list of staged vector tiles
         paths = self.tiles.get_filenames_from_dir("staged")
         # Process each tile
-        for path in paths:
+        for i, path in enumerate(paths):
             self.staged_to_3dtile(path)
+            # Periodic garbage collection
+            if (i + 1) % 50 == 0:
+                gc.collect()
 
     def staged_to_3dtile(self, path):
         """
@@ -119,6 +123,9 @@ class StagedTo3DConverter:
                 tilesetVersion=self.config.get("version"),
                 boundingVolume=tile_bv,
             )
+
+            if gdf is not None:
+                del gdf
 
             return ces_tile, ces_tileset
 
