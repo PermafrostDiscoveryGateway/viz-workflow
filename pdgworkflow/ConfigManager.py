@@ -657,7 +657,7 @@ class ConfigManager:
             palette = [colors, nodata_color]
             palettes.append(palette)
         return palettes
-    
+
     def get_doi(self):
         """
         Get the DOI for the workflow run, if set.
@@ -678,7 +678,7 @@ class ConfigManager:
         str or None
             The title, or None if not set.
         """
-        
+
         return self.get("title")
 
     def get_stat_names(self):
@@ -1557,7 +1557,6 @@ class ConfigManager:
             Whether web tiles parent tile creation is enabled.
         """
         return self.get("enable_web_tiles_parents")
-    
 
     def is_generate_wmtsCapabilities_enabled(self):
         """
