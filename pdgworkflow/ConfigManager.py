@@ -390,10 +390,13 @@ class ConfigManager:
         "dir_3dtiles": "3dtiles",
         "dir_staged": "staged",
         "dir_input": "input",
+        "dir_h3": "h3",
+        "ext_h3": ".gpkg",
         "dir_footprints": "footprints",
         "filename_staging_summary": "staging_summary.csv",
         "filename_rasterization_events": "rasterization_events.csv",
         "filename_rasters_summary": "rasters_summary.csv",
+        "filename_h3_summary": "h3_summary.csv",
         "filename_config": "config.json",
         "title": "Placeholder Title",
         "doi": "doi/placeholder",
@@ -417,6 +420,7 @@ class ConfigManager:
         # Staging options
         "simplify_tolerance": 0.0001,
         # Tiling & rasterization options
+        "enable_h3": False,
         "tms_id": "WGS1984Quad",
         "tile_path_structure": ("style", "tms", "z", "x", "y"),
         "z_range": (0, 13),
@@ -1283,6 +1287,7 @@ class ConfigManager:
                     "ext": self.get("ext_web_tiles"),
                 },
                 "3dtiles": {"path": self.get("dir_3dtiles"), "ext": ".json"},
+                "h3": {"path": self.get("dir_h3"), "ext": self.get("ext_h3")},
             },
         }
 
@@ -1334,6 +1339,18 @@ class ConfigManager:
             }
 
         return None
+    
+    def get_h3_config(self) -> dict:
+        return {
+            "h3_res": self.get("h3_res"),
+            "attr_to_sum": self.get("h3_attr_to_sum") or [],
+            "attr_to_mean": self.get("h3_attr_to_mean") or [],
+            "land_polygons_path": self.get("h3_land_polygons_path"),
+            "area_epsg": self.get("h3_area_epsg"),
+            "out_base_dir": self.get("dir_h3"),
+            "out_ext": self.get("ext_h3"),
+            "summary_filename": self.get("filename_h3_summary"),
+        }
 
     def deduplicate_at(self, step):
         """
@@ -1567,6 +1584,9 @@ class ConfigManager:
             Whether WMTS capabilities generation is enabled.
         """
         return self.get("generate_wmtsCapabilities")
+    
+    def is_h3_enabled(self) -> bool:
+     return bool(self.get("enable_h3"))
 
     @staticmethod
     def to_hex(color_str):
