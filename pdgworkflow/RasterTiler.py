@@ -5,6 +5,7 @@ import os
 
 import geopandas as gpd
 import pandas as pd
+import gc
 from .ConfigManager import ConfigManager
 import pdgstaging
 import pyarrow as pa
@@ -142,11 +143,15 @@ class RasterTiler:
         # Assume that all vector files are staged, and all at the same z level.
         # Assume that tile paths have followed the convention configured for
         # the tilePathManager.
-        for path in paths:
+        for i, path in enumerate(paths):
             tile = self.rasterize_vector(path, overwrite=overwrite)
             # Add the parent tile to the set of parent tiles.
             if tile is not None:
                 parent_tiles.add(self.tiles.get_parent_tile(tile))
+
+            # Periodic garbage collection
+            if (i + 1) % 50 == 0:
+                gc.collect()
 
         logger.info(f"Finished rasterization of {len(paths)} vector files.")
 
@@ -216,6 +221,8 @@ class RasterTiler:
 
             # Rasterize
             raster = Raster.from_vector(vector=gdf, bounds=bounds, **raster_opts)
+            if gdf is not None:
+                del gdf
             raster.write(out_path)
 
             # Track and log the end of the event
@@ -223,6 +230,7 @@ class RasterTiler:
             self.__end_tracking(id, raster=raster, tile=tile, message=message)
             logger.info(f"Complete rasterization of tile {tile} to {out_path}.")
 
+            del raster
             return tile
 
         except Exception as e:
@@ -273,10 +281,14 @@ class RasterTiler:
 
         logger.info(f"Start creating {len(tiles)} parent geotiffs at level {z}.")
 
-        for tile in tiles:
+        for i, tile in enumerate(tiles):
             new_tile = self.parent_geotiff_from_children(tile, overwrite=overwrite)
             if new_tile is not None:
                 parent_tiles.add(self.tiles.get_parent_tile(new_tile))
+
+            # Periodic garbage collection
+            if (i + 1) % 50 == 0:
+                gc.collect()
 
         logger.info(f"Finished creating {len(tiles)} parent geotiffs at level {z}.")
 
@@ -396,8 +408,11 @@ class RasterTiler:
 
         logger.info(f"Beginning creation of {len(geotiff_paths)} web tiles")
 
-        for geotiff_path in geotiff_paths:
+        for i, geotiff_path in enumerate(geotiff_paths):
             self.webtile_from_geotiff(geotiff_path, overwrite=overwrite)
+            # Periodic garbage collection
+            if (i + 1) % 50 == 0:
+                gc.collect()
 
         logger.info(f"Finished creating {len(geotiff_paths)} web tiles.")
 
@@ -466,6 +481,8 @@ class RasterTiler:
             message = f"Done creating web tile {tile}"
             self.__end_tracking(id, raster=raster, tile=tile, message=message)
 
+            del raster
+            del image_data
             return tile
 
         except Exception as e:
@@ -758,3 +775,303 @@ class RasterTiler:
             min_value=None,
             max_value=None
         )
+            del df
+            gc.collect()
+
+    def rasterize_max_z_level(self, file_paths=None, overwrite=True):
+        """
+        Wrapper to rasterize only the maximum z-level tiles from staged vectors.
+
+        This method processes all staged vector tiles at the maximum configured
+        z-level and converts them to GeoTIFF rasters. Parent tiles are NOT created
+        in this step - they will be created in subsequent steps using
+        rasterize_composite_z_level().
+
+        Parameters
+        ----------
+        file_paths : list of str, optional
+            List of file paths to staged vector tiles. If not provided, all files
+            from the configured staged directory will be discovered automatically.
+        overwrite : bool, optional
+            Defaults to True. If set to False, then if there is an existing
+            GeoTiff tile at the output path, rasterization will be skipped.
+
+        Returns
+        -------
+        int
+            The number of tiles successfully rasterized.
+
+        Raises
+        ------
+        ValueError
+            If no staged vector files are found or if z-level mismatch occurs.
+
+        Example
+        -------
+        >>> tiler = RasterTiler(config)
+        >>> # Auto-discovery mode
+        >>> tiles_processed = tiler.rasterize_max_z_level(overwrite=True)
+        >>> print(f"Processed {tiles_processed} tiles at max z-level")
+        >>>
+        >>> # Explicit file paths mode
+        >>> paths = ['path/to/tile1.geojson', 'path/to/tile2.geojson']
+        >>> tiles_processed = tiler.rasterize_max_z_level(file_paths=paths)
+        """
+        logger.info("Starting rasterization for maximum z-level")
+
+        # Get file paths from parameter or discover from directory
+        if file_paths is not None:
+            logger.info(f"Using {len(file_paths)} provided file paths")
+            paths = file_paths
+        else:
+            logger.info(
+                "Auto-discovering staged vector files from configured directory"
+            )
+            paths = self.tiles.get_filenames_from_dir("staged")
+
+        # Validate paths exist
+        paths = self.tiles.remove_nonexistent_paths(paths)
+        if not paths:
+            raise ValueError(
+                "No vector files found. Check the path to the staged vector files."
+            )
+
+        # Validate z-level and TMS
+        z = self.config.get_max_z()
+        tms_id = self.config.get("tms_id")
+        ref_tile_props = self.tiles.dict_from_path(paths[0])
+
+        if ref_tile_props.get("z") != z:
+            raise ValueError(
+                f"z-level of the input vector tiles ({ref_tile_props.get('z')}) "
+                f"must match the max z-level specified in the config ({z})."
+            )
+        if ref_tile_props.get("tms") != tms_id:
+            raise ValueError(
+                f"tms of the input vector tiles ({ref_tile_props.get('tms')}) "
+                f"must match the tms specified in the config ({tms_id})."
+            )
+
+        logger.info(
+            f"Beginning rasterization of {len(paths)} vector files at z-level {z}."
+        )
+
+        # Rasterize all tiles at max z-level (without creating parents)
+        tiles_processed = 0
+        for path in paths:
+            tile = self.rasterize_vector(path, overwrite=overwrite)
+            if tile is not None:
+                tiles_processed += 1
+
+        logger.info(
+            f"Completed rasterization of {tiles_processed} tiles at z-level {z}."
+        )
+
+        return tiles_processed
+
+    def rasterize_composite_z_level(self, z, file_paths=None, overwrite=True):
+        """
+        Wrapper to create composite (parent) GeoTIFF tiles for a specific z-level.
+
+        This method creates parent tiles at the specified z-level by compositing
+        the four child tiles from z+1. This should be called sequentially for each
+        z-level from (max_z - 1) down to min_z to ensure all parent tiles exist
+        before creating their own parents.
+
+        Run this for each z-level in sequence, ensuring z+1 completes before
+        starting z. Can parallelize within a z-level across tiles.
+
+        Parameters
+        ----------
+        z : int
+            The z-level to create composite tiles for. Must be less than max_z.
+        file_paths : list of str, optional
+            List of file paths to child GeoTIFF tiles at z+1. If not provided,
+            all child tiles from the configured geotiff directory will be
+            discovered automatically.
+        overwrite : bool, optional
+            Defaults to True. If set to False, existing GeoTiff tiles will
+            not be recreated.
+
+        Returns
+        -------
+        int
+            The number of parent tiles successfully created at this z-level.
+
+        Raises
+        ------
+        ValueError
+            If z is invalid (>= max_z or < min_z).
+
+        Example
+        -------
+        >>> tiler = RasterTiler(config)
+        >>> # First process max z-level
+        >>> tiler.rasterize_max_z_level()
+        >>> # Then process each composite level sequentially (auto-discovery)
+        >>> for z in range(max_z - 1, min_z - 1, -1):
+        >>>     tiles_created = tiler.rasterize_composite_z_level(z)
+        >>>     print(f"Created {tiles_created} tiles at z-level {z}")
+        >>>
+        >>> # Or with explicit file paths
+        >>> child_paths = ['path/to/child1.tif', 'path/to/child2.tif']
+        >>> tiles_created = tiler.rasterize_composite_z_level(z=10, file_paths=child_paths)
+        """
+        max_z = self.config.get_max_z()
+        min_z = self.config.get_min_z()
+
+        # Validate z-level
+        if z >= max_z:
+            raise ValueError(
+                f"z-level {z} must be less than max_z ({max_z}). "
+                "Use rasterize_max_z_level() for the maximum z-level."
+            )
+        if z < min_z:
+            raise ValueError(
+                f"z-level {z} is below min_z ({min_z}). No tiles to create."
+            )
+
+        logger.info(f"Starting composite tile creation for z-level {z}")
+
+        # Get child tile paths from parameter or discover from directory
+        child_z = z + 1
+        if file_paths is not None:
+            logger.info(f"Using {len(file_paths)} provided child tile paths")
+            child_paths = file_paths
+        else:
+            logger.info(f"Auto-discovering child GeoTIFF tiles at z-level {child_z}")
+            child_paths = self.tiles.get_filenames_from_dir("geotiff", z=child_z)
+
+        child_paths = self.tiles.remove_nonexistent_paths(child_paths)
+
+        if not child_paths:
+            logger.warning(
+                f"No child GeoTIFF tiles found at z-level {child_z}. "
+                "Ensure previous z-level processing completed successfully."
+            )
+            return 0
+
+        # Get unique parent tiles from all children
+        parent_tiles = set()
+        for child_path in child_paths:
+            child_tile = self.tiles.tile_from_path(child_path)
+            parent_tile = self.tiles.get_parent_tile(child_tile)
+            # Only add if parent is at the target z-level
+            if parent_tile.z == z:
+                parent_tiles.add(parent_tile)
+
+        logger.info(
+            f"Creating {len(parent_tiles)} parent tiles at z-level {z} "
+            f"from {len(child_paths)} child tiles at z-level {child_z}."
+        )
+
+        # Create each parent tile
+        tiles_created = 0
+        for tile in parent_tiles:
+            created_tile = self.parent_geotiff_from_children(tile, overwrite=overwrite)
+            if created_tile is not None:
+                tiles_created += 1
+
+        logger.info(
+            f"Completed creation of {tiles_created} parent tiles at z-level {z}."
+        )
+
+        return tiles_created
+
+    def create_web_tiles_for_z_level(
+        self, z, file_paths=None, update_ranges=True, overwrite=True
+    ):
+        """
+        Wrapper to create web tiles for a specific z-level from GeoTIFF tiles.
+
+        This method creates web image tiles (PNG) from GeoTIFF tiles at the
+        specified z-level. Can be run independently for each z-level after all
+        GeoTIFF tiles have been created (both max z and all composite levels).
+
+        Run this for each z-level in parallel once all GeoTIFF processing is
+        complete. Can also parallelize within a z-level across tiles.
+
+        Parameters
+        ----------
+        z : int
+            The z-level to create web tiles for.
+        file_paths : list of str, optional
+            List of file paths to GeoTIFF tiles. If not provided, all GeoTIFF
+            tiles at the specified z-level from the configured directory will
+            be discovered automatically.
+        update_ranges : bool, optional
+            If True, the minimum and maximum values for this z-level will be
+            updated from the raster summary data before creating web tiles.
+            This ensures consistent color mapping. Defaults to True.
+        overwrite : bool, optional
+            Defaults to True. If set to False, existing web tiles will not
+            be recreated.
+
+        Returns
+        -------
+        int
+            The number of web tiles successfully created at this z-level.
+
+        Raises
+        ------
+        ValueError
+            If z is invalid or no GeoTIFF tiles exist at this z-level.
+
+        Example
+        -------
+        >>> tiler = RasterTiler(config)
+        >>> # After all GeoTIFF processing is complete (auto-discovery)
+        >>> for z in range(min_z, max_z + 1):
+        >>>     tiles_created = tiler.create_web_tiles_for_z_level(z)
+        >>>     print(f"Created {tiles_created} web tiles at z-level {z}")
+        >>>
+        >>> # Or with explicit file paths
+        >>> geotiff_paths = ['path/to/tile1.tif', 'path/to/tile2.tif']
+        >>> tiles_created = tiler.create_web_tiles_for_z_level(
+        >>>     z=10, file_paths=geotiff_paths
+        >>> )
+        """
+        max_z = self.config.get_max_z()
+        min_z = self.config.get_min_z()
+
+        # Validate z-level
+        if z > max_z or z < min_z:
+            raise ValueError(f"z-level {z} is outside valid range [{min_z}, {max_z}].")
+
+        logger.info(f"Starting web tile creation for z-level {z}")
+
+        # Update ranges if requested
+        if update_ranges:
+            logger.info("Updating value ranges from raster summary data")
+            self.update_ranges()
+
+        # Get GeoTIFF paths from parameter or discover from directory
+        if file_paths is not None:
+            logger.info(f"Using {len(file_paths)} provided GeoTIFF paths")
+            geotiff_paths = file_paths
+        else:
+            logger.info(f"Auto-discovering GeoTIFF tiles at z-level {z}")
+            geotiff_paths = self.tiles.get_filenames_from_dir("geotiff", z=z)
+
+        geotiff_paths = self.tiles.remove_nonexistent_paths(geotiff_paths)
+
+        if not geotiff_paths:
+            raise ValueError(
+                f"No GeoTIFF tiles found at z-level {z}. "
+                "Ensure GeoTIFF processing completed successfully."
+            )
+
+        logger.info(
+            f"Creating web tiles for {len(geotiff_paths)} GeoTIFF tiles at z-level {z}."
+        )
+
+        # Create web tiles
+        tiles_created = 0
+        for geotiff_path in geotiff_paths:
+            tile = self.webtile_from_geotiff(geotiff_path, overwrite=overwrite)
+            if tile is not None:
+                tiles_created += 1
+
+        logger.info(f"Completed creation of {tiles_created} web tiles at z-level {z}.")
+
+        return tiles_created
