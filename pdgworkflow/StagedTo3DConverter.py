@@ -114,10 +114,27 @@ class StagedTo3DConverter:
                 tiny_mask = gdf[area_prop] <= 0.0001
                 if tiny_mask.any():
                     logger.warning(
-                        f"Vector tile {path} contains very small polygons.Expanding slightly to make them visible in 3D tiles."
+                        f"Vector tile {path} contains very small polygons. "
+                        "Expanding to make them visible in 3D tiles."
                     )
                     gdf = gdf.copy()
-                    gdf.loc[tiny_mask, "geometry"] = gdf.loc[tiny_mask, "geometry"].buffer(1e-8)
+
+                    original_crs = gdf.crs
+                    projected_crs = gdf.estimate_utm_crs()
+
+                    if projected_crs is not None:
+                        gdf_projected = gdf.to_crs(projected_crs)
+                        gdf_projected.loc[tiny_mask, "geometry"] = (
+                            gdf_projected.loc[tiny_mask, "geometry"].buffer(0.25)
+                        )
+                        gdf["geometry"] = gdf_projected.to_crs(original_crs)["geometry"]
+                    else:
+                        logger.warning(
+                            f"Could not estimate a projected CRS for {path}. "
+                            "Skipping polygon."
+                        )
+
+                    
 
             # Check if deduplication should be performed
             dedup_here = self.config.deduplicate_at("3dtiles")
