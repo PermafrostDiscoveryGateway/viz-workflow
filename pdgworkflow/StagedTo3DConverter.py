@@ -94,6 +94,47 @@ class StagedTo3DConverter:
             # Remove polygons with centroids that are outside the tile boundary
             prop_cent_in_tile = self.config.polygon_prop("centroid_within_tile")
             gdf = gdf[gdf[prop_cent_in_tile]]
+            if len(gdf) == 0:
+                logger.warning(
+                    f"Vector tile {path} has no features with centroid inside tile. "
+                    "3D tile will not be created."
+                )
+                return None, None
+            
+            simplify_tol = self.config.get("simplify_tolerance")
+            if simplify_tol is not None:
+                gdf = gdf.copy()
+                gdf["geometry"] = gdf["geometry"].simplify(
+                    simplify_tol, preserve_topology=True
+                )
+
+            # buffer extremely small polygons
+            area_prop = self.config.polygon_prop("area")
+            if area_prop in gdf.columns:
+                tiny_mask = gdf[area_prop] <= 0.0001
+                if tiny_mask.any():
+                    logger.warning(
+                        f"Vector tile {path} contains very small polygons. "
+                        "Expanding to make them visible in 3D tiles."
+                    )
+                    gdf = gdf.copy()
+
+                    original_crs = gdf.crs
+                    projected_crs = gdf.estimate_utm_crs()
+
+                    if projected_crs is not None:
+                        gdf_projected = gdf.to_crs(projected_crs)
+                        gdf_projected.loc[tiny_mask, "geometry"] = (
+                            gdf_projected.loc[tiny_mask, "geometry"].buffer(0.25)
+                        )
+                        gdf["geometry"] = gdf_projected.to_crs(original_crs)["geometry"]
+                    else:
+                        logger.warning(
+                            f"Could not estimate a projected CRS for {path}. "
+                            "Skipping polygon."
+                        )
+
+                    
 
             # Check if deduplication should be performed
             dedup_here = self.config.deduplicate_at("3dtiles")
