@@ -94,6 +94,30 @@ class StagedTo3DConverter:
             # Remove polygons with centroids that are outside the tile boundary
             prop_cent_in_tile = self.config.polygon_prop("centroid_within_tile")
             gdf = gdf[gdf[prop_cent_in_tile]]
+            if len(gdf) == 0:
+                logger.warning(
+                    f"Vector tile {path} has no features with centroid inside tile. "
+                    "3D tile will not be created."
+                )
+                return None, None
+            
+            simplify_tol = self.config.get("simplify_tolerance")
+            if simplify_tol is not None:
+                gdf = gdf.copy()
+                gdf["geometry"] = gdf["geometry"].simplify(
+                    simplify_tol, preserve_topology=True
+                )
+
+            # buffer extremely small polygons
+            area_prop = self.config.polygon_prop("area")
+            if area_prop in gdf.columns:
+                tiny_mask = gdf[area_prop] <= 0.0001
+                if tiny_mask.any():
+                    logger.warning(
+                        f"Vector tile {path} contains very small polygons.Expanding slightly to make them visible in 3D tiles."
+                    )
+                    gdf = gdf.copy()
+                    gdf.loc[tiny_mask, "geometry"] = gdf.loc[tiny_mask, "geometry"].buffer(1e-8)
 
             # Check if deduplication should be performed
             dedup_here = self.config.deduplicate_at("3dtiles")
