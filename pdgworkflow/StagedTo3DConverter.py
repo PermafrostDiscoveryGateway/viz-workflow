@@ -35,6 +35,40 @@ class StagedTo3DConverter:
         self.config = workflow_config
         self.tiles = pdgstaging.TilePathManager(**self.config.get_path_manager_config())
 
+    def get_3dtiles_z_coord(self):
+        z_coord = self.config.get("z_coord")
+        if z_coord not in (None, 0, 0.0):
+            return z_coord
+        return self.config.get_max_z()
+
+    def get_3dtiles_jsons_at_z(self, z):
+        """
+        Return generated tile JSON files at a zoom level, ignoring metadata JSON.
+        """
+        base_dir = self.tiles.get_base_dir("3dtiles")
+        if base_dir is None:
+            raise ValueError("Base directory does not exist")
+
+        dir_path = base_dir["path"]
+        ext = base_dir["ext"]
+        paths = []
+        for root, _, files in os.walk(dir_path):
+            for file in files:
+                if not file.endswith(ext):
+                    continue
+
+                fullpath = os.path.join(root, file)
+                try:
+                    tile = self.tiles.dict_from_path(fullpath)
+                except ValueError:
+                    logger.debug("Skipping non-tile JSON while building 3D tileset: %s", fullpath)
+                    continue
+
+                if tile["z"] == z:
+                    paths.append(fullpath)
+
+        return sorted(paths)
+
     def all_staged_to_3dtiles(self):
         """
         Process all staged vector tiles into 3D tiles.
@@ -118,7 +152,7 @@ class StagedTo3DConverter:
                 gdf,
                 dir=tile_dir,
                 filename=tile_filename,
-                z=self.config.get("z_coord"),
+                z=self.get_3dtiles_z_coord(),
                 geometricError=self.config.get("geometricError"),
                 tilesetVersion=self.config.get("version"),
                 boundingVolume=tile_bv,
@@ -243,7 +277,7 @@ class StagedTo3DConverter:
 
         # Make a parent tileset.json - this will combine the top level tiles if
         # there are 2, otherwise it will just refer to the top level tile.
-        top_level_tiles = tile_manager.get_filenames_from_dir("3dtiles", z=max_z)
+        top_level_tiles = self.get_3dtiles_jsons_at_z(max_z)
         top_level_dir = tile_manager.get_base_dir("3dtiles")["path"]
 
         return TreeGenerator.parent_tile_from_children_json(
