@@ -18,7 +18,7 @@ Cite this software as:
 
 ## Usage
 
-Requires Python version `3.11`.
+Requires Python version `3.11` or `3.12`.
 
 To run the visualization workflow with Ray on the National Center for Supercomputing Applications Delta server, see documentation in [`PermafrostDiscoveryGateway/viz-info/09_iwp-workflow`](https://github.com/PermafrostDiscoveryGateway/viz-info/blob/main/09_iwp-workflow.md)
 
