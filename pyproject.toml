@@ -1,6 +1,6 @@
 [project]
 name = "pdgworkflow"
-version = "1.0.0"
+version = "1.1.0"
 description = "PDG Visualization workflow."
 authors = [
     {name = "Robyn Thiessen-Bock", email = "thiessenbock@nceas.ucsb.edu"},
@@ -8,7 +8,8 @@ authors = [
     {name = "Lauren Walker", email = "walker@nceas.ucsb.edu"},
     {name = "Matthew B. Jones", email = "jones@nceas.ucsb.edu"},
     {name = "Rushiraj Nenuji", email = "nenuji@nceas.ucsb.edu"},
-    {name = "Alyona Kosobokova", email = "alyonak@nceas.ucsb.edu"}  
+    {name = "Alyona Kosobokova", email = "alyonak@nceas.ucsb.edu"},
+    {name = "Jim Regetz", email = "regetz@nceas.ucsb.edu"}
 ]
 license = {text = "Apache Software License 2.0"}
 readme = "README.md"
@@ -49,5 +50,5 @@ allow-direct-references = true
 
 [tool.black]
 line-length = 88
-target-version = ["py39"]
+target-version = ["py311"]
 include = "\\.pyi?$"
