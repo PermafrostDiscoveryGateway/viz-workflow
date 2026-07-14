@@ -397,8 +397,8 @@ class WorkflowManager:
         """
         Generate WMTS capabilities document.
         """
-        max_z   = self.config.get_max_z()
-        tms_id  = self.config.get("tms_id")   
+        max_z = self.config.get_max_z()
+        tms_id = self.config.get("tms_id")
         title = self.config.get("title")
         base_url = "https://arcticdata.io/data/"
         doi = self.config.get("doi")
@@ -409,12 +409,14 @@ class WorkflowManager:
             bbox_vals = self.tiles.get_total_bounding_box("web_tiles", max_z)
             bbox = {
                 "left": bbox_vals[0],
-                 "bottom": bbox_vals[1],
-                 "right": bbox_vals[2],
-                 "top": bbox_vals[3],
+                "bottom": bbox_vals[1],
+                "right": bbox_vals[2],
+                "top": bbox_vals[3],
             }
         except ValueError:
-            logger.warning("Bounding box could not be retrieved for WMTSCapabilities.xml; using global extent.")
+            logger.warning(
+                "Bounding box could not be retrieved for WMTSCapabilities.xml; using global extent."
+            )
             bbox = None
 
         try:
@@ -429,16 +431,16 @@ class WorkflowManager:
         except ValueError as e:
             logger.error("Failed to initialize WMTSCapabilitiesGenerator: %s", e)
 
-         # Add Staged layer
+        # Add Staged layer
         if self.config.is_stager_enabled():
             ext = self.config.get("ext_staged")
             dir_staged = paths["base_dirs"]["staged"]["path"]
 
             generator.add_layer(
-            layer_title= f"{title} {ext}",
-            layer_identifier=f"{title}({ext})",
-            tile_format= ext,
-            url_postfix= dir_staged,
+                layer_title=f"{title} {ext}",
+                layer_identifier=f"{title}({ext})",
+                tile_format=ext,
+                url_postfix=dir_staged,
             )
 
         # Add Raster .tif layer
@@ -446,10 +448,10 @@ class WorkflowManager:
             ext = ".tif"
             dir_geotiff = paths["base_dirs"]["geotiff"]["path"]
             generator.add_layer(
-            layer_title=f"{title} {ext}",
-            layer_identifier=f"{title}({ext})",
-            tile_format= ext,
-            url_postfix= dir_geotiff,
+                layer_title=f"{title} {ext}",
+                layer_identifier=f"{title}({ext})",
+                tile_format=ext,
+                url_postfix=dir_geotiff,
             )
 
         # Add Web Tiles layers (png)
@@ -461,8 +463,8 @@ class WorkflowManager:
                 generator.add_layer(
                     layer_title=f"{title} {layer_name}",
                     layer_identifier=f"{title}{layer_name}({ext})",
-                    tile_format= ext,
-                    url_postfix= f"{dir_web_tiles}/{layer_name}",
+                    tile_format=ext,
+                    url_postfix=f"{dir_web_tiles}/{layer_name}",
                 )
 
         xml_txt = generator.generate_capabilities()
@@ -472,7 +474,7 @@ class WorkflowManager:
         out_path.write_text(xml_txt, encoding="utf-8")
         logger.info("WMTS capabilities written to %s", out_path)
         return True
-    
+
     def run_workflow(self) -> None:
         """
         Run the complete visualization workflow.
@@ -506,9 +508,99 @@ class WorkflowManager:
             logger.info("3D tiles enabled, starting 3D tile generation...")
             self.run_3d_tiling()
 
-        if self.config.is_generate_wmtsCapabilities_enabled():
+        if self.config.is_generate_wmtsCapabilities_enabled() and (
+            self.config.is_stager_enabled()
+            or self.config.is_raster_enabled()
+            or self.config.is_web_tiles_enabled()
+        ):
             logger.info("Generating WMTSCapabilities.xml ")
-            self.generate_wmts_capabilities()  
+            self.generate_wmts_capabilities()
+
+    def get_filenames_from_dir(self, base_dir, z=None):
+        """
+        Given the name of a base directory that has been saved to this Path
+        Manager, get all of the files within that directory that have the
+        associated extension.
+
+        Parameters
+        ----------
+        base_dir : str
+            The name of the base directory.
+
+        z : int, optional
+            The zoom level to get the files for. If not provided, files
+            from all zoom levels will be returned.
+
+        Returns
+        -------
+        paths : list
+            A list of paths to the files in the base directory.
+        """
+        return self.tiles.get_filenames_from_dir(base_dir, z=z)
+
+    def rasterize_max_z_level(self, overwrite: bool = True) -> int:
+        """
+        Wrapper to rasterize only the maximum z-level tiles from staged vectors.
+
+        Args:
+            overwrite: Whether to overwrite existing GeoTIFF files
+
+        Returns:
+            Number of tiles successfully rasterized
+
+        Raises:
+            WokflowManagerError: If rasterization fails
+        """
+        if not self.raster_tiler:
+            self.raster_tiler = self.init_raster_tiler()
+
+        return self.raster_tiler.rasterize_max_z_level(overwrite=overwrite)
+
+    def rasterize_composite_z_level(self, z: int, overwrite: bool = True) -> int:
+        """
+        Wrapper to create composite (parent) GeoTIFF tiles for a specific z-level.
+
+        Args:
+            z: The z-level to create composite tiles for
+            overwrite: Whether to overwrite existing GeoTIFF files
+
+        Returns:
+            Number of parent tiles successfully created
+
+        Raises:
+            WokflowManagerError: If composite tile creation fails
+            ValueError: If z-level is invalid
+        """
+        if not self.raster_tiler:
+            self.raster_tiler = self.init_raster_tiler()
+
+        return self.raster_tiler.rasterize_composite_z_level(z, overwrite=overwrite)
+
+    def create_web_tiles_for_z_level(
+        self, z: int, update_ranges: bool = True, overwrite: bool = True
+    ) -> int:
+        """
+        Wrapper to create web tiles for a specific z-level from GeoTIFF tiles.
+
+        Args:
+            z: The z-level to create web tiles for
+            update_ranges: Whether to update value ranges before creating tiles
+            overwrite: Whether to overwrite existing web tiles
+
+        Returns:
+            Number of web tiles successfully created
+
+        Raises:
+            WokflowManagerError: If web tile creation fails
+            ValueError: If z-level is invalid
+        """
+        if not self.raster_tiler:
+            self.raster_tiler = self.init_raster_tiler()
+
+        return self.raster_tiler.create_web_tiles_for_z_level(
+            z, update_ranges=update_ranges, overwrite=overwrite
+        )
+
 
 # CLI interface
 @click.group()

@@ -1,7 +1,7 @@
 # Viz-workflow: the Permafrost Discovery Gateway geospatial data visualization workflow
 
-- **Authors**: Robyn Thiessen-Bock ; Juliet Cohen ; Matthew B. Jones ; Kastan Day ; Lauren Walker; Rushiraj Nenuji; Alyona Kosobokova
-- **DOI**: [10.18739/A2QV3C583](https://ezid.cdlib.org/id/doi:10.18739/A2QV3C583)
+- **Authors**: Robyn Thiessen-Bock; Juliet Cohen; Matthew B. Jones; Kastan Day; Lauren Walker; Rushiraj Nenuji; Alyona Kosobokova; Jim Regetz
+- **DOI**: [10.18739/A2MP4VQ5B](https://ezid.cdlib.org/id/doi:10.18739/A2MP4VQ5B)
 - **License**: [Apache 2](https://opensource.org/license/apache-2-0/)
 - [Package source code on GitHub](https://github.com/PermafrostDiscoveryGateway/viz-workflow)
 - [Submit bugs and feature requests](https://github.com/PermafrostDiscoveryGateway/viz-workflow/issues/new)
@@ -14,9 +14,11 @@ The Permafrost Discovery Gateway visualization workflow uses [viz-staging](https
 
 Cite this software as:
 
-> Robyn Thiessen-Bock, Juliet Cohen, Matthew B. Jones, Kastan Day, Lauren Walker, Rushiraj Nenuji, Alyona Kosobokova. 2025. Viz-workflow: the Permafrost Discovery Gateway geospatial data visualization workflow (version 1.0.0). Arctic Data Center. doi: 10.18739/A2QV3C583
+> Robyn Thiessen-Bock, Juliet Cohen, Matthew B. Jones, Kastan Day, Lauren Walker, Rushiraj Nenuji, Alyona Kosobokova, Jim Regetz. 2026. Viz-workflow: the Permafrost Discovery Gateway geospatial data visualization workflow (version 1.1.0). Arctic Data Center. doi:10.18739/A2MP4VQ5B
 
 ## Usage
+
+Requires Python version `3.11` or `3.12`.
 
 To run the visualization workflow with Ray on the National Center for Supercomputing Applications Delta server, see documentation in [`PermafrostDiscoveryGateway/viz-info/09_iwp-workflow`](https://github.com/PermafrostDiscoveryGateway/viz-info/blob/main/09_iwp-workflow.md)
 
