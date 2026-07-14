@@ -10,10 +10,15 @@ from .ConfigManager import ConfigManager
 import pdgstaging
 import pyarrow as pa
 import pyarrow.parquet as pq
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
 
 from pdgraster import Raster
 from pdgraster import Palette
 from pdgraster import WebImage
+from .TifToWebTiles import generate_tiles_from_tif
+
 
 logger = logging.getLogger(__name__)
 
@@ -721,6 +726,55 @@ class RasterTiler:
                 parquet_path,
                 compression="snappy",
             )
+
+    def webtiles_from_external_tifs(self, tif_paths=None):
+
+        tms_id = self.config.get("tms_id")
+        min_z = self.config.get_min_z()
+        max_z = self.config.get_max_z()
+        web_dir = self.tiles.base_dirs["web_tiles"]["path"]
+
+        pals = self.config.get_palettes()
+        if pals:
+            colors = pals[0][0]
+        else:
+            colors = ["#000000", "#c2e699", "#78c679", "#238443", "#004529"]
+
+        nodata_color = self.config.get("nodata_color") or "#ffffff00"
+        reverse_palette_cfg = self.config.get("external_reverse_palette")
+        reverse_palette = bool(reverse_palette_cfg) if reverse_palette_cfg is not None else False
+
+        if tif_paths is None:
+            base = self.config.get("dir_input") or "."
+            ext = self.config.get("input_file_ext") or ".tif"
+            paths = [str(p) for p in Path(base).rglob(f"*{ext}")]
+        elif isinstance(tif_paths, dict):
+            base = tif_paths["path"]
+            ext = tif_paths.get("ext", ".tif")
+            paths = [str(p) for p in Path(base).rglob(f"*{ext}")]
+        elif isinstance(tif_paths, str):
+            if os.path.isdir(tif_paths):
+                paths = [str(p) for p in Path(tif_paths).rglob("*.tif")]
+            else:
+                paths = [tif_paths]
+        else:
+            paths = list(tif_paths)
+
+        if len(paths) == 0:
+            raise ValueError("No TIFF files found.")
+        
+        generate_tiles_from_tif(
+            tif_path=paths,
+            out_dir=web_dir,
+            tms_id=tms_id,
+            min_z=min_z,
+            max_z=max_z,
+            colors=colors,
+            nodata_color=nodata_color,
+            reverse_palette=reverse_palette,
+            min_value=None,
+            max_value=None
+        )
             del df
             gc.collect()
 
