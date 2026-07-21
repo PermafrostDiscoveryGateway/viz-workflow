@@ -550,7 +550,11 @@ class WorkflowManager:
             logger.info("3D tiles enabled, starting 3D tile generation...")
             self.run_3d_tiling()
 
-        if self.config.is_generate_wmtsCapabilities_enabled():
+        if self.config.is_generate_wmtsCapabilities_enabled() and (
+            self.config.is_stager_enabled()
+            or self.config.is_raster_enabled()
+            or self.config.is_web_tiles_enabled()
+        ):
             logger.info("Generating WMTSCapabilities.xml ")
             self.generate_wmts_capabilities()
 
