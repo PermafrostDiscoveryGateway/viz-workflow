@@ -20,6 +20,8 @@ from .RasterTiler import RasterTiler
 from .StagedTo3DConverter import StagedTo3DConverter
 from pdgstaging import TileStager
 from pdgstaging import TilePathManager
+from pdgstaging import H3GridSummaryGenerator
+from pdgstaging import H3SummaryStager
 from .WMTSCapabilitiesGenerator import WMTSCapabilitiesGenerator
 from pathlib import Path
 
@@ -103,6 +105,9 @@ class WorkflowManager:
         # Initialize 3D tiler to None (will be created when needed)
         self.cesium_3d_tiler = None
 
+        # Initialize h3_stager  
+        self.h3_stager = None
+
     def run_staging(self) -> bool:
         """
         Run the data staging step of the workflow.
@@ -120,6 +125,39 @@ class WorkflowManager:
         self.tile_stager = self.init_tiler()
 
         return self.tile_stager.stage_all()
+    
+    def init_h3_stager(self) -> H3SummaryStager:
+        h3_cfg = self.config.get_h3_config()
+        generator = H3GridSummaryGenerator(
+            tiles=self.tiles,
+            out_base_dir=h3_cfg["out_base_dir"],
+            land_polygons_path=h3_cfg["land_polygons_path"],
+            area_epsg=h3_cfg["area_epsg"],
+            attr_to_sum=h3_cfg["attr_to_sum"],
+            attr_to_mean=h3_cfg["attr_to_mean"],
+            logger=logger,
+        )
+        return H3SummaryStager(
+            tiles=self.tiles,
+            out_base_dir=h3_cfg["out_base_dir"],
+            out_ext=h3_cfg["out_ext"],
+            summary_filename=h3_cfg["summary_filename"],
+            generator=generator,
+        )
+
+    def run_h3_staging(self) -> bool:
+        if not self.h3_stager:
+            self.h3_stager = self.init_h3_stager()
+
+        h3_cfg = self.config.get_h3_config()
+        self.h3_stager.stage_all(
+            h3_res=h3_cfg["h3_res"],
+            attr_to_sum=h3_cfg["attr_to_sum"],
+            attr_to_mean=h3_cfg["attr_to_mean"],
+            land_polygons_path=h3_cfg["land_polygons_path"],
+            area_epsg=h3_cfg["area_epsg"],
+        )
+        return True
 
     def init_tiler(self) -> TileStager:
         """
@@ -499,6 +537,10 @@ class WorkflowManager:
         if self.config.is_stager_enabled():
             logger.info("Staging enabled, starting tile staging...")
             self.run_staging()
+        
+        if self.config.is_h3_enabled():
+            logger.info("H3 summary enabled, starting H3 summary generation...")
+            self.run_h3_staging()
 
         if self.config.is_raster_enabled():
             logger.info("Rasterization enabled, starting rasterization process...")
