@@ -6,8 +6,7 @@ import geopandas as gpd
 from shapely.geometry import box
 
 import pdgstaging
-from pdg3dtiles import TreeGenerator, BoundingVolumeRegion
-
+from pdg3dtiles import BoundingVolume, BoundingVolumeRegion, Tile, Tileset, TreeGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +60,9 @@ class StagedTo3DConverter:
                 try:
                     tile = self.tiles.dict_from_path(fullpath)
                 except ValueError:
-                    logger.debug("Skipping non-tile JSON while building 3D tileset: %s", fullpath)
+                    logger.debug(
+                        "Skipping non-tile JSON while building 3D tileset: %s", fullpath
+                    )
                     continue
 
                 if tile["z"] == z:
@@ -82,6 +83,38 @@ class StagedTo3DConverter:
             # Periodic garbage collection
             if (i + 1) % 50 == 0:
                 gc.collect()
+
+    def empty_leaf_tileset(self, tile_dir, tile_filename, bounding_volume):
+        """Write a leaf tileset JSON file that has no content.
+
+        This mirrors the staging behavior, and a tileset is generated for every tile, even if there is no content.
+        """
+        z = self.get_3dtiles_z_coord()
+        z = 0.0 if z is None else float(z)
+        empty_bounding_volume = {
+            **bounding_volume,
+            "min_height": z - 1.0,
+            "max_height": z + 1.0,
+        }
+        geometric_error = self.config.get("geometricError")
+        if geometric_error is None:
+            geometric_error = 0
+
+        tileset = Tileset(
+            asset={"version": "1.0"},
+            geometricError=geometric_error,
+            root=Tile(
+                boundingVolume=BoundingVolume(empty_bounding_volume),
+                geometricError=geometric_error,
+            ),
+        )
+        version = self.config.get("version")
+        if version:
+            tileset.asset.tilesetVersion = version
+
+        os.makedirs(tile_dir, exist_ok=True)
+        tileset.to_file(os.path.join(tile_dir, tile_filename + ".json"), minify=True)
+        return None, tileset
 
     def staged_to_3dtile(self, path):
         """
@@ -118,16 +151,24 @@ class StagedTo3DConverter:
             # Read in the staged vector tile
             gdf = gpd.read_file(path)
 
-            # Check if the gdf is empty
+            # Preserve an empty leaf JSON file for every staged tile
             if len(gdf) == 0:
                 logger.warning(
-                    f"Vector tile {path} is empty. 3D tile will not be" " created."
+                    f"Vector tile {path} is empty. Creating a content-free 3D "
+                    "tileset JSON."
                 )
-                return None, None
+                return self.empty_leaf_tileset(tile_dir, tile_filename, tile_bv)
 
             # Remove polygons with centroids that are outside the tile boundary
             prop_cent_in_tile = self.config.polygon_prop("centroid_within_tile")
             gdf = gdf[gdf[prop_cent_in_tile]]
+
+            if len(gdf) == 0:
+                logger.info(
+                    f"Vector tile {path} has no centroid-owned polygons. "
+                    "Creating a content-free 3D tileset JSON."
+                )
+                return self.empty_leaf_tileset(tile_dir, tile_filename, tile_bv)
 
             # Check if deduplication should be performed
             dedup_here = self.config.deduplicate_at("3dtiles")
@@ -141,11 +182,11 @@ class StagedTo3DConverter:
 
                 # The tile could theoretically be empty after deduplication
                 if len(gdf) == 0:
-                    logger.warning(
+                    logger.info(
                         f"Vector tile {path} is empty after deduplication."
-                        " 3D Tile will not be created."
+                        " Creating a content-free 3D tileset JSON."
                     )
-                    return None, None
+                    return self.empty_leaf_tileset(tile_dir, tile_filename, tile_bv)
 
             # Create & save the b3dm file
             ces_tile, ces_tileset = TreeGenerator.leaf_tile_from_gdf(
@@ -229,16 +270,19 @@ class StagedTo3DConverter:
         tile : morecantile.Tile
             The tile object.
         limit_to : list of float
-            Optional list of west, south, east, north coordinates to limit
-            the bounding region to.
+            Optional list of left, bottom, right, top coordinates in the TMS
+            coordinate reference system used to limit the bounding region.
 
         Returns
         -------
-        bv : BoundingVolumeRegion
-            The bounding region object.
+        bv : dict
+            Geographic west, south, east, and north bounds in degrees, suitable
+            for constructing a BoundingVolumeRegion.
         """
         tms = self.tiles.tms
-        bounds = tms.bounds(tile)
+        # morecantile.bounds() returns geographic coordinates, while xy_bounds()
+        # returns coordinates in tms.crs. 
+        bounds = tms.xy_bounds(tile)
         bounds = gpd.GeoSeries(
             box(bounds.left, bounds.bottom, bounds.right, bounds.top), crs=tms.crs
         )
@@ -247,6 +291,10 @@ class StagedTo3DConverter:
                 box(limit_to[0], limit_to[1], limit_to[2], limit_to[3]), crs=tms.crs
             )
             bounds = bounds.intersection(bounds_limitor)
+            if bounds.iloc[0].is_empty:
+                raise ValueError(
+                    f"Tile {tile} does not intersect bounding-volume limit {limit_to}."
+                )
         bounds = bounds.to_crs(BoundingVolumeRegion.CESIUM_EPSG)
         bounds = bounds.total_bounds
 
