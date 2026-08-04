@@ -14,7 +14,7 @@ The Permafrost Discovery Gateway visualization workflow uses [viz-staging](https
 
 Cite this software as:
 
-> Robyn Thiessen-Bock, Juliet Cohen, Matthew B. Jones, Kastan Day, Lauren Walker, Rushiraj Nenuji, Alyona Kosobokova, Jim Regetz. 2026. Viz-workflow: the Permafrost Discovery Gateway geospatial data visualization workflow (version 1.1.0). Arctic Data Center. doi:10.18739/A2MP4VQ5B
+> Robyn Thiessen-Bock, Juliet Cohen, Matthew B. Jones, Kastan Day, Lauren Walker, Rushiraj Nenuji, Alyona Kosobokova, Jim Regetz. 2026. Viz-workflow: the Permafrost Discovery Gateway geospatial data visualization workflow (version 1.1.1). Arctic Data Center. doi:10.18739/A2MP4VQ5B
 
 ## Usage
 

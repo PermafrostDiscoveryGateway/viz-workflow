@@ -1,6 +1,6 @@
 [project]
 name = "pdgworkflow"
-version = "1.1.0"
+version = "1.1.1"
 description = "PDG Visualization workflow."
 authors = [
     {name = "Robyn Thiessen-Bock", email = "thiessenbock@nceas.ucsb.edu"},
