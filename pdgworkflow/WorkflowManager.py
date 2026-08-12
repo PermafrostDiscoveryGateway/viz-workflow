@@ -130,6 +130,7 @@ class WorkflowManager:
         h3_cfg = self.config.get_h3_config()
         generator = H3GridSummaryGenerator(
             tiles=self.tiles,
+            config=self.config,
             out_base_dir=h3_cfg["out_base_dir"],
             land_polygons_path=h3_cfg["land_polygons_path"],
             area_epsg=h3_cfg["area_epsg"],
@@ -139,6 +140,7 @@ class WorkflowManager:
         )
         return H3SummaryStager(
             tiles=self.tiles,
+            config=self.config,
             out_base_dir=h3_cfg["out_base_dir"],
             out_ext=h3_cfg["out_ext"],
             summary_filename=h3_cfg["summary_filename"],
