@@ -22,8 +22,10 @@ from pdgstaging import TileStager
 from pdgstaging import TilePathManager
 from pdgstaging import H3GridSummaryGenerator
 from pdgstaging import H3SummaryStager
+from pdg3dtiles import Cesium3DTile, Tileset
 from .WMTSCapabilitiesGenerator import WMTSCapabilitiesGenerator
 from pathlib import Path
+import json
 
 
 # Set up logging
@@ -159,7 +161,96 @@ class WorkflowManager:
             land_polygons_path=h3_cfg["land_polygons_path"],
             area_epsg=h3_cfg["area_epsg"],
         )
+        h3_3d_enabled = h3_cfg.get("h3_3dtiles", {}).get("enabled", False)
+        if h3_3d_enabled:
+            print("H3 3D Tiles generation enabled. Building LOD tree...")
+            h3_output_dir = Path(h3_cfg["out_base_dir"]) 
+            self._generate_h3_3dtiles(h3_cfg["h3_3dtiles"], h3_output_dir)
+
         return True
+
+    def _generate_h3_3dtiles(self, cfg: dict, h3_input_dir: Path):
+        """Helper method to convert GPKG H3 summaries into a nested 3D Tileset."""
+        deploy_dir = Path(cfg.get('deploy_dir', 'pdg_3dtiles_release'))
+        deploy_dir.mkdir(parents=True, exist_ok=True)
+        
+        all_h3_tiles = []
+
+        for i in self.config.get_h3_config()["h3_res"]:
+            layer_input = h3_input_dir / f"summary_h3r{i}.gpkg"
+            
+            if not layer_input.exists():
+                continue
+                
+            tile_out_dir = deploy_dir / "h3" / str(i)
+            tile_out_dir.mkdir(parents=True, exist_ok=True)
+            
+            tile = Cesium3DTile()
+            tile.save_to = str(tile_out_dir)
+            tile.from_file(str(layer_input), crs=self.config.get("input_crs"), z=5.2)
+            
+            all_h3_tiles.append(tile)
+
+        if not all_h3_tiles:
+            print(f"Warning: No GPKG files found in {h3_input_dir} to tile.")
+            return
+
+        master_tileset_path = deploy_dir / "tileset.json"
+        Tileset.from_Cesium3DTiles(all_h3_tiles, str(master_tileset_path))
+
+        with open(master_tileset_path, 'r') as f:
+            data = json.load(f)
+
+        all_layers = []
+        def extract_nodes(node):
+            if 'content' in node and 'uri' in node['content']:
+                all_layers.append(node)
+            if 'children' in node:
+                for child in node['children']:
+                    extract_nodes(child)
+
+        master_root = data['root']
+        extract_nodes(master_root)
+
+        all_layers.sort(key=lambda x: int(x['content']['uri'].split('/')[1]))
+
+        if cfg.get('nest_features', False):
+            raw_tileset_path = Path(self.config.get("dir_3dtiles")) / "tileset.json"
+            
+            if raw_tileset_path.exists():
+                with open(raw_tileset_path, 'r') as f:
+                    raw_data = json.load(f)
+                
+                if raw_data.get('root', {}).get('refine') == 'ADD':
+                    raw_data['root']['refine'] = 'REPLACE'
+                    with open(raw_tileset_path, 'w') as f:
+                        json.dump(raw_data, f, indent=2)
+
+                raw_features_node = {
+                    "boundingVolume": raw_data['root']['boundingVolume'],
+                    "content": {"uri": "raw/tileset.json"}
+                }
+                all_layers.append(raw_features_node)
+            else:
+                print(f"Warning: nest_features is True, but {raw_tileset_path} not found.")
+        # TODO: set default in config manager
+        errors = cfg.get('geom_errors', [30000, 15000, 7500, 4000, 3000, 2000, 1000, 750, 100])
+        
+        for i in range(len(all_layers)):
+            all_layers[i]['refine'] = 'REPLACE'
+            all_layers[i]['geometricError'] = errors[i] if i < len(errors) else 0
+            all_layers[i]['children'] = [] 
+
+        for i in range(len(all_layers) - 1):
+            all_layers[i]['children'].append(all_layers[i+1])
+
+        master_root['children'] = [all_layers[0]] if all_layers else []
+        master_root['geometricError'] = 500000.0
+        data['root'] = master_root
+
+        with open(master_tileset_path, 'w') as f:
+            json.dump(data, f, indent=2)
+
 
     def init_tiler(self) -> TileStager:
         """
@@ -539,10 +630,6 @@ class WorkflowManager:
         if self.config.is_stager_enabled():
             logger.info("Staging enabled, starting tile staging...")
             self.run_staging()
-        
-        if self.config.is_h3_enabled():
-            logger.info("H3 summary enabled, starting H3 summary generation...")
-            self.run_h3_staging()
 
         if self.config.is_raster_enabled():
             logger.info("Rasterization enabled, starting rasterization process...")
@@ -559,6 +646,10 @@ class WorkflowManager:
         ):
             logger.info("Generating WMTSCapabilities.xml ")
             self.generate_wmts_capabilities()
+
+        if self.config.is_h3_enabled():
+            logger.info("H3 summary enabled, starting H3 summary generation...")
+            self.run_h3_staging()
 
     def get_filenames_from_dir(self, base_dir, z=None):
         """

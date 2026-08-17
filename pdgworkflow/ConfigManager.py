@@ -1350,6 +1350,7 @@ class ConfigManager:
             "out_base_dir": self.get("dir_h3"),
             "out_ext": self.get("ext_h3"),
             "summary_filename": self.get("filename_h3_summary"),
+            "h3_3dtiles": self.get("h3_3dtiles") or {},
         }
 
     def deduplicate_at(self, step):
