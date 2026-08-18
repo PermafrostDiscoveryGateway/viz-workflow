@@ -169,6 +169,13 @@ class WorkflowManager:
 
         return True
 
+    def _extract_nodes(self, node, all_layers):
+        if 'content' in node and 'uri' in node['content']:
+            all_layers.append(node)
+        if 'children' in node:
+            for child in node['children']:
+                self._extract_nodes(child, all_layers)
+
     def _generate_h3_3dtiles(self, cfg: dict, h3_input_dir: Path):
         """Helper method to convert GPKG H3 summaries into a nested 3D Tileset."""
         deploy_dir = Path(cfg.get('deploy_dir', 'pdg_3dtiles_release'))
@@ -202,15 +209,10 @@ class WorkflowManager:
             data = json.load(f)
 
         all_layers = []
-        def extract_nodes(node):
-            if 'content' in node and 'uri' in node['content']:
-                all_layers.append(node)
-            if 'children' in node:
-                for child in node['children']:
-                    extract_nodes(child)
+
 
         master_root = data['root']
-        extract_nodes(master_root)
+        self._extract_nodes(master_root, all_layers)
 
         all_layers.sort(key=lambda x: int(x['content']['uri'].split('/')[1]))
 
@@ -234,18 +236,18 @@ class WorkflowManager:
             else:
                 print(f"Warning: nest_features is True, but {raw_tileset_path} not found.")
         # TODO: set default in config manager
-        errors = cfg.get('geom_errors', [30000, 15000, 7500, 4000, 3000, 2000, 1000, 750, 100])
+        errors = cfg.get('geom_errors', [100000, 50000, 25000, 10000, 5000, 3000, 1000, 500, 150])
         
         for i in range(len(all_layers)):
             all_layers[i]['refine'] = 'REPLACE'
-            all_layers[i]['geometricError'] = errors[i] if i < len(errors) else 0
+            all_layers[i]['geometricError'] = errors[i] if i < len(errors) else 5
             all_layers[i]['children'] = [] 
 
         for i in range(len(all_layers) - 1):
             all_layers[i]['children'].append(all_layers[i+1])
 
         master_root['children'] = [all_layers[0]] if all_layers else []
-        master_root['geometricError'] = 500000.0
+        master_root['geometricError'] = 10000000.0
         data['root'] = master_root
 
         with open(master_tileset_path, 'w') as f:
