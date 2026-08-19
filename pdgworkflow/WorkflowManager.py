@@ -25,7 +25,6 @@ from pdgstaging import H3SummaryStager
 from pdg3dtiles import Cesium3DTile, Tileset, Tile
 from .WMTSCapabilitiesGenerator import WMTSCapabilitiesGenerator
 from pathlib import Path
-import json
 
 
 # Set up logging
