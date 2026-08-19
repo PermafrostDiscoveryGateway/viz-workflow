@@ -22,7 +22,7 @@ from pdgstaging import TileStager
 from pdgstaging import TilePathManager
 from pdgstaging import H3GridSummaryGenerator
 from pdgstaging import H3SummaryStager
-from pdg3dtiles import Cesium3DTile, Tileset
+from pdg3dtiles import Cesium3DTile, Tileset, Tile
 from .WMTSCapabilitiesGenerator import WMTSCapabilitiesGenerator
 from pathlib import Path
 import json
@@ -169,12 +169,13 @@ class WorkflowManager:
 
         return True
 
-    def _extract_nodes(self, node, all_layers):
-        if 'content' in node and 'uri' in node['content']:
-            all_layers.append(node)
-        if 'children' in node:
-            for child in node['children']:
-                self._extract_nodes(child, all_layers)
+    def _extract_tile_nodes(self, tile: Tile, all_layers: list):
+        """Helper to recursively extract Tile objects containing content URIs."""
+        if tile.content and tile.content.uri:
+            all_layers.append(tile)
+        if tile.children:
+            for child in tile.children:
+                self._extract_tile_nodes(child, all_layers)
 
     def _generate_h3_3dtiles(self, cfg: dict, h3_input_dir: Path):
         """Helper method to convert GPKG H3 summaries into a nested 3D Tileset."""
@@ -203,55 +204,48 @@ class WorkflowManager:
             return
 
         master_tileset_path = deploy_dir / "tileset.json"
-        Tileset.from_Cesium3DTiles(all_h3_tiles, str(master_tileset_path))
+        
+        master_tileset = Tileset.from_Cesium3DTiles(all_h3_tiles, str(master_tileset_path))
 
-        with open(master_tileset_path, 'r') as f:
-            data = json.load(f)
+        all_layers: list[Tile] = []
+        self._extract_tile_nodes(master_tileset.root, all_layers)
 
-        all_layers = []
-
-
-        master_root = data['root']
-        self._extract_nodes(master_root, all_layers)
-
-        all_layers.sort(key=lambda x: int(x['content']['uri'].split('/')[1]))
+        all_layers.sort(key=lambda tile: int(tile.content.uri.split('/')[1]))
 
         if cfg.get('nest_features', False):
             raw_tileset_path = Path(self.config.get("dir_3dtiles")) / "tileset.json"
             
             if raw_tileset_path.exists():
-                with open(raw_tileset_path, 'r') as f:
-                    raw_data = json.load(f)
+                raw_tileset = Tileset.from_file(raw_tileset_path)
                 min_error = min(self.config.get_h3_config()["h3_3dtiles"]["geom_errors"])
-                raw_data['root']['refine'] = 'REPLACE'
-                raw_data['root']['geometricError'] = min_error
-                with open(raw_tileset_path, 'w') as f:
-                    json.dump(raw_data, f, indent=2)
+                
+                raw_tileset.root.refine = 'REPLACE'
+                raw_tileset.root.geometricError = min_error
+                raw_tileset.to_file(str(raw_tileset_path), minify=False)
 
-                raw_features_node = {
-                    "boundingVolume": raw_data['root']['boundingVolume'],
-                    "content": {"uri": "raw/tileset.json"}
-                }
+                raw_features_node = Tile(
+                    boundingVolume=raw_tileset.root.boundingVolume,
+                    content={"uri": "raw/tileset.json"}
+                )
                 all_layers.append(raw_features_node)
             else:
                 print(f"Warning: nest_features is True, but {raw_tileset_path} not found.")
-        # TODO: set default in config manager
+
         errors = cfg.get('geom_errors', [100000, 50000, 25000, 10000, 5000, 3000, 1000, 500, 150])
         
-        for i in range(len(all_layers)):
-            all_layers[i]['refine'] = 'REPLACE'
-            all_layers[i]['geometricError'] = errors[i] if i < len(errors) else 5
-            all_layers[i]['children'] = [] 
+        for i, tile in enumerate(all_layers):
+            tile.refine = 'REPLACE'
+            tile.geometricError = errors[i] if i < len(errors) else 5
+            tile.children = []
 
         for i in range(len(all_layers) - 1):
-            all_layers[i]['children'].append(all_layers[i+1])
+            all_layers[i].children = [all_layers[i+1]]
 
-        master_root['children'] = [all_layers[0]] if all_layers else []
-        master_root['geometricError'] = 10000000.0
-        data['root'] = master_root
+        master_tileset.root.children = [all_layers[0]] if all_layers else []
+        master_tileset.root.geometricError = 10000000.0
+        master_tileset.geometricError = 10000000.0
 
-        with open(master_tileset_path, 'w') as f:
-            json.dump(data, f, indent=2)
+        master_tileset.to_file(str(master_tileset_path), minify=False)
 
 
     def init_tiler(self) -> TileStager:
