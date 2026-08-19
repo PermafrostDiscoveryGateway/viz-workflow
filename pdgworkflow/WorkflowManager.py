@@ -222,11 +222,11 @@ class WorkflowManager:
             if raw_tileset_path.exists():
                 with open(raw_tileset_path, 'r') as f:
                     raw_data = json.load(f)
-                
-                if raw_data.get('root', {}).get('refine') == 'ADD':
-                    raw_data['root']['refine'] = 'REPLACE'
-                    with open(raw_tileset_path, 'w') as f:
-                        json.dump(raw_data, f, indent=2)
+                min_error = min(self.config.get_h3_config()["h3_3dtiles"]["geom_errors"])
+                raw_data['root']['refine'] = 'REPLACE'
+                raw_data['root']['geometricError'] = min_error
+                with open(raw_tileset_path, 'w') as f:
+                    json.dump(raw_data, f, indent=2)
 
                 raw_features_node = {
                     "boundingVolume": raw_data['root']['boundingVolume'],
