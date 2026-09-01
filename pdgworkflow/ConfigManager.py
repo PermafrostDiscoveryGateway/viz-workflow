@@ -336,7 +336,7 @@ class ConfigManager:
                 masking, or clipping during H3 processing. Defaults to None.
             - h3_area_epsg : str
                 The EPSG code used for equal-area calculations during H3 processing. 
-                Defaults to 'EPSG:6933'.
+                Defaults to '6933'.
             - h3_3dtiles : dict
                 A dictionary of configuration options specific to generating 3D 
                 Tiles from H3 spatial indices. Contains the following properties:
@@ -354,7 +354,7 @@ class ConfigManager:
                         resolution level. This controls the Level of Detail (LOD) 
                         and refinement threshold when rendering in Cesium. Defaults 
                         to [100000, 50000, 25000, 10000, 5000, 3000, 1000, 500, 150].
-    
+
     - Operation control flags. Control which operations are performed and
       whether to overwrite existing files.
         - overwrite : bool
@@ -498,7 +498,7 @@ class ConfigManager:
         "h3_attr_to_sum": [],
         "h3_attr_to_mean": [],
         "h3_land_polygons_path": None,
-        "h3_area_epsg": "EPSG:6933",
+        "h3_area_epsg": "6933",
         "h3_3dtiles": {
             "enabled": True,
             "nest_features": True,
