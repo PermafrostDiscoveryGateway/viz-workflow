@@ -35,6 +35,15 @@ class StagedTo3DConverter:
         self.tiles = pdgstaging.TilePathManager(**self.config.get_path_manager_config())
 
     def get_3dtiles_z_coord(self):
+        """
+        Return the Z coordinate to use for 3D tiles.
+
+        Returns
+        -------
+        float or int or None
+            The ``z_coord`` config value or the max Z from ``z_range``.
+        """
+
         z_coord = self.config.get("z_coord")
         if z_coord not in (None, 0, 0.0):
             return z_coord
@@ -85,9 +94,26 @@ class StagedTo3DConverter:
                 gc.collect()
 
     def empty_leaf_tileset(self, tile_dir, tile_filename, bounding_volume):
-        """Write a leaf tileset JSON file that has no content.
+        """
+        Write a leaf tileset JSON file that has no content.
 
         This mirrors the staging behavior, and a tileset is generated for every tile, even if there is no content.
+
+        Parameters
+        ----------
+        tile_dir : str
+            Directory where the tileset JSON will be written.
+        tile_filename : str
+            Base filename without extension.
+        bounding_volume : dict
+            Geographic bounds with ``west``, ``south``, ``east``, ``north``.
+
+        Returns
+        -------
+        tile : None
+            Always ``None`` because no B3DM is produced.
+        tileset : Tileset
+            The empty leaf tileset written to disk.
         """
         z = self.get_3dtiles_z_coord()
         z = 0.0 if z is None else float(z)
@@ -130,6 +156,8 @@ class StagedTo3DConverter:
         -------
         tile, tileset : Cesium3DTile, Tileset
             The Cesium3DTiles and Cesium3DTileset objects
+        Returns ``(None, tileset)`` for
+            empty tiles and ``(None, None)`` on error.
         """
 
         try:
@@ -269,7 +297,7 @@ class StagedTo3DConverter:
         ----------
         tile : morecantile.Tile
             The tile object.
-        limit_to : list of float
+        limit_to : list of float, optional
             Optional list of left, bottom, right, top coordinates in the TMS
             coordinate reference system used to limit the bounding region.
 
@@ -278,6 +306,11 @@ class StagedTo3DConverter:
         bv : dict
             Geographic west, south, east, and north bounds in degrees, suitable
             for constructing a BoundingVolumeRegion.
+
+        Raises
+        ------
+        ValueError
+            If ``limit_to`` is given and the tile does not intersect it.
         """
         tms = self.tiles.tms
         # morecantile.bounds() returns geographic coordinates, while xy_bounds()
