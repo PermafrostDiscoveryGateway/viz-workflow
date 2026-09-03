@@ -283,6 +283,7 @@ class StagedTo3DConverter:
                 geometricError=geometric_error,
                 tilesetVersion=version,
                 boundingVolume=parent_bv,
+                boundingVolumeSource="root",
             )
             tileset_objs.append(tileset_obj)
 
@@ -362,5 +363,5 @@ class StagedTo3DConverter:
         top_level_dir = tile_manager.get_base_dir("3dtiles")["path"]
 
         return TreeGenerator.parent_tile_from_children_json(
-            children=top_level_tiles, dir=top_level_dir
+            children=top_level_tiles, dir=top_level_dir, boundingVolumeSource="root"
         )
