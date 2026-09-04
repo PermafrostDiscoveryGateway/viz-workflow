@@ -128,6 +128,15 @@ class WorkflowManager:
         return self.tile_stager.stage_all()
     
     def init_h3_stager(self) -> H3SummaryStager:
+        """Initializes and configures the H3 summary stager.
+
+        Reads the H3-specific configuration settings to instantiate an 
+        H3GridSummaryGenerator and binds it to a new H3SummaryStager.
+
+        Returns:
+            H3SummaryStager: A fully configured stager instance ready to 
+                process and save H3 grid summaries.
+        """
         h3_cfg = self.config.get_h3_config()
         generator = H3GridSummaryGenerator(
             tiles=self.tiles,
@@ -149,6 +158,15 @@ class WorkflowManager:
         )
 
     def run_h3_staging(self) -> bool:
+        """Executes the H3 staging process and optional 3D tileset generation.
+        
+        Initializes the H3 stager if it does not exist, runs the staging process
+        using properties defined in the H3 configuration, and builds a level-of-detail 
+        (LOD) tree for 3D tiles if the feature is enabled.
+
+        Returns:
+            bool: True indicating the staging process completed successfully.
+        """
         if not self.h3_stager:
             self.h3_stager = self.init_h3_stager()
 
@@ -168,16 +186,28 @@ class WorkflowManager:
 
         return True
 
-    def _extract_tile_nodes(self, tile: Tile, all_layers: list):
-        """Helper to recursively extract Tile objects containing content URIs."""
+    def _extract_tile_nodes(self, tile: Tile, all_layers: list) -> None:
+        """Helper to recursively extract Tile objects containing content URIs.
+
+        Args:
+            tile (Tile): The current tile node to inspect for content.
+            all_layers (list): An accumulator list where tiles with valid 
+                content URIs are appended in-place.
+        """
         if tile.content and tile.content.uri:
             all_layers.append(tile)
         if tile.children:
             for child in tile.children:
                 self._extract_tile_nodes(child, all_layers)
 
-    def _generate_h3_3dtiles(self, cfg: dict, h3_input_dir: Path):
-        """Helper method to convert GPKG H3 summaries into a nested 3D Tileset."""
+    def _generate_h3_3dtiles(self, cfg: dict, h3_input_dir: Path) -> None:
+        """Helper method to convert GPKG H3 summaries into a nested 3D Tileset.
+
+        Args:
+            cfg (dict): Configuration settings for the 3D Tileset generation.
+            h3_input_dir (Path): The directory path containing the input GeoPackage 
+                (GPKG) files with H3 summary data.
+        """
         deploy_dir = Path(cfg.get('deploy_dir', 'pdg_3dtiles_release'))
         deploy_dir.mkdir(parents=True, exist_ok=True)
         
