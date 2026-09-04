@@ -57,6 +57,9 @@ class ConfigManager:
             The path and filename to save a CSV file that summarizes the
             data from the rasters that were created during the
             rasterization process.
+        - filename_h3_summary : str
+            The path and filename to save a CSV file that summarizes the files
+            and data created during the H3 spatial indexing process.
         - filename_config : str
             The path to the config file. This property will be set
             automatically if the config is passed as a path string. When
@@ -65,6 +68,9 @@ class ConfigManager:
         - title : str
             The title of the tileset. This will be used in the WMTSCapabilities.xml file.
             Defaults to "Placeholder Title".
+        - doi : str`
+            The DOI (Digital Object Identifier) for the workflow run. Defaults to 
+            'doi/placeholder'.
 
     - Filetypes for input and output data.
         - ext_input : str
@@ -76,6 +82,8 @@ class ConfigManager:
             The file extension to use for web tiles, e.g. '.png' or '.jpg'.
         - ext_footprints: str
             The file extension of footprint files, e.g. '.shp' or '.gpkg'.
+        - ext_h3 : str
+            The file extension to use for H3 vector files, e.g. '.gpkg'.
 
     - Properties. Names of properties added to polygons created during
       processing. These names cannot already exist in the input data. It is
@@ -312,6 +320,40 @@ class ConfigManager:
                 listed by
                 geopandas.GeoDataFrame.sindex.valid_query_predicates).
                 Defaults to 'intersects'.
+        - H3 options. Configuration for generating H3 spatial indices and H3 3D Tiles.
+            - dir_h3 : str
+                The directory to save H3 spatial index outputs to.
+            - h3_res : list of int
+                A list of H3 resolutions to process. Defaults to [1, 2, 3, 4, 5, 6, 7, 8].
+            - h3_attr_to_sum : list of str
+                A list of attributes from the input data to aggregate using a sum 
+                function during H3 indexing. Defaults to [].
+            - h3_attr_to_mean : list of str
+                A list of attributes from the input data to aggregate using a mean 
+                function during H3 indexing. Defaults to [].
+            - h3_land_polygons_path : str or None
+                The path to a vector file containing land polygons to use for bounding, 
+                masking, or clipping during H3 processing. Defaults to None.
+            - h3_area_epsg : str
+                The EPSG code used for equal-area calculations during H3 processing. 
+                Defaults to '6933'.
+            - h3_3dtiles : dict
+                A dictionary of configuration options specific to generating 3D 
+                Tiles from H3 spatial indices. Contains the following properties:
+                    - enabled : bool
+                        Whether to enable 3D tile generation for the H3 summaries. 
+                        Defaults to True.
+                    - nest_features : bool
+                        Whether to nest the raw, original features (raw/tileset.json) 
+                        inside the highest-resolution H3 tileset. Defaults to True.
+                    - deploy_dir : str
+                        The directory path where the H3 3D tileset release will be 
+                        saved. Defaults to 'h3_3dtiles'.
+                    - geom_errors : list of int or float
+                        A list of geometric error values corresponding to each H3 
+                        resolution level. This controls the Level of Detail (LOD) 
+                        and refinement threshold when rendering in Cesium. Defaults 
+                        to [100000, 50000, 25000, 10000, 5000, 3000, 1000, 500, 150].
 
     - Operation control flags. Control which operations are performed and
       whether to overwrite existing files.
@@ -330,6 +372,9 @@ class ConfigManager:
             Defaults to True.
         - enable_3dtiles : bool
             Whether to enable 3D tiles generation. Defaults to True.
+        - enable_h3 : bool
+            Whether to enable H3 spatial indexing/tiling operations. Defaults 
+            to False.
         - generate_wmtsCapabilities : bool
             Whether to generate WMTSCapabilities.xml document
         - enable_raster_parents : bool
@@ -390,10 +435,13 @@ class ConfigManager:
         "dir_3dtiles": "3dtiles",
         "dir_staged": "staged",
         "dir_input": "input",
+        "dir_h3": "h3",
+        "ext_h3": ".gpkg",
         "dir_footprints": "footprints",
         "filename_staging_summary": "staging_summary.csv",
         "filename_rasterization_events": "rasterization_events.csv",
         "filename_rasters_summary": "rasters_summary.csv",
+        "filename_h3_summary": "h3_summary.csv",
         "filename_config": "config.json",
         "title": "Placeholder Title",
         "doi": "doi/placeholder",
@@ -417,6 +465,7 @@ class ConfigManager:
         # Staging options
         "simplify_tolerance": 0.0001,
         # Tiling & rasterization options
+        "enable_h3": False,
         "tms_id": "WGS1984Quad",
         "tile_path_structure": ("style", "tms", "z", "x", "y"),
         "z_range": (0, 13),
@@ -445,6 +494,17 @@ class ConfigManager:
         ],
         "geometricError": None,
         "z_coord": 0,
+        "h3_res": [1,2,3,4,5,6,7,8],
+        "h3_attr_to_sum": [],
+        "h3_attr_to_mean": [],
+        "h3_land_polygons_path": None,
+        "h3_area_epsg": "6933",
+        "h3_3dtiles": {
+            "enabled": True,
+            "nest_features": True,
+            "deploy_dir": "h3_3dtiles",
+            "geom_errors": [100000, 50000, 25000, 10000, 5000, 3000, 1000, 500, 150]
+        },
         # Deduplication options. Do not deduplicate by default.
         "deduplicate_at": None,
         "deduplicate_method": None,
@@ -1283,6 +1343,7 @@ class ConfigManager:
                     "ext": self.get("ext_web_tiles"),
                 },
                 "3dtiles": {"path": self.get("dir_3dtiles"), "ext": ".json"},
+                "h3": {"path": self.get("dir_h3"), "ext": self.get("ext_h3")},
             },
         }
 
@@ -1334,6 +1395,19 @@ class ConfigManager:
             }
 
         return None
+    
+    def get_h3_config(self) -> dict:
+        return {
+            "h3_res": self.get("h3_res"),
+            "attr_to_sum": self.get("h3_attr_to_sum") or [],
+            "attr_to_mean": self.get("h3_attr_to_mean") or [],
+            "land_polygons_path": self.get("h3_land_polygons_path"),
+            "area_epsg": self.get("h3_area_epsg"),
+            "out_base_dir": self.get("dir_h3"),
+            "out_ext": self.get("ext_h3"),
+            "summary_filename": self.get("filename_h3_summary"),
+            "h3_3dtiles": self.get("h3_3dtiles") or {},
+        }
 
     def deduplicate_at(self, step):
         """
@@ -1567,6 +1641,9 @@ class ConfigManager:
             Whether WMTS capabilities generation is enabled.
         """
         return self.get("generate_wmtsCapabilities")
+    
+    def is_h3_enabled(self) -> bool:
+     return bool(self.get("enable_h3"))
 
     @staticmethod
     def to_hex(color_str):

@@ -20,6 +20,9 @@ from .RasterTiler import RasterTiler
 from .StagedTo3DConverter import StagedTo3DConverter
 from pdgstaging import TileStager
 from pdgstaging import TilePathManager
+from pdgstaging import H3GridSummaryGenerator
+from pdgstaging import H3SummaryStager
+from pdg3dtiles import Cesium3DTile, Tileset, Tile
 from .WMTSCapabilitiesGenerator import WMTSCapabilitiesGenerator
 from pathlib import Path
 
@@ -103,6 +106,9 @@ class WorkflowManager:
         # Initialize 3D tiler to None (will be created when needed)
         self.cesium_3d_tiler = None
 
+        # Initialize h3_stager  
+        self.h3_stager = None
+
     def run_staging(self) -> bool:
         """
         Run the data staging step of the workflow.
@@ -120,6 +126,156 @@ class WorkflowManager:
         self.tile_stager = self.init_tiler()
 
         return self.tile_stager.stage_all()
+    
+    def init_h3_stager(self) -> H3SummaryStager:
+        """Initializes and configures the H3 summary stager.
+
+        Reads the H3-specific configuration settings to instantiate an 
+        H3GridSummaryGenerator and binds it to a new H3SummaryStager.
+
+        Returns:
+            H3SummaryStager: A fully configured stager instance ready to 
+                process and save H3 grid summaries.
+        """
+        h3_cfg = self.config.get_h3_config()
+        generator = H3GridSummaryGenerator(
+            tiles=self.tiles,
+            config=self.config,
+            out_base_dir=h3_cfg["out_base_dir"],
+            land_polygons_path=h3_cfg["land_polygons_path"],
+            area_epsg=h3_cfg["area_epsg"],
+            attr_to_sum=h3_cfg["attr_to_sum"],
+            attr_to_mean=h3_cfg["attr_to_mean"],
+            logger=logger,
+        )
+        return H3SummaryStager(
+            tiles=self.tiles,
+            config=self.config,
+            out_base_dir=h3_cfg["out_base_dir"],
+            out_ext=h3_cfg["out_ext"],
+            summary_filename=h3_cfg["summary_filename"],
+            generator=generator,
+        )
+
+    def run_h3_staging(self) -> bool:
+        """Executes the H3 staging process and optional 3D tileset generation.
+        
+        Initializes the H3 stager if it does not exist, runs the staging process
+        using properties defined in the H3 configuration, and builds a level-of-detail 
+        (LOD) tree for 3D tiles if the feature is enabled.
+
+        Returns:
+            bool: True indicating the staging process completed successfully.
+        """
+        if not self.h3_stager:
+            self.h3_stager = self.init_h3_stager()
+
+        h3_cfg = self.config.get_h3_config()
+        self.h3_stager.stage_all(
+            h3_res=h3_cfg["h3_res"],
+            attr_to_sum=h3_cfg["attr_to_sum"],
+            attr_to_mean=h3_cfg["attr_to_mean"],
+            land_polygons_path=h3_cfg["land_polygons_path"],
+            area_epsg=h3_cfg["area_epsg"],
+        )
+        h3_3d_enabled = h3_cfg.get("h3_3dtiles", {}).get("enabled", False)
+        if h3_3d_enabled:
+            print("H3 3D Tiles generation enabled. Building LOD tree...")
+            h3_output_dir = Path(h3_cfg["out_base_dir"]) 
+            self._generate_h3_3dtiles(h3_cfg["h3_3dtiles"], h3_output_dir)
+
+        return True
+
+    def _extract_tile_nodes(self, tile: Tile, all_layers: list) -> None:
+        """Helper to recursively extract Tile objects containing content URIs.
+
+        Args:
+            tile (Tile): The current tile node to inspect for content.
+            all_layers (list): An accumulator list where tiles with valid 
+                content URIs are appended in-place.
+        """
+        if tile.content and tile.content.uri:
+            all_layers.append(tile)
+        if tile.children:
+            for child in tile.children:
+                self._extract_tile_nodes(child, all_layers)
+
+    def _generate_h3_3dtiles(self, cfg: dict, h3_input_dir: Path) -> None:
+        """Helper method to convert GPKG H3 summaries into a nested 3D Tileset.
+
+        Args:
+            cfg (dict): Configuration settings for the 3D Tileset generation.
+            h3_input_dir (Path): The directory path containing the input GeoPackage 
+                (GPKG) files with H3 summary data.
+        """
+        deploy_dir = Path(cfg.get('deploy_dir', 'pdg_3dtiles_release'))
+        deploy_dir.mkdir(parents=True, exist_ok=True)
+        
+        all_h3_tiles = []
+
+        for i in self.config.get_h3_config()["h3_res"]:
+            layer_input = h3_input_dir / f"summary_h3r{i}.gpkg"
+            
+            if not layer_input.exists():
+                continue
+                
+            tile_out_dir = deploy_dir / "h3" / str(i)
+            tile_out_dir.mkdir(parents=True, exist_ok=True)
+            
+            tile = Cesium3DTile()
+            tile.save_to = str(tile_out_dir)
+            tile.from_file(str(layer_input), crs=self.config.get("input_crs"), z=5.2)
+            
+            all_h3_tiles.append(tile)
+
+        if not all_h3_tiles:
+            print(f"Warning: No GPKG files found in {h3_input_dir} to tile.")
+            return
+
+        master_tileset_path = deploy_dir / "tileset.json"
+        
+        master_tileset = Tileset.from_Cesium3DTiles(all_h3_tiles, str(master_tileset_path))
+
+        all_layers: list[Tile] = []
+        self._extract_tile_nodes(master_tileset.root, all_layers)
+
+        all_layers.sort(key=lambda tile: int(tile.content.uri.split('/')[1]))
+
+        if cfg.get('nest_features', False):
+            raw_tileset_path = Path(self.config.get("dir_3dtiles")) / "tileset.json"
+            
+            if raw_tileset_path.exists():
+                raw_tileset = Tileset.from_file(raw_tileset_path)
+                min_error = min(self.config.get_h3_config()["h3_3dtiles"]["geom_errors"])
+                
+                raw_tileset.root.refine = 'REPLACE'
+                raw_tileset.root.geometricError = min_error
+                raw_tileset.to_file(str(raw_tileset_path), minify=False)
+
+                raw_features_node = Tile(
+                    boundingVolume=raw_tileset.root.boundingVolume,
+                    content={"uri": "raw/tileset.json"}
+                )
+                all_layers.append(raw_features_node)
+            else:
+                print(f"Warning: nest_features is True, but {raw_tileset_path} not found.")
+
+        errors = cfg.get('geom_errors', [100000, 50000, 25000, 10000, 5000, 3000, 1000, 500, 150])
+        
+        for i, tile in enumerate(all_layers):
+            tile.refine = 'REPLACE'
+            tile.geometricError = errors[i] if i < len(errors) else 5
+            tile.children = []
+
+        for i in range(len(all_layers) - 1):
+            all_layers[i].children = [all_layers[i+1]]
+
+        master_tileset.root.children = [all_layers[0]] if all_layers else []
+        master_tileset.root.geometricError = 10000000.0
+        master_tileset.geometricError = 10000000.0
+
+        master_tileset.to_file(str(master_tileset_path), minify=False)
+
 
     def init_tiler(self) -> TileStager:
         """
@@ -515,6 +671,10 @@ class WorkflowManager:
         ):
             logger.info("Generating WMTSCapabilities.xml ")
             self.generate_wmts_capabilities()
+
+        if self.config.is_h3_enabled():
+            logger.info("H3 summary enabled, starting H3 summary generation...")
+            self.run_h3_staging()
 
     def get_filenames_from_dir(self, base_dir, z=None):
         """
