@@ -34,6 +34,28 @@ class StagedTo3DConverter:
         self.config = workflow_config
         self.tiles = pdgstaging.TilePathManager(**self.config.get_path_manager_config())
 
+    def convert_leaf(self, input_path, content_output, tileset_output):
+        """
+        Convert one staged tile to 3D content, filling z and version from config.
+
+        input_path : str or Path
+            Staged tile to convert.
+        content_output : str or Path
+            Output path for the tile content (glb).
+        tileset_output : str or Path
+            Output path for the leaf tileset JSON.
+        """
+        from pdg3dtiles import convert_leaf
+
+        return convert_leaf(
+            input_path,
+            content_output,
+            tileset_output,
+            z=self.get_3dtiles_z_coord(),
+            geometric_error=self.config.get("geometricError"),
+            version=self.config.get("version"),
+        )
+
     def get_3dtiles_z_coord(self):
         """
         Return the Z coordinate to use for 3D tiles.
@@ -315,7 +337,7 @@ class StagedTo3DConverter:
         """
         tms = self.tiles.tms
         # morecantile.bounds() returns geographic coordinates, while xy_bounds()
-        # returns coordinates in tms.crs. 
+        # returns coordinates in tms.crs.
         bounds = tms.xy_bounds(tile)
         bounds = gpd.GeoSeries(
             box(bounds.left, bounds.bottom, bounds.right, bounds.top), crs=tms.crs

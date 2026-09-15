@@ -179,6 +179,34 @@ class WorkflowManager:
 
         return self.tile_stager.stage(path=path)
 
+    def stage_source(self, input_path, shard_root, source_key, *, overwrite=False):
+        """
+        Stage a single source file into shards, filling TMS config from config.
+
+        Args:
+            input_path: Source file to stage
+            shard_root: Root directory for output shards
+            source_key: Allowlisted source key for the input
+            overwrite: Optional, defaults to False. Regenerate shards if they exist
+
+        Returns:
+            Staging result from ``pdgstaging.stage_source``
+        """
+        from pdgstaging import stage_source
+
+        return stage_source(
+            input_path,
+            shard_root,
+            source_key,
+            tms_id=self.config.get("tms_id"),
+            z=self.config.get_max_z(),
+            path_structure=list(self.config.get("tile_path_structure")),
+            properties=self.config.props.copy(),
+            input_crs=self.config.get("input_crs"),
+            tolerance=self.config.get("simplify_tolerance"),
+            overwrite=overwrite,
+        )
+
     def run_rasterization(self) -> bool:
         """
         Run the rasterization step of the workflow.

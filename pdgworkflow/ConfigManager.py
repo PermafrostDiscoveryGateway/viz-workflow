@@ -495,6 +495,8 @@ class ConfigManager:
             if config.get("filename_config") is None:
                 config["filename_config"] = path
 
+        if config is None:
+            config = {}
         if not isinstance(config, dict):
             raise ValueError("config must be a dict or a path to a JSON file")
 
