@@ -6,7 +6,7 @@
 - [Package source code on GitHub](https://github.com/PermafrostDiscoveryGateway/viz-workflow)
 - [Submit bugs and feature requests](https://github.com/PermafrostDiscoveryGateway/viz-workflow/issues/new)
 
-The Permafrost Discovery Gateway visualization workflow uses [viz-staging](https://github.com/PermafrostDiscoveryGateway/viz-staging), [viz-raster](https://github.com/PermafrostDiscoveryGateway/viz-raster/tree/main), and [viz-3dtiles](https://github.com/PermafrostDiscoveryGateway/viz-3dtiles) in parallel using Ray Core and Ray workflows. An alternative workflow that uses `Docker` and `parsl` for parallelization is currently under development.
+For OGDC on Kubernetes, invoke the lower packages directly with one explicit function call per operation. `WorkflowManager` remains the local sequential compatibility layer; it does not schedule Kubernetes work.
 
 ![PDG workflow summary](docs/images/viz_workflow.png)
 
@@ -14,7 +14,7 @@ The Permafrost Discovery Gateway visualization workflow uses [viz-staging](https
 
 Cite this software as:
 
-> Robyn Thiessen-Bock, Juliet Cohen, Matthew B. Jones, Kastan Day, Lauren Walker, Rushiraj Nenuji, Alyona Kosobokova, Jim Regetz. 2026. Viz-workflow: the Permafrost Discovery Gateway geospatial data visualization workflow (version 1.1.0). Arctic Data Center. doi:10.18739/A2MP4VQ5B
+> Robyn Thiessen-Bock, Juliet Cohen, Matthew B. Jones, Kastan Day, Lauren Walker, Rushiraj Nenuji, Alyona Kosobokova, Jim Regetz. 2026. Viz-workflow: the Permafrost Discovery Gateway geospatial data visualization workflow (version 1.1.1). Arctic Data Center. doi:10.18739/A2MP4VQ5B
 
 ## Usage
 
