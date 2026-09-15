@@ -1,6 +1,6 @@
 [project]
 name = "pdgworkflow"
-version = "1.1.0"
+version = "1.1.1"
 description = "PDG Visualization workflow."
 authors = [
     {name = "Robyn Thiessen-Bock", email = "thiessenbock@nceas.ucsb.edu"},
@@ -26,9 +26,9 @@ classifiers = [
 ]
 dependencies = [
     "Click >= 7.0",
-    "pdgraster @ git+https://github.com/PermafrostDiscoveryGateway/viz-raster.git@main",
-    "pdgstaging @ git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git@main",
-    "pdg3dtiles @ git+https://github.com/PermafrostDiscoveryGateway/viz-3dtiles.git@main",
+    "pdgraster @ git+https://github.com/PermafrostDiscoveryGateway/viz-raster.git@57600833c7605b947d9b348c069bee03edb2e710",
+    "pdgstaging @ git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git@392e652989fe1382b2e2286bcbfd0137fb96b04b",
+    "pdg3dtiles @ git+https://github.com/PermafrostDiscoveryGateway/viz-3dtiles.git@4ce07e7fe823b1e91c5137a5e5e664887bb6e387",
 ]
 
 [project.urls]
