@@ -46,6 +46,32 @@ class RasterTiler:
         palettes = self.config.get_palettes()
         self.palettes = [Palette(*pal) for pal in palettes]
 
+    def rasterize_tile(self, input_path, output_path, *, bounds, overwrite=False):
+        """
+        Rasterize a single staged tile, filling shape/stats from config.
+
+        input_path : str or Path
+            Staged vector tile to rasterize.
+        output_path : str or Path
+            GeoTIFF output path.
+        bounds : tuple
+            Tile bounds passed through to ``pdgraster.rasterize_tile``.
+        overwrite : bool
+            Optional, defaults to False. Regenerate the output if it exists.
+        """
+        from pdgraster import rasterize_tile
+
+        raster = self.config.get_raster_config()
+        return rasterize_tile(
+            input_path,
+            output_path,
+            bounds=bounds,
+            shape=raster["shape"],
+            centroid_properties=raster["centroid_properties"],
+            statistics=raster["stats"],
+            overwrite=overwrite,
+        )
+
     def rasterize_all(self, overwrite=True):
         """
         The main method for the RasterTiler class. Uses all the information
