@@ -354,7 +354,6 @@ class StagedTo3DConverter:
 
         tile_manager = self.tiles
         config_manager = self.config
-        min_z = config_manager.get_min_z()
         max_z = config_manager.get_max_z()
 
         # Make a parent tileset.json - this will combine the top level tiles if
