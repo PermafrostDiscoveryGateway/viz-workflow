@@ -325,10 +325,12 @@ class ConfigManager:
                 The directory to save H3 spatial index outputs to.
             - h3_res : list of int
                 A list of H3 resolutions to process. Defaults to [1, 2, 3, 4, 5, 6, 7, 8].
-            - h3_feature_split: bool
+            - intersect_h3_cells: bool
                 Whether to split features that overlap multiple H3 polygons, such that area
                 and cover calculations are exactly accurate by polygon. Note that count values
                 are not split.
+            - h3_dissolve_overlaps: bool
+                Whether to union overlapping features prior to calculating H3 summaries.
             - h3_attr_to_sum : list of str
                 A list of attributes from the input data to aggregate using a sum 
                 function during H3 indexing. Defaults to [].
@@ -499,7 +501,8 @@ class ConfigManager:
         "geometricError": None,
         "z_coord": 0,
         "h3_res": [1,2,3,4,5,6,7,8],
-        "h3_feature_split": False,
+        "intersect_h3_cells": False,
+        "h3_dissolve_overlaps": False,
         "h3_attr_to_sum": [],
         "h3_attr_to_mean": [],
         "h3_land_polygons_path": None,
@@ -1404,7 +1407,8 @@ class ConfigManager:
     def get_h3_config(self) -> dict:
         return {
             "h3_res": self.get("h3_res"),
-            "feature_split": self.get("h3_feature_split") or False,
+            "intersect_h3_cells": self.get("intersect_h3_cells") or False,
+            "dissolve_overlaps": self.get("h3_dissolve_overlaps") or False,
             "attr_to_sum": self.get("h3_attr_to_sum") or [],
             "attr_to_mean": self.get("h3_attr_to_mean") or [],
             "land_polygons_path": self.get("h3_land_polygons_path"),

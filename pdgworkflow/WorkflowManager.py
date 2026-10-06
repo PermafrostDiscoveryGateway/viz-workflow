@@ -173,7 +173,7 @@ class WorkflowManager:
         h3_cfg = self.config.get_h3_config()
         self.h3_stager.stage_all(
             h3_res=h3_cfg["h3_res"],
-            feature_split=h3_cfg["feature_split"],
+            intersect_h3_cells=h3_cfg["intersect_h3_cells"],
             attr_to_sum=h3_cfg["attr_to_sum"],
             attr_to_mean=h3_cfg["attr_to_mean"],
             land_polygons_path=h3_cfg["land_polygons_path"],
