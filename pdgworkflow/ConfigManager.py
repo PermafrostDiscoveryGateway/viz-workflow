@@ -325,15 +325,19 @@ class ConfigManager:
                 The directory to save H3 spatial index outputs to.
             - h3_res : list of int
                 A list of H3 resolutions to process. Defaults to [1, 2, 3, 4, 5, 6, 7, 8].
-            - intersect_h3_cells: bool
+            - h3_intersect_cells: bool
                 Whether to split features that overlap multiple H3 polygons, such that area
                 and cover calculations are exactly accurate by polygon. Note that count values
                 are not split.
             - h3_dissolve_overlaps: bool
                 Whether to union overlapping features prior to calculating H3 summaries.
-            - h3_attr_to_sum : list of str
-                A list of attributes from the input data to aggregate using a sum 
-                function during H3 indexing. Defaults to [].
+            - h3_attr_to_sum : dict or list of str
+                Attributes from the input data to aggregate using a sum function 
+                during H3 indexing. Can be passed as a simple list of column names 
+                (which defaults to assigning the total sum to the centroid cell), 
+                or a dictionary specifying the spatial aggregation strategy: 
+                {"split_across_cells": ["col1"], "anchor_to_centroid": ["col2"]}. 
+                Defaults to [].
             - h3_attr_to_mean : list of str
                 A list of attributes from the input data to aggregate using a mean 
                 function during H3 indexing. Defaults to [].
@@ -501,7 +505,7 @@ class ConfigManager:
         "geometricError": None,
         "z_coord": 0,
         "h3_res": [1,2,3,4,5,6,7,8],
-        "intersect_h3_cells": False,
+        "h3_intersect_cells": False,
         "h3_dissolve_overlaps": False,
         "h3_attr_to_sum": [],
         "h3_attr_to_mean": [],
@@ -1407,7 +1411,7 @@ class ConfigManager:
     def get_h3_config(self) -> dict:
         return {
             "h3_res": self.get("h3_res"),
-            "intersect_h3_cells": self.get("intersect_h3_cells") or False,
+            "h3_intersect_cells": self.get("h3_intersect_cells") or False,
             "dissolve_overlaps": self.get("h3_dissolve_overlaps") or False,
             "attr_to_sum": self.get("h3_attr_to_sum") or [],
             "attr_to_mean": self.get("h3_attr_to_mean") or [],
