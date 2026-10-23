@@ -344,11 +344,11 @@ class WorkflowManager:
         Args:
             input_path: Source file to stage
             shard_root: Root directory for output shards
-            source_key: Allowlisted source key for the input
+            source_key: Safe single path component naming this source under shard_root
             overwrite: Optional, defaults to False. Regenerate shards if they exist
 
         Returns:
-            Staging result from ``pdgstaging.stage_source``
+            Sorted list of shard paths from ``pdgstaging.stage_source``
         """
         from pdgstaging import stage_source
 

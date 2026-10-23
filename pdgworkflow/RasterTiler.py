@@ -50,14 +50,22 @@ class RasterTiler:
         """
         Rasterize a single staged tile, filling shape/stats from config.
 
+        Parameters
+        ----------
         input_path : str or Path
             Staged vector tile to rasterize.
         output_path : str or Path
             GeoTIFF output path.
-        bounds : tuple
-            Tile bounds passed through to ``pdgraster.rasterize_tile``.
+        bounds : dict
+            Tile bounds with ``left``, ``right``, ``bottom`` and ``top`` keys,
+            passed through to ``pdgraster.rasterize_tile``.
         overwrite : bool
             Optional, defaults to False. Regenerate the output if it exists.
+
+        Returns
+        -------
+        pathlib.Path
+            The written (or reused, still valid) GeoTIFF path.
         """
         from pdgraster import rasterize_tile
 

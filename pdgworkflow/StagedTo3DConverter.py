@@ -38,12 +38,19 @@ class StagedTo3DConverter:
         """
         Convert one staged tile to 3D content, filling z and version from config.
 
+        Parameters
+        ----------
         input_path : str or Path
             Staged tile to convert.
         content_output : str or Path
-            Output path for the tile content (glb).
+            Output path for the tile content (b3dm).
         tileset_output : str or Path
             Output path for the leaf tileset JSON.
+
+        Returns
+        -------
+        tuple of pathlib.Path
+            ``(content_path, tileset_path)`` from ``pdg3dtiles.convert_leaf``.
         """
         from pdg3dtiles import convert_leaf
 
