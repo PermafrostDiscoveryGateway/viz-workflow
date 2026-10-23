@@ -26,9 +26,9 @@ classifiers = [
 ]
 dependencies = [
     "Click >= 7.0",
-    "pdgraster @ git+https://github.com/PermafrostDiscoveryGateway/viz-raster.git@1d4c4ed03dfa301a67195f7982483a70320dd519",
-    "pdgstaging @ git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git@15c63a50668e0eace2b7a514dc11c0671b7e64d4",
-    "pdg3dtiles @ git+https://github.com/PermafrostDiscoveryGateway/viz-3dtiles.git@742d2cb6eaff1f004688c0ee61439ee9ba43ad0f",
+    "pdgraster @ git+https://github.com/PermafrostDiscoveryGateway/viz-raster.git@6f93480c14c9a853965f0b3ed4193bb37aa07cfb",
+    "pdgstaging @ git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git@2ae4825c3fe19191aaf280d6891570562932df17",
+    "pdg3dtiles @ git+https://github.com/PermafrostDiscoveryGateway/viz-3dtiles.git@3d111c04f86dfb8a607dcc0aa33ae14cc3ea7ab3",
 ]
 
 [project.urls]
