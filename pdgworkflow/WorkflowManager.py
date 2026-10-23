@@ -174,6 +174,7 @@ class WorkflowManager:
         self.h3_stager.stage_all(
             h3_res=h3_cfg["h3_res"],
             h3_intersect_cells=h3_cfg["h3_intersect_cells"],
+            dissolve_overlaps=h3_cfg["dissolve_overlaps"],
             attr_to_sum=h3_cfg["attr_to_sum"],
             attr_to_mean=h3_cfg["attr_to_mean"],
             land_polygons_path=h3_cfg["land_polygons_path"],
