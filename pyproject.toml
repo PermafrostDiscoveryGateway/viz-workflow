@@ -1,6 +1,6 @@
 [project]
 name = "pdgworkflow"
-version = "1.1.0"
+version = "1.1.1"
 description = "PDG Visualization workflow."
 authors = [
     {name = "Robyn Thiessen-Bock", email = "thiessenbock@nceas.ucsb.edu"},
@@ -26,9 +26,9 @@ classifiers = [
 ]
 dependencies = [
     "Click >= 7.0",
-    "pdgraster @ git+https://github.com/PermafrostDiscoveryGateway/viz-raster.git@main",
-    "pdgstaging @ git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git@main",
-    "pdg3dtiles @ git+https://github.com/PermafrostDiscoveryGateway/viz-3dtiles.git@main",
+    "pdgraster @ git+https://github.com/PermafrostDiscoveryGateway/viz-raster.git@feat-modularity-raster-clean",
+    "pdgstaging @ git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git@feat-modularity-staging-clean",
+    "pdg3dtiles @ git+https://github.com/PermafrostDiscoveryGateway/viz-3dtiles.git@feat-modularity-3dtiles-clean",
 ]
 
 [project.urls]
@@ -40,6 +40,7 @@ dev = [
     "pytest >= 7",
     "pre-commit >= 4.1",
     "black >= 24.1.1",
+    "flake8 >= 7.3.0",
 ]
 
 [build-system]

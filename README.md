@@ -8,13 +8,43 @@
 
 The Permafrost Discovery Gateway visualization workflow uses [viz-staging](https://github.com/PermafrostDiscoveryGateway/viz-staging), [viz-raster](https://github.com/PermafrostDiscoveryGateway/viz-raster/tree/main), and [viz-3dtiles](https://github.com/PermafrostDiscoveryGateway/viz-3dtiles) in parallel using Ray Core and Ray workflows. An alternative workflow that uses `Docker` and `parsl` for parallelization is currently under development.
 
+For OGDC on Kubernetes, invoke the lower packages directly with one explicit function call per operation. `WorkflowManager` remains the local sequential compatibility layer; it does not schedule Kubernetes work.
+
 ![PDG workflow summary](docs/images/viz_workflow.png)
 
 ## Citation
 
 Cite this software as:
 
-> Robyn Thiessen-Bock, Juliet Cohen, Matthew B. Jones, Kastan Day, Lauren Walker, Rushiraj Nenuji, Alyona Kosobokova, Jim Regetz. 2026. Viz-workflow: the Permafrost Discovery Gateway geospatial data visualization workflow (version 1.1.0). Arctic Data Center. doi:10.18739/A2MP4VQ5B
+> Robyn Thiessen-Bock, Juliet Cohen, Matthew B. Jones, Kastan Day, Lauren Walker, Rushiraj Nenuji, Alyona Kosobokova, Jim Regetz. 2026. Viz-workflow: the Permafrost Discovery Gateway geospatial data visualization workflow (version 1.1.1). Arctic Data Center. doi:10.18739/A2MP4VQ5B
+
+## Operations
+
+Each method calls one lower-package function and fills the shared options (tile matrix set, z range, statistics, versions) from the config.
+
+| Method | Calls |
+| --- | --- |
+| `WorkflowManager(config).stage_source(input_path, shard_root, source_key)` | `pdgstaging.stage_source` |
+| `RasterTiler(config).rasterize_tile(input_path, output_path, bounds=...)` | `pdgraster.rasterize_tile` |
+| `StagedTo3DConverter(config).convert_leaf(input_path, content_output, tileset_output)` | `pdg3dtiles.convert_leaf` |
+
+## H3 summaries
+
+Set `enable_h3` to summarize the staged tiles (or the input files when staging is disabled) into H3 cells. `run_workflow()` does this last; `WorkflowManager(config).run_h3_staging()` runs it alone. Summaries are written to `dir_h3` as `summary_h3r<resolution>.gpkg`, and the 3D tileset to `h3_3dtiles.deploy_dir` unless `h3_3dtiles.enabled` is false.
+
+```json
+{
+  "enable_h3": true,
+  "h3_res": [4, 5, 6],
+  "h3_intersect_cells": true,
+  "h3_dissolve_overlaps": false,
+  "h3_attr_to_sum": {"split_across_cells": ["area_m2"], "anchor_to_centroid": ["count"]},
+  "h3_attr_to_mean": ["depth"],
+  "h3_3dtiles": {"enabled": false}
+}
+```
+
+All `h3_*` options and their defaults are documented in `ConfigManager`; the algorithm is described in [viz-staging](https://github.com/PermafrostDiscoveryGateway/viz-staging/blob/develop/docs/h3_summaries_algorithm.md).
 
 ## Usage
 

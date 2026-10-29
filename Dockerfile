@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 # Install transitive dependencies and build tools
 RUN apt-get update \
-    && apt-get install -y git libspatialindex-dev libgdal-dev libproj-dev build-essential g++ libgl1 libgomp1 \
+    && apt-get install -y git libspatialindex-dev libgdal-dev libproj-dev build-essential g++ libegl1 libgl1 libgomp1 libusb-1.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv

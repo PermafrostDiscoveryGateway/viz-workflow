@@ -174,6 +174,7 @@ class WorkflowManager:
         self.h3_stager.stage_all(
             h3_res=h3_cfg["h3_res"],
             h3_intersect_cells=h3_cfg["h3_intersect_cells"],
+            dissolve_overlaps=h3_cfg["dissolve_overlaps"],
             attr_to_sum=h3_cfg["attr_to_sum"],
             attr_to_mean=h3_cfg["attr_to_mean"],
             land_polygons_path=h3_cfg["land_polygons_path"],
@@ -335,6 +336,34 @@ class WorkflowManager:
             self.tile_stager = self.init_tiler()
 
         return self.tile_stager.stage(path=path)
+
+    def stage_source(self, input_path, shard_root, source_key, *, overwrite=False):
+        """
+        Stage a single source file into shards, filling TMS config from config.
+
+        Args:
+            input_path: Source file to stage
+            shard_root: Root directory for output shards
+            source_key: Safe single path component naming this source under shard_root
+            overwrite: Optional, defaults to False. Regenerate shards if they exist
+
+        Returns:
+            Sorted list of shard paths from ``pdgstaging.stage_source``
+        """
+        from pdgstaging import stage_source
+
+        return stage_source(
+            input_path,
+            shard_root,
+            source_key,
+            tms_id=self.config.get("tms_id"),
+            z=self.config.get_max_z(),
+            path_structure=list(self.config.get("tile_path_structure")),
+            properties=self.config.props.copy(),
+            input_crs=self.config.get("input_crs"),
+            tolerance=self.config.get("simplify_tolerance"),
+            overwrite=overwrite,
+        )
 
     def run_rasterization(self) -> bool:
         """
