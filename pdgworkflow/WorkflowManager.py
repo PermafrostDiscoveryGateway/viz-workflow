@@ -550,15 +550,24 @@ class WorkflowManager:
             self.cesium_3d_tiler = self.init_3d_tiling()
 
         return self.cesium_3d_tiler.staged_to_3dtile(path)
-    
-    def tile_external_tifs(self) -> bool:
+
+    def run_geotiff_tiling(self, tif_paths=None) -> bool:
         """
-        Generate web tiles directly from external GeoTIFFs, using only config.
+        Tile input GeoTIFFs into web tiles and per-tile GeoTIFFs (by default, the
+        files in ``dir_input`` with extension ``ext_input``), skipping
+        staging and rasterization. See
+        ``RasterTiler.tiles_from_geotiffs``.
+
+        Args:
+            tif_paths: Optional files, directory, or {"path", "ext"} dict
+                to tile instead of ``dir_input``.
+
+        Returns:
+            True when tiling finishes.
         """
         if not self.raster_tiler:
             self.raster_tiler = self.init_raster_tiler()
-        self.raster_tiler.webtiles_from_external_tifs()
-        
+        self.raster_tiler.tiles_from_geotiffs(tif_paths)
         return True
 
     def parent_3d_tiles(self, tiles, bv_limit=None) -> None:
@@ -704,10 +713,15 @@ class WorkflowManager:
             logger.info("3D tiles enabled, starting 3D tile generation...")
             self.run_3d_tiling()
 
+        if self.config.is_geotiff_tiling_enabled():
+            logger.info("GeoTIFF tiling enabled, tiling input GeoTIFFs...")
+            self.run_geotiff_tiling()
+
         if self.config.is_generate_wmtsCapabilities_enabled() and (
             self.config.is_stager_enabled()
             or self.config.is_raster_enabled()
             or self.config.is_web_tiles_enabled()
+            or self.config.is_geotiff_tiling_enabled()
         ):
             logger.info("Generating WMTSCapabilities.xml ")
             self.generate_wmts_capabilities()
@@ -802,10 +816,6 @@ class WorkflowManager:
         )
 
 
-        if self.config.generate_from_external_tifs():
-            logger.info("Genereating web tiles from external TIFs")
-            self.tile_external_tifs()  
-        
 # CLI interface
 @click.group()
 @click.option(

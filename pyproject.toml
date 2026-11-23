@@ -26,10 +26,13 @@ classifiers = [
 ]
 dependencies = [
     "Click >= 7.0",
-    "rio-tiler>=5,<6",
-    "pdgraster @ git+https://github.com/PermafrostDiscoveryGateway/viz-raster.git@main",
-    "pdgstaging @ git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git@main",
-    "pdg3dtiles @ git+https://github.com/PermafrostDiscoveryGateway/viz-3dtiles.git@main",
+    "rio-tiler",
+    "morecantile",
+    "rasterio",
+    "pdgraster @ git+https://github.com/PermafrostDiscoveryGateway/viz-raster.git@feat-modularity-raster-clean",
+    "pdgstaging @ git+https://github.com/PermafrostDiscoveryGateway/viz-staging.git@feat-modularity-staging-clean",
+    "pdg3dtiles @ git+https://github.com/PermafrostDiscoveryGateway/viz-3dtiles.git@feat-modularity-3dtiles-clean",
+    "py3dtiles>=12.1.1",
 ]
 
 [project.urls]

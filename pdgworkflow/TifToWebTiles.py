@@ -1,210 +1,318 @@
-from pathlib import Path
-from typing import List, Optional, Sequence, Union
+"""
+Create web tiles (PNG) and per-tile GeoTIFFs directly from existing
+GeoTIFFs, for use with web maps such as Cesium.
+
+The input rasters are read with rio-tiler in the target TileMatrixSet and
+mosaicked tile by tile, so inputs may be in any CRS and may overlap or
+leave gaps between each other. Colors are stretched using one value range
+per band (and z-level), not per tile, so adjacent tiles match.
+"""
+
+import logging
+import os
+from dataclasses import dataclass, field
+from typing import Callable, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import rasterio
-import morecantile
-from morecantile import TileMatrixSet
+from morecantile import Tile, TileMatrixSet
+from rasterio.enums import Resampling
 from rasterio.transform import from_bounds
-from rio_tiler.errors import PointOutsideBounds, TileOutsideBounds
+from rasterio.warp import transform_bounds
+from rio_tiler.errors import EmptyMosaicError, PointOutsideBounds, TileOutsideBounds
 from rio_tiler.io import Reader
 from rio_tiler.mosaic import mosaic_reader
-from rio_tiler.mosaic.methods import HighestMethod
-from pdgraster import WebImage, Palette
-from colormaps.colormap import Colormap
-import colormaps as cmaps
+from rio_tiler.mosaic.methods import FirstMethod
+from rio_tiler.mosaic.methods.base import MosaicMethodBase
+
+from pdgraster import Palette, WebImage
+
+logger = logging.getLogger(__name__)
+
+TIF_EXTENSIONS = (".tif", ".tiff")
+DEFAULT_COLORS = ["#c2e699", "#78c679", "#238443", "#004529"]
+# transparent
+DEFAULT_NODATA_COLOR = "#ffffff00"
+# Value used to mark masked pixels for WebImage when a band has no
+# configured nodata value. WebImage can't detect NaN as nodata.
+NODATA_SENTINEL = float(np.finfo(np.float32).min)
+# Max dimension of the decimated read used to compute value ranges
+RANGE_SAMPLE_SIZE = 1024
+
+ValueRange = Tuple[Optional[float], Optional[float]]
+# Returns the output path for a tile; kind is "web_tiles" or "geotiff"
+PathFor = Callable[[Tile, str, Optional[str]], str]
 
 
-DEFAULT_COLORS = ["#00000000", "#c2e699", "#78c679", "#238443", "#004529"]
-DEFAULT_NODATA_COLOR = "#00000000"
+@dataclass
+class BandStyle:
+    """
+    How to render one band of the input GeoTIFFs as web tiles.
+
+    Attributes
+    ----------
+    name : str
+        Style name; used in the output path of the web tiles.
+    palette : pdgraster.Palette
+        Colors used to render the band.
+    value_range : tuple or callable
+        (min, max) values mapped to the first and last palette colors, or
+        a function of the z-level that returns one. Either end may be
+        None, in which case the min/max of the band across all inputs is
+        used.
+    nodata_val : float or None
+        Pixels with this value are also rendered with the nodata color
+        (in addition to pixels masked in the source GeoTIFFs).
+    """
+
+    name: str
+    palette: Palette = field(
+        default_factory=lambda: Palette(DEFAULT_COLORS, DEFAULT_NODATA_COLOR)
+    )
+    value_range: Union[ValueRange, Callable[[int], ValueRange]] = (None, None)
+    nodata_val: Optional[float] = None
+
+    def range_for_z(self, z: int) -> ValueRange:
+        vr = self.value_range(z) if callable(self.value_range) else self.value_range
+        return tuple(vr) if vr is not None else (None, None)
 
 
-def _ensure_palette(
-    colors: Optional[Union[Sequence[str], str]],
-    nodata_color: Optional[str],
-    reverse: bool = False,
-) -> Palette:
-    colors = colors or DEFAULT_COLORS
-    nodata_color = nodata_color or DEFAULT_NODATA_COLOR
-
-    if isinstance(colors, str):
-        cmap: Colormap = getattr(cmaps, colors)
-        if reverse:
-            cmap = Colormap(cmap.reversed().colors)
-        return Palette(cmap, nodata_color)
-
-    cols = list(colors)
-    if reverse:
-        cols.reverse()
-    return Palette(cols, nodata_color)
-
-
-def _band_names_from_reader(reader: Reader) -> List[str]:
-    count = reader.dataset.count
-    names: List[str] = []
-
-    try:
-        for b in range(1, count + 1):
-            tags = reader.dataset.tags(b)
-            names.append(tags.get("NAME") or tags.get("BANDNAME") or f"band_{b}")
-    except Exception:
-        names = [f"band_{b}" for b in range(1, count + 1)]
-
+def _band_names(dataset) -> List[str]:
+    """Band names from GeoTIFF tags/descriptions, falling back to band_<i>."""
+    names = []
+    for b in range(1, dataset.count + 1):
+        tags = dataset.tags(b)
+        desc = dataset.descriptions[b - 1]
+        names.append(tags.get("NAME") or tags.get("BANDNAME") or desc or f"band_{b}")
     return names
 
 
-def tiles_covering_bounds(
-    tms: TileMatrixSet,
-    bounds: Sequence[float],
-    z: int,
-):
-    w, s, e, n = bounds
-    return tms.tiles(w, s, e, n, [z])
+def compute_global_range(
+    tif_paths: Sequence[str], bidx: int, exclude: Optional[float] = None
+) -> ValueRange:
+    """
+    Approximate min and max of one band across several GeoTIFFs.
+
+    Each file is read decimated (largest side at most RANGE_SAMPLE_SIZE
+    pixels) with its nodata/mask applied.
+
+    Parameters
+    ----------
+    tif_paths : list of str
+        The GeoTIFFs.
+    bidx : int
+        1-based band index.
+    exclude : float, optional
+        A value to ignore (e.g. a configured nodata value).
+
+    Returns
+    -------
+    tuple
+        (min, max), or (None, None) if the band has no valid pixels.
+    """
+    mins, maxs = [], []
+    for path in tif_paths:
+        with rasterio.open(path) as src:
+            scale = max(1.0, max(src.width, src.height) / RANGE_SAMPLE_SIZE)
+            shape = (max(1, int(src.height / scale)), max(1, int(src.width / scale)))
+            data = src.read(
+                bidx, out_shape=shape, masked=True, resampling=Resampling.nearest
+            ).astype("float64")
+        data = np.ma.masked_invalid(data)
+        if exclude is not None:
+            data = np.ma.masked_equal(data, exclude)
+        if data.count():
+            mins.append(float(data.min()))
+            maxs.append(float(data.max()))
+    if not mins:
+        return (None, None)
+    return (min(mins), max(maxs))
+
+
+def _bounds_intersect(a, b) -> bool:
+    return a[0] < b[2] and a[2] > b[0] and a[1] < b[3] and a[3] > b[1]
 
 
 def generate_tiles_from_tif(
-    tif_path: Union[str, Path, List[Union[str, Path]]],
-    out_dir: Union[str, Path],
+    tif_paths: Union[str, Sequence[str]],
+    path_for: PathFor,
     *,
-    tms_id: str = "WGS1984Quad",
+    tms: TileMatrixSet,
     min_z: int = 0,
     max_z: int = 13,
-    colors: Optional[Union[Sequence[str], str]] = None,
-    nodata_color: Optional[str] = None,
-    reverse_palette: bool = False,
-    min_value: Optional[float] = None,
-    max_value: Optional[float] = None,
-    style_prefix: Optional[str] = None,
-    nodata_val_fallback: float = np.nan,
+    styles: Optional[Sequence[BandStyle]] = None,
+    pixel_selection: Union[type, MosaicMethodBase] = FirstMethod,
+    tilesize: int = 256,
     save_tiff: bool = True,
+    overwrite: bool = True,
 ) -> List[str]:
+    """
+    Create web tiles from GeoTIFFs for every tile of ``tms`` that the
+    inputs cover, from ``max_z`` down to ``min_z``.
 
-    if isinstance(tif_path, (str, Path)):
-        tif_list = [str(tif_path)]
-    else:
-        tif_list = [str(p) for p in tif_path]
+    Parameters
+    ----------
+    tif_paths : str or list of str
+        GeoTIFF(s) to tile. All must have a CRS and the same band count.
+    path_for : callable
+        ``path_for(tile, kind, style)`` returns the output path for a
+        tile, where kind is "web_tiles" (with a style name) or "geotiff"
+        (style is None).
+    tms : morecantile.TileMatrixSet
+        The tiling scheme of the output.
+    min_z, max_z : int
+        The range of z-levels to create.
+    styles : list of BandStyle, optional
+        How to render each band; band i uses styles[i]. Bands beyond the
+        number of styles are not rendered. If None, every band is rendered
+        with the default palette, named from its band tags.
+    pixel_selection : MosaicMethod
+        How to choose a pixel where inputs overlap. Defaults to the first
+        input (in order) that has a valid pixel.
+    tilesize : int
+        Width and height of output tiles in pixels.
+    save_tiff : bool
+        Also write a float32 GeoTIFF per tile (all bands, in the TMS CRS).
+    overwrite : bool
+        If False, skip tiles whose outputs already exist.
 
-    tif_list = [p for p in tif_list if p.lower().endswith(".tif")]
+    Returns
+    -------
+    list of str
+        Paths of the web tiles that were written.
+    """
+    tif_list = [str(tif_paths)] if isinstance(tif_paths, str) else [str(p) for p in tif_paths]
+    if not tif_list:
+        raise ValueError("No GeoTIFFs passed to generate_tiles_from_tif")
 
-    if len(tif_list) == 0:
-        raise ValueError("No TIFF files passed to generate_tiles_from_tif")
+    asset_bounds = {}
+    band_count = None
+    src_nodata = None
+    band_names: List[str] = []
+    for path in tif_list:
+        with Reader(path, tms=tms) as r:
+            if r.crs is None:
+                raise ValueError(f"GeoTIFF has no CRS: {path}")
+            if band_count is None:
+                band_count = r.dataset.count
+                src_nodata = r.dataset.nodata
+                band_names = _band_names(r.dataset)
+            elif r.dataset.count != band_count:
+                raise ValueError(
+                    f"All GeoTIFFs must have the same number of bands; {path} has "
+                    f"{r.dataset.count}, expected {band_count}"
+                )
+            # Bounds in the TMS's geographic CRS, as tms.tiles() expects
+            asset_bounds[path] = transform_bounds(
+                r.crs, tms.rasterio_geographic_crs, *r.bounds, densify_pts=21
+            )
 
-    for p in tif_list:
-        if not Path(p).is_file():
-            raise FileNotFoundError(f"GeoTIFF not found: {p}")
+    if styles is None:
+        styles = [BandStyle(name=n) for n in band_names]
+    if len(styles) != band_count:
+        logger.warning(
+            f"Inputs have {band_count} band(s) but {len(styles)} style(s) were "
+            f"given; rendering the first {min(band_count, len(styles))}."
+        )
+    styles = list(styles)[:band_count]
 
-    web_root = Path(out_dir)
-    png_root = web_root / "png"
-    tif_root = web_root / "tiff"
+    # Fill unset ends of each style's value range from the data itself so
+    # every tile uses the same stretch.
+    data_ranges = {}
 
-    png_root.mkdir(parents=True, exist_ok=True)
-    if save_tiff:
-        tif_root.mkdir(parents=True, exist_ok=True)
+    def range_for(i: int, z: int) -> ValueRange:
+        lo, hi = styles[i].range_for_z(z)
+        if lo is None or hi is None:
+            if i not in data_ranges:
+                data_ranges[i] = compute_global_range(
+                    tif_list, i + 1, exclude=styles[i].nodata_val
+                )
+            dlo, dhi = data_ranges[i]
+            lo = dlo if lo is None else lo
+            hi = dhi if hi is None else hi
+        return lo, hi
 
-    tms = morecantile.tms.get(tms_id)
-    palette = _ensure_palette(colors, nodata_color, reverse_palette)
+    w = min(b[0] for b in asset_bounds.values())
+    s = min(b[1] for b in asset_bounds.values())
+    e = max(b[2] for b in asset_bounds.values())
+    n = max(b[3] for b in asset_bounds.values())
+
+    def _tile_reader(asset: str, x: int, y: int, z: int, **kwargs):
+        with Reader(asset, tms=tms) as src:
+            return src.tile(x, y, z, tilesize=tilesize, **kwargs)
+
+    tiff_nodata = src_nodata if src_nodata is not None else np.nan
     written: List[str] = []
 
-    with Reader(tif_list[0]) as meta_reader:
-        if meta_reader.crs is None:
-            raise ValueError("Input TIFFs must have valid CRS")
-
-        band_count = meta_reader.dataset.count
-        band_names = _band_names_from_reader(meta_reader)
-        ds_nodata = meta_reader.dataset.nodata
-        nodata_val = ds_nodata if ds_nodata is not None else nodata_val_fallback
-
-    all_bounds = []
-    for asset in tif_list:
-        with Reader(asset) as r:
-            b = getattr(r, "geographic_bounds", r.bounds)
-            all_bounds.append(b)
-
-    w = min(b[0] for b in all_bounds)
-    s = min(b[1] for b in all_bounds)
-    e = max(b[2] for b in all_bounds)
-    n = max(b[3] for b in all_bounds)
-    bounds = (w, s, e, n)
-
-    def _tif_tiler(asset: str, x: int, y: int, z: int, **kwargs):
-        with Reader(asset) as src:
-            return src.tile(x, y, z, **kwargs)
-
     for z in range(max_z, min_z - 1, -1):
-        for tile in tiles_covering_bounds(tms, bounds, z):
-            x = int(tile.x)
-            y = int(tile.y)
-            z_int = int(z)
+        for tile in tms.tiles(w, s, e, n, [z]):
+            web_paths = [path_for(tile, "web_tiles", st.name) for st in styles]
+            tif_out = path_for(tile, "geotiff", None) if save_tiff else None
+            if not overwrite and all(
+                os.path.isfile(p) for p in web_paths + ([tif_out] if tif_out else [])
+            ):
+                continue
+
+            tile_bounds = tms.bounds(tile)
+            assets = [a for a in tif_list if _bounds_intersect(asset_bounds[a], tile_bounds)]
+            if not assets:
+                continue
 
             try:
-                img, assets_used = mosaic_reader(
-                    tif_list,
-                    _tif_tiler,
-                    x,
-                    y,
-                    z_int,
-                    pixel_selection=HighestMethod(),
+                img, _ = mosaic_reader(
+                    assets,
+                    _tile_reader,
+                    tile.x,
+                    tile.y,
+                    tile.z,
+                    pixel_selection=pixel_selection,
                 )
-            except (TileOutsideBounds, PointOutsideBounds):
+            except (TileOutsideBounds, PointOutsideBounds, EmptyMosaicError):
                 continue
-            arr = img.data.astype("float32", copy=False)
-            mask = img.mask.astype("uint8")
-            arr = np.where(mask == 0, np.nan, arr)
 
-            if save_tiff:
-                left, bottom, right, top = tms.xy_bounds(tile)
-                _, height, width = arr.shape
-                transform = from_bounds(left, bottom, right, top, width, height)
-                arr_tif = np.where(np.isnan(arr), nodata_val, arr)
+            arr = np.ma.masked_invalid(img.array.astype("float32"))
+            invalid = np.ma.getmaskarray(arr)
+            if invalid.all():
+                continue
 
-                tif_rel = Path(tms_id) / str(z_int) / str(x) / f"{y}.tif"
-                tif_path_tile = tif_root / tif_rel
-                tif_path_tile.parent.mkdir(parents=True, exist_ok=True)
+            if tif_out:
+                _write_tile_tiff(tif_out, arr, invalid, tms, tile, tiff_nodata)
 
-                profile = {
-                    "driver": "GTiff",
-                    "height": height,
-                    "width": width,
-                    "count": band_count,
-                    "dtype": "float32",
-                    "crs": meta_reader.dataset.crs,
-                    "transform": transform,
-                    "nodata": nodata_val,
-                }
-
-                with rasterio.open(tif_path_tile, "w", **profile) as dst:
-                    dst.write(arr_tif)
-
-            # Save PNG tiles by band
-            for b in range(band_count):
-                band = arr[b]
-
-                if min_value is None or max_value is None:
-                    if not np.isfinite(band).any():
-                        continue
-                    bmin = float(np.nanmin(band))
-                    bmax = float(np.nanmax(band))
-                    if bmin == bmax:
-                        continue
-                else:
-                    bmin, bmax = float(min_value), float(max_value)
-
-                masked = np.ma.masked_invalid(band)
-
-                web_img = WebImage(
-                    image_data=masked.filled(nodata_val),
-                    palette=palette,
-                    min_val=bmin,
-                    max_val=bmax,
-                    nodata_val=nodata_val,
-                )
-
-                style = style_prefix or band_names[b]
-                png_rel = Path(style) / tms_id / str(z_int) / str(x) / f"{y}.png"
-                png_path = png_root / png_rel
-                png_path.parent.mkdir(parents=True, exist_ok=True)
-
-                web_img.save(str(png_path))
-                written.append(str(png_path))
+            for i, style in enumerate(styles):
+                band_invalid = invalid[i]
+                if style.nodata_val is not None:
+                    band_invalid = band_invalid | (arr.data[i] == style.nodata_val)
+                if band_invalid.all():
+                    continue
+                fill = style.nodata_val if style.nodata_val is not None else NODATA_SENTINEL
+                band = np.where(band_invalid, fill, arr.data[i]).astype("float64")
+                lo, hi = range_for(i, z)
+                WebImage(
+                    image_data=band,
+                    palette=style.palette,
+                    min_val=lo,
+                    max_val=hi,
+                    nodata_val=fill,
+                ).save(web_paths[i])
+                written.append(web_paths[i])
 
     return written
+
+
+def _write_tile_tiff(path, arr, invalid, tms, tile, nodata):
+    """Write all bands of one tile as a float32 GeoTIFF in the TMS CRS."""
+    left, bottom, right, top = tms.xy_bounds(tile)
+    count, height, width = arr.shape
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    profile = {
+        "driver": "GTiff",
+        "height": height,
+        "width": width,
+        "count": count,
+        "dtype": "float32",
+        "crs": tms.rasterio_crs,
+        "transform": from_bounds(left, bottom, right, top, width, height),
+        "nodata": nodata,
+    }
+    with rasterio.open(path, "w", **profile) as dst:
+        dst.write(np.where(invalid, nodata, arr.data).astype("float32"))

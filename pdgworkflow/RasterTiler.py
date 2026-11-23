@@ -11,14 +11,11 @@ import pdgstaging
 import pyarrow as pa
 import pyarrow.parquet as pq
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
-
 
 from pdgraster import Raster
 from pdgraster import Palette
 from pdgraster import WebImage
-from .TifToWebTiles import generate_tiles_from_tif
-
+from .TifToWebTiles import TIF_EXTENSIONS, BandStyle, generate_tiles_from_tif
 
 logger = logging.getLogger(__name__)
 
@@ -760,57 +757,117 @@ class RasterTiler:
                 parquet_path,
                 compression="snappy",
             )
-
-    def webtiles_from_external_tifs(self, tif_paths=None):
-
-        tms_id = self.config.get("tms_id")
-        min_z = self.config.get_min_z()
-        max_z = self.config.get_max_z()
-        web_dir = self.tiles.base_dirs["web_tiles"]["path"]
-
-        pals = self.config.get_palettes()
-        if pals:
-            colors = pals[0][0]
-        else:
-            colors = ["#000000", "#c2e699", "#78c679", "#238443", "#004529"]
-
-        nodata_color = self.config.get("nodata_color") or "#ffffff00"
-        reverse_palette_cfg = self.config.get("external_reverse_palette")
-        reverse_palette = bool(reverse_palette_cfg) if reverse_palette_cfg is not None else False
-
-        if tif_paths is None:
-            base = self.config.get("dir_input") or "."
-            ext = self.config.get("input_file_ext") or ".tif"
-            paths = [str(p) for p in Path(base).rglob(f"*{ext}")]
-        elif isinstance(tif_paths, dict):
-            base = tif_paths["path"]
-            ext = tif_paths.get("ext", ".tif")
-            paths = [str(p) for p in Path(base).rglob(f"*{ext}")]
-        elif isinstance(tif_paths, str):
-            if os.path.isdir(tif_paths):
-                paths = [str(p) for p in Path(tif_paths).rglob("*.tif")]
-            else:
-                paths = [tif_paths]
-        else:
-            paths = list(tif_paths)
-
-        if len(paths) == 0:
-            raise ValueError("No TIFF files found.")
-        
-        generate_tiles_from_tif(
-            tif_path=paths,
-            out_dir=web_dir,
-            tms_id=tms_id,
-            min_z=min_z,
-            max_z=max_z,
-            colors=colors,
-            nodata_color=nodata_color,
-            reverse_palette=reverse_palette,
-            min_value=None,
-            max_value=None
-        )
             del df
             gc.collect()
+
+    def tiles_from_geotiffs(self, tif_paths=None, overwrite=None):
+        """
+        Create web tiles (and per-tile GeoTIFFs) directly from existing
+        GeoTIFFs, skipping staging and rasterization.
+
+        Band *i* of the inputs is rendered with the config's
+        ``statistics[i]`` (name → web tile style, palette, val_range and
+        nodata_val). Unset ends of a val_range are filled with the
+        min/max across all inputs so that colors are consistent between
+        tiles. Outputs are written with the TilePathManager, so they use
+        the same layout as the rest of the workflow.
+
+        Parameters
+        ----------
+        tif_paths : str, list of str, dict or None
+            The GeoTIFFs to tile. None (default) searches ``dir_input``
+            for files with extension ``ext_input`` (falls back to
+            .tif/.tiff when ``ext_input`` isn't a GeoTIFF extension). A
+            directory string is searched for .tif/.tiff files. A dict
+            with ``path`` and optional ``ext`` keys is searched like
+            ``dir_input``.
+        overwrite : bool or None
+            Whether to regenerate tiles that already exist. Defaults to
+            the config's ``overwrite`` value.
+
+        Returns
+        -------
+        list of str
+            Paths of the web tiles that were written.
+        """
+        paths = self._find_input_geotiffs(tif_paths)
+        if overwrite is None:
+            overwrite = bool(self.config.get("overwrite"))
+
+        stats = self.config.get_stat_names()
+        nodata_vals = self.config.get_nodata_vals()
+        config = self.config
+
+        def make_range(stat):
+            def value_range(z):
+                return (
+                    config.get_min(stat=stat, z=z, sub_general=True),
+                    config.get_max(stat=stat, z=z, sub_general=True),
+                )
+
+            return value_range
+
+        styles = [
+            BandStyle(
+                name=stat,
+                palette=self.palettes[i],
+                value_range=make_range(stat),
+                nodata_val=nodata_vals[i],
+            )
+            for i, stat in enumerate(stats)
+        ]
+
+        def path_for(tile, kind, style=None):
+            return self.tiles.path_from_tile(tile, base_dir=kind, style=style)
+
+        tile_size = self.config.get("tile_size") or (256, 256)
+
+        logger.info(f"Tiling {len(paths)} input GeoTIFF(s)")
+        written = generate_tiles_from_tif(
+            paths,
+            path_for,
+            tms=self.tiles.tms,
+            min_z=self.config.get_min_z(),
+            max_z=self.config.get_max_z(),
+            styles=styles,
+            tilesize=int(tile_size[0]),
+            save_tiff=True,
+            overwrite=overwrite,
+        )
+        logger.info(f"Finished GeoTIFF tiling: {len(written)} web tiles written")
+        return written
+
+    def _find_input_geotiffs(self, tif_paths=None):
+        """
+        Resolve the ``tif_paths`` argument of
+        ``tiles_from_geotiffs`` to a sorted list of file paths.
+        """
+        if tif_paths is None:
+            base = self.config.get("dir_input")
+            ext = self.config.get("ext_input")
+            exts = (ext,) if ext and ext.lower() in TIF_EXTENSIONS else TIF_EXTENSIONS
+        elif isinstance(tif_paths, dict):
+            base = tif_paths["path"]
+            ext = tif_paths.get("ext")
+            exts = (ext,) if ext else TIF_EXTENSIONS
+        elif isinstance(tif_paths, (str, Path)) and os.path.isdir(tif_paths):
+            base, exts = tif_paths, TIF_EXTENSIONS
+        elif isinstance(tif_paths, (str, Path)):
+            return [str(tif_paths)]
+        else:
+            return [str(p) for p in tif_paths]
+
+        exts = {e.lower() for e in exts}
+        paths = sorted(
+            str(p)
+            for p in Path(base).rglob("*")
+            if p.is_file() and p.suffix.lower() in exts
+        )
+        if not paths:
+            raise ValueError(
+                f"No GeoTIFFs with extension(s) {sorted(exts)} found in {base}"
+            )
+        return paths
 
     def rasterize_max_z_level(self, file_paths=None, overwrite=True):
         """

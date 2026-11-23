@@ -46,6 +46,29 @@ Set `enable_h3` to summarize the staged tiles (or the input files when staging i
 
 All `h3_*` options and their defaults are documented in `ConfigManager`; the algorithm is described in [viz-staging](https://github.com/PermafrostDiscoveryGateway/viz-staging/blob/develop/docs/h3_summaries_algorithm.md).
 
+## Tiling GeoTIFF inputs
+
+Set `enable_geotiff_tiling` to tile GeoTIFFs in `dir_input` directly, without staging or rasterizing vectors. `run_workflow()` writes PNG web tiles to `dir_web_tiles` and a float32 GeoTIFF per tile to `dir_geotiff`, using the same `tms_id`, `z_range` and `tile_path_structure` as the rest of the workflow, then generates `WMTSCapabilities.xml`. `WorkflowManager(config).run_geotiff_tiling()` runs this step alone.
+
+The GeoTIFFs can be in any CRS and can overlap or have gaps between them. Every location with valid data in any input appears in the tiles. Where inputs overlap, each pixel takes its value from the first file (in path order) that has valid data there; values from the other files at that pixel are not used. To control which file wins, name the files accordingly or pass an ordered list to `run_geotiff_tiling(tif_paths=[...])`.
+
+Band *i* of the inputs is rendered with `statistics[i]`: its `name` is the web tile style, and its `palette`, `val_range` (including `z_config`) and `nodata_val` are applied. Leave an end of `val_range` as `null` to use the min/max across all inputs. Pixels that are masked or equal to the GeoTIFF's nodata value are transparent. Turn off the operations you don't need:
+
+```json
+{
+  "enable_geotiff_tiling": true,
+  "dir_input": "input",
+  "ext_input": ".tif",
+  "enable_stager": false,
+  "enable_raster": false,
+  "enable_3dtiles": false,
+  "z_range": [0, 10],
+  "statistics": [
+    {"name": "temperature", "val_range": [-20, null], "palette": ["#440154", "#21918c", "#fde725"], "nodata_val": null}
+  ]
+}
+```
+
 ## Usage
 
 Requires Python version `3.11` or `3.12`.
