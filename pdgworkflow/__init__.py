@@ -2,10 +2,18 @@
 
 __author__ = """Matthew B. Jones"""
 __email__ = "jones@nceas.ucsb.edu"
-__version__ = "0.1.0"
+__version__ = "1.1.0"
 
 from .StagedTo3DConverter import StagedTo3DConverter
 from .ConfigManager import ConfigManager
 from .RasterTiler import RasterTiler
 from .WMTSCapabilitiesGenerator import WMTSCapabilitiesGenerator
 from .WorkflowManager import WorkflowManager
+
+__all__ = [
+    "StagedTo3DConverter",
+    "ConfigManager",
+    "RasterTiler",
+    "WMTSCapabilitiesGenerator",
+    "WorkflowManager",
+]

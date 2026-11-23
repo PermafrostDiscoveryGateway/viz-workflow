@@ -116,7 +116,7 @@ class WMTSCapabilitiesGenerator:
         self.tms_object = morecantile.tms.get(self.tile_matrix_set_id)
         self.top_left_corner = f"{self.tms_object.bbox.left} {self.tms_object.bbox.top}"
 
-        if bounding_box == None:
+        if bounding_box is None:
             self.bounding_box = {
                 "left": self.tms_object.bbox.left,
                 "bottom": self.tms_object.bbox.bottom,
