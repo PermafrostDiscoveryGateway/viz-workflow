@@ -765,12 +765,14 @@ class RasterTiler:
         Create web tiles (and per-tile GeoTIFFs) directly from existing
         GeoTIFFs, skipping staging and rasterization.
 
-        Band *i* of the inputs is rendered with the config's
-        ``statistics[i]`` (name → web tile style, palette, val_range and
-        nodata_val). Unset ends of a val_range are filled with the
-        min/max across all inputs so that colors are consistent between
-        tiles. Outputs are written with the TilePathManager, so they use
-        the same layout as the rest of the workflow.
+        Works tile by tile, from max_z down to min_z. Each tile is read
+        once (all bands) from the inputs and written as one GeoTIFF; then
+        band *i* is rendered to a PNG using the config's ``statistics[i]``
+        (name → web tile style, plus its palette, val_range and
+        nodata_val). Unset ends of a val_range are filled once per band
+        with the min/max across all inputs, so colors are consistent
+        between tiles. Outputs are written with the TilePathManager, so
+        they use the same layout as the rest of the workflow.
 
         Parameters
         ----------
