@@ -395,6 +395,16 @@ class ConfigManager:
             Whether to create parent tiles for web tiles by resampling
             child tiles. Parent tiles provide lower resolution versions
             for pyramid tiling. Defaults to True.
+        - enable_geotiff_tiling : bool
+            Whether to tile the GeoTIFFs (PNG web tiles plus per-tile GeoTIFFs)
+            found in ``dir_input`` (with extension ``ext_input``, e.g.
+            ".tif"), skipping staging and rasterization. Band *i* of the
+            input is rendered as ``statistics[i]``: its name is the web
+            tile style, and its palette, val_range (including z_config)
+            and nodata_val are applied. Unset val_range ends are filled
+            with the min/max across all inputs, so colors are consistent
+            across tiles. Pixels masked or equal to the GeoTIFF's nodata
+            value are transparent. Defaults to False.
 
     Example config:
     ---------------
@@ -536,6 +546,7 @@ class ConfigManager:
         "enable_raster_parents": True,
         "enable_web_tiles_parents": True,
         "generate_wmtsCapabilities": True,
+        "enable_geotiff_tiling": False,
     }
 
     tiling_scheme_map = {
@@ -1660,6 +1671,18 @@ class ConfigManager:
     
     def is_h3_enabled(self) -> bool:
      return bool(self.get("enable_h3"))
+
+    def is_geotiff_tiling_enabled(self) -> bool:
+        """
+        Check if web tiles should be generated directly from existing
+        GeoTIFFs in ``dir_input`` (skipping staging and rasterization).
+
+        Returns
+        -------
+        bool
+            Whether GeoTIFF tiling is enabled.
+        """
+        return bool(self.get("enable_geotiff_tiling"))
 
     @staticmethod
     def to_hex(color_str):

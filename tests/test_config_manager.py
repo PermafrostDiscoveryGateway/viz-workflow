@@ -8,6 +8,14 @@ def test_defaults_are_valid_without_a_config_file():
     assert WorkflowManager().config.get("dir_input") == "input"
 
 
+def test_geotiff_tiling_flag_defaults_off_and_is_bool():
+    assert ConfigManager().is_geotiff_tiling_enabled() is False
+    assert (
+        ConfigManager({"enable_geotiff_tiling": 1}).is_geotiff_tiling_enabled()
+        is True
+    )
+
+
 def test_staging_options_come_straight_from_config():
     config = ConfigManager(
         {"tms_id": "WebMercatorQuad", "z_range": (2, 5), "input_crs": "EPSG:4326"}
